@@ -1,0 +1,12 @@
+{
+  "library": {
+    "name": "TontooUI",
+    "description": "SwiftUI-inspired declarative UI layer for TontooOS"
+  },
+  "elements": {
+    "text_input": {
+      "name": "Text Input",
+      "placeholder_default": "Enter text..."
+    }
+  }
+}

@@ -1,0 +1,18 @@
+[package]
+name = "tontooui"
+version = "26.1.0"
+edition = "2021"
+license = "TCL"
+description = "SwiftUI-inspired declarative UI layer for TontooOS, built on top of TontooUIKit"
+readme = "README.md"
+keywords = ["tontoo", "ui", "swiftui", "declarative", "gtk4"]
+categories = ["gui"]
+
+[dependencies]
+uikit = { path = "../UIKit" }
+gtk = { package = "gtk4", version = "0.9", features = ["v4_12"] }
+glib = "0.20"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
