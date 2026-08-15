@@ -15,6 +15,8 @@ TontooUI is a SwiftUI-inspired declarative UI layer for TontooOS, built on top o
 | TextInput | [TextInput.md](TextInput.md) | Single-line text input field |
 | WheelPicker | [WheelPicker.md](WheelPicker.md) | macOS/iOS scroll wheel picker |
 | Slider | [Slider.md](Slider.md) | Spring-physics slider with pill thumb |
+| ProgressView | [ProgressView.md](ProgressView.md) | Loading indicator: spinner or progress ring |
+| Sidebar | [Sidebar.md](Sidebar.md) | macOS-style sidebar with traffic lights, search, items |
 
 ## Quick Start
 
@@ -44,6 +46,8 @@ tontooui (SwiftUI-style layer)
  +-- TextInput       (placeholder, password, on_change, on_submit)
  +-- WheelPicker     (spring physics, snap-to-center, 3D fade)
  +-- Slider          (spring physics, pill thumb, grow/squish)
+ +-- ProgressView    (indeterminate spinner / determinate ring)
+ +-- Sidebar         (traffic lights, search, selectable item list)
  |
  +-- uikit (backend)
       +-- View, Widget, ViewContent
@@ -57,3 +61,5 @@ tontooui (SwiftUI-style layer)
 - [TextInput.md](TextInput.md) -- text input element
 - [WheelPicker.md](WheelPicker.md) -- scroll wheel picker
 - [Slider.md](Slider.md) -- spring-physics slider
+- [ProgressView.md](ProgressView.md) -- loading indicator
+- [Sidebar.md](Sidebar.md) -- sidebar with traffic lights and item list

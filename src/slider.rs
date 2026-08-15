@@ -121,6 +121,7 @@ pub struct Slider {
     initial_value: f32,
     step: f32,
     accent_color: Color,
+    track_color: Color,
     label: Option<String>,
     width: f32,
     on_change: Option<Arc<dyn Fn(f32) + Send + Sync>>,
@@ -131,12 +132,14 @@ pub struct Slider {
 impl Slider {
     pub fn new(min: f32, max: f32) -> Self {
         Self { id: next_widget_id(), min, max, initial_value: min, step: 0.0,
-            accent_color: Color::new(0.016, 0.525, 0.941, 1.0), label: None, width: 300.0,
+            accent_color: Color::new(0.016, 0.525, 0.941, 1.0), track_color: Color::from_rgb(51, 51, 51),
+            label: None, width: 300.0,
             on_change: None, position_mode: PositionMode::Auto, position: Position::new() }
     }
     pub fn value(mut self, v: f32) -> Self { self.initial_value = v; self }
     pub fn step(mut self, s: f32) -> Self { self.step = s; self }
     pub fn accent_color(mut self, c: Color) -> Self { self.accent_color = c; self }
+    pub fn track_color(mut self, c: Color) -> Self { self.track_color = c; self }
     pub fn label(mut self, l: impl Into<String>) -> Self { self.label = Some(l.into()); self }
     pub fn width(mut self, w: f32) -> Self { self.width = w; self }
     pub fn on_change(mut self, h: impl Fn(f32) + Send + Sync + 'static) -> Self { self.on_change = Some(Arc::new(h)); self }
@@ -163,6 +166,9 @@ impl ViewContent for Slider {
         let accent = self.accent_color;
         let accent_hex = format!("#{:02x}{:02x}{:02x}",
             (accent.r * 255.0) as u8, (accent.g * 255.0) as u8, (accent.b * 255.0) as u8);
+        let track = self.track_color;
+        let track_hex = format!("#{:02x}{:02x}{:02x}",
+            (track.r * 255.0) as u8, (track.g * 255.0) as u8, (track.b * 255.0) as u8);
 
         let container = gtk::Box::new(Orientation::Vertical, 8);
         container.set_width_request(w as i32);
@@ -171,7 +177,7 @@ impl ViewContent for Slider {
             ".sl-c {{ background: transparent; }}
              .sl-lbl {{ color: rgba(255,255,255,0.6); font-family: 'SF Pro Display'; font-size: 13px; }}
              .sl-val {{ color: {accent_hex}; font-family: 'SF Pro Display'; font-size: 28px; font-weight: 600; }}
-             .sl-track {{ background: #333; border-radius: 3px; min-height: 4px; }}
+             .sl-track {{ background: {track_hex}; border-radius: 3px; min-height: 4px; }}
              .sl-fill {{ background: {accent_hex}; border-radius: 3px; min-height: 4px; }}
              .sl-thumb {{ background: white; border-radius: 15px; min-width: 30px; min-height: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }}"
         );
@@ -217,7 +223,6 @@ impl ViewContent for Slider {
         thumb.set_width_request(30); thumb.set_height_request(20);
         thumb.set_halign(gtk::Align::Start);
         thumb.set_valign(gtk::Align::Center);
-        thumb.set_margin_top(5);
         thumb.add_css_class("sl-thumb");
         track_bar.add_overlay(&thumb);
 
@@ -365,10 +370,12 @@ mod tests {
 
     #[test]
     fn slider_builder() {
-        let s = Slider::new(0.0, 100.0).value(50.0).step(1.0).label("Vol");
+        let s = Slider::new(0.0, 100.0).value(50.0).step(1.0).label("Vol")
+            .track_color(Color::from_rgb(10, 20, 30));
         assert_eq!(s.min, 0.0);
         assert_eq!(s.max, 100.0);
         assert_eq!(s.initial_value, 50.0);
+        assert_eq!(s.track_color, Color::from_rgb(10, 20, 30));
     }
 
     #[test]

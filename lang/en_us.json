@@ -7,6 +7,12 @@
     "text_input": {
       "name": "Text Input",
       "placeholder_default": "Enter text..."
+    },
+    "progress_view": {
+      "name": "Loading Indicator"
+    },
+    "sidebar": {
+      "name": "Sidebar"
     }
   }
 }

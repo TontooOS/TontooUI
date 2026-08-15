@@ -17,7 +17,8 @@ Creates a new slider with the given range.
 | `value` | `value(self, v: f32) -> Self` | Set initial value |
 | `step` | `step(self, s: f32) -> Self` | Set step increment |
 | `label` | `label(self, l: impl Into<String>) -> Self` | Set header label |
-| `accent_color` | `accent_color(self, c: Color) -> Self` | Set fill/thumb color |
+| `accent_color` | `accent_color(self, c: Color) -> Self` | Set the fill bar and value label color (thumb stays white) |
+| `track_color` | `track_color(self, c: Color) -> Self` | Set the track bar background color |
 | `width` | `width(self, w: f32) -> Self` | Set width |
 | `frame` | `frame(self, w: f32, h: f32) -> Self` | Set size |
 | `on_change` | `on_change(self, h: impl Fn(f32) + Send + Sync + 'static) -> Self` | Callback on value change |
@@ -49,6 +50,7 @@ let slider = Slider::new(0.0, 100.0)
     .step(1.0)
     .label("Volume")
     .accent_color(Color::new(0.016, 0.525, 0.941, 1.0))
+    .track_color(Color::from_rgb(51, 51, 51))
     .width(300.0)
     .on_change(|val| println!("Value: {}", val));
 ```

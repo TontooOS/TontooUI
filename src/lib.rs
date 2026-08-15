@@ -30,19 +30,25 @@
 //! | [`TextInput`] | Single-line text input field |
 //! | [`WheelPicker`] | macOS/iOS style scroll wheel picker |
 //! | [`Slider`] | Slider with spring physics and squish animation |
+//! | [`ProgressView`] | Loading indicator: spinner or progress ring |
+//! | [`Sidebar`] | macOS-style sidebar with traffic lights, search, and item list |
 
 pub mod text_input;
 pub mod wheel_picker;
 pub mod slider;
+pub mod progress_view;
+pub mod sidebar;
 
 pub use text_input::TextInput;
 pub use wheel_picker::WheelPicker;
 pub use slider::Slider;
+pub use progress_view::ProgressView;
+pub use sidebar::{Sidebar, SidebarIcon};
 
 pub const TONTOO_UI_VERSION: (u32, u32, u32) = (0, 1, 0);
 
 pub mod prelude {
-    pub use crate::{TextInput, WheelPicker, Slider, TONTOO_UI_VERSION};
+    pub use crate::{TextInput, WheelPicker, Slider, ProgressView, Sidebar, SidebarIcon, TONTOO_UI_VERSION};
 
     // Re-export UIKit types for convenience
     pub use uikit::prelude::*;

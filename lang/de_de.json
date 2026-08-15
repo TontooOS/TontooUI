@@ -7,6 +7,12 @@
     "text_input": {
       "name": "Texteingabe",
       "placeholder_default": "Text eingeben..."
+    },
+    "progress_view": {
+      "name": "Ladeanzeige"
+    },
+    "sidebar": {
+      "name": "Seitenleiste"
     }
   }
 }
