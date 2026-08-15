@@ -43,12 +43,16 @@ pub use text_input::TextInput;
 pub use wheel_picker::WheelPicker;
 pub use slider::Slider;
 pub use progress_view::ProgressView;
-pub use sidebar::{Sidebar, SidebarIcon};
+pub use sidebar::Sidebar;
+#[cfg(feature = "coreicon")]
+pub use sidebar::SidebarIcon;
 
 pub const TONTOO_UI_VERSION: (u32, u32, u32) = (0, 1, 0);
 
 pub mod prelude {
-    pub use crate::{TextInput, WheelPicker, Slider, ProgressView, Sidebar, SidebarIcon, TONTOO_UI_VERSION};
+    pub use crate::{TextInput, WheelPicker, Slider, ProgressView, Sidebar, TONTOO_UI_VERSION};
+    #[cfg(feature = "coreicon")]
+    pub use crate::SidebarIcon;
 
     // Re-export UIKit types for convenience
     pub use uikit::prelude::*;

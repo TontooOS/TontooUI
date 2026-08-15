@@ -1,25 +1,37 @@
 use tontooui::prelude::*;
+#[cfg(feature = "coreicon")]
+use tontooui::SidebarIcon;
 
 fn main() {
     let mut app = App::new("TontooUI Demo", 800, 600);
     app.no_window_bar();
 
+    #[cfg(feature = "coreicon")]
+    let sidebar = Sidebar::new()
+        .item("Wi-Fi", SidebarIcon::sf("wifi.circle.fill", Color::from_rgb(0, 122, 255)))
+        .item("Bluetooth", SidebarIcon::sf("antenna.radiowaves.left.and.right", Color::from_rgb(0, 122, 255)))
+        .item("Network", SidebarIcon::sf("globe", Color::from_rgb(0, 122, 255)))
+        .item("VPN", SidebarIcon::sf("lock.shield", Color::from_rgb(0, 122, 255)))
+        .item("Battery", SidebarIcon::sf("battery.100", Color::from_rgb(52, 199, 89)))
+        .item("General", SidebarIcon::sf("gearshape", Color::from_rgb(142, 142, 147)))
+        .item("Sound", SidebarIcon::sf_gradient("speaker.wave.2.fill",
+            coreicon::Gradient::linear_two(
+                coreicon::Color::new(1.0, 0.27, 0.23, 1.0),
+                coreicon::Color::new(1.0, 0.62, 0.04, 1.0))))
+        .selected(0)
+        .on_select(|i| println!("Sidebar selected: {}", i));
+
+    #[cfg(not(feature = "coreicon"))]
+    let sidebar = Sidebar::new()
+        .item("Wi-Fi", "wifi.circle.fill.png")
+        .item("Bluetooth", "antenna.radiowaves.left.and.right.png")
+        .selected(0)
+        .on_select(|i| println!("Sidebar selected: {}", i));
+
     app.set_root(
         HStack::new()
             .spacing(0.0)
-            .child(Sidebar::new()
-                .item("Wi-Fi", SidebarIcon::sf("wifi.circle.fill", Color::from_rgb(0, 122, 255)))
-                .item("Bluetooth", SidebarIcon::sf("antenna.radiowaves.left.and.right", Color::from_rgb(0, 122, 255)))
-                .item("Network", SidebarIcon::sf("globe", Color::from_rgb(0, 122, 255)))
-                .item("VPN", SidebarIcon::sf("lock.shield", Color::from_rgb(0, 122, 255)))
-                .item("Battery", SidebarIcon::sf("battery.100", Color::from_rgb(52, 199, 89)))
-                .item("General", SidebarIcon::sf("gearshape", Color::from_rgb(142, 142, 147)))
-                .item("Sound", SidebarIcon::sf_gradient("speaker.wave.2.fill",
-                    coreicon::Gradient::linear_two(
-                        coreicon::Color::new(1.0, 0.27, 0.23, 1.0),
-                        coreicon::Color::new(1.0, 0.62, 0.04, 1.0))))
-                .selected(0)
-                .on_select(|i| println!("Sidebar selected: {}", i)))
+            .child(sidebar)
             .child(VStack::new()
                 .spacing(16.0)
                 .child(Text::new("TontooUI Demo").font_size(24.0).bold())

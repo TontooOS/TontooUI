@@ -1,9 +1,12 @@
 //! Sidebar — macOS-style sidebar with traffic lights, search, and item list.
 //!
-//! Icons are generated at render time via CoreIcon. Specify a SF Symbol name
-//! and a color (or gradient) — the icon PNG is created automatically.
+//! With the `coreicon` feature (default), icons are generated at render time
+//! via CoreIcon. Specify a SF Symbol name and a color (or gradient) — the
+//! icon PNG is created automatically.
 //!
-//! ```rust,no_run
+//! Without `coreicon`, pass a PNG file path as a string.
+//!
+//! ```rust,ignore
 //! use tontooui::prelude::*;
 //!
 //! let sidebar = Sidebar::new()
@@ -32,6 +35,7 @@ use gtk::Orientation;
 // ═══════════════════════════════════════════════════════════════
 
 /// Icon source for a sidebar item — SF Symbol with solid color or gradient.
+#[cfg(feature = "coreicon")]
 pub enum SidebarIcon {
     /// SF Symbol with a solid background color and white foreground.
     Sf { symbol: String, color: Color },
@@ -39,6 +43,7 @@ pub enum SidebarIcon {
     SfGradient { symbol: String, gradient: coreicon::Gradient },
 }
 
+#[cfg(feature = "coreicon")]
 impl SidebarIcon {
     /// Create an icon from an SF Symbol name with a solid background color.
     pub fn sf(symbol: impl Into<String>, color: Color) -> Self {
@@ -137,6 +142,7 @@ impl SidebarIcon {
     }
 }
 
+#[cfg(feature = "coreicon")]
 fn to_ci(c: Color) -> coreicon::Color {
     coreicon::Color::new(c.r, c.g, c.b, c.a)
 }
@@ -147,12 +153,23 @@ fn to_ci(c: Color) -> coreicon::Color {
 
 pub struct SidebarItem {
     label: String,
+    #[cfg(feature = "coreicon")]
     icon: SidebarIcon,
+    #[cfg(not(feature = "coreicon"))]
+    icon_path: String,
 }
 
+#[cfg(feature = "coreicon")]
 impl SidebarItem {
     pub fn new(label: impl Into<String>, icon: SidebarIcon) -> Self {
         Self { label: label.into(), icon }
+    }
+}
+
+#[cfg(not(feature = "coreicon"))]
+impl SidebarItem {
+    pub fn new(label: impl Into<String>, icon: impl Into<String>) -> Self {
+        Self { label: label.into(), icon_path: icon.into() }
     }
 }
 
@@ -199,7 +216,15 @@ impl Sidebar {
     }
 
     /// Add a sidebar item with a `SidebarIcon` (SF Symbol + color/gradient).
+    #[cfg(feature = "coreicon")]
     pub fn item(mut self, label: impl Into<String>, icon: SidebarIcon) -> Self {
+        self.items.push(SidebarItem::new(label, icon));
+        self
+    }
+
+    /// Add a sidebar item with a PNG icon path.
+    #[cfg(not(feature = "coreicon"))]
+    pub fn item(mut self, label: impl Into<String>, icon: impl Into<String>) -> Self {
         self.items.push(SidebarItem::new(label, icon));
         self
     }
@@ -282,6 +307,7 @@ impl ViewContent for Sidebar {
             row.set_margin_end(14);
             row.set_valign(gtk::Align::Center);
 
+            #[cfg(feature = "coreicon")]
             match item.icon.to_path(i == sel) {
                 Some(path) => {
                     let img = gtk::Image::from_file(&path);
@@ -293,6 +319,12 @@ impl ViewContent for Sidebar {
                     placeholder.set_size_request(22, 22);
                     row.append(&placeholder);
                 }
+            }
+            #[cfg(not(feature = "coreicon"))]
+            {
+                let icon = gtk::Image::from_file(&item.icon_path);
+                icon.set_pixel_size(22);
+                row.append(&icon);
             }
 
             let label = GtkLabel::new(Some(&item.label));
@@ -358,18 +390,21 @@ impl Widget for Sidebar {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "coreicon")]
     #[test]
     fn sidebar_icon_sf() {
         let icon = SidebarIcon::sf("wifi.circle.fill", Color::from_rgb(0, 122, 255));
         assert!(icon.to_path(false).is_some());
     }
 
+    #[cfg(feature = "coreicon")]
     #[test]
     fn sidebar_icon_selected() {
         let icon = SidebarIcon::sf("wifi.circle.fill", Color::from_rgb(0, 122, 255));
         assert!(icon.to_path(true).is_some());
     }
 
+    #[cfg(feature = "coreicon")]
     #[test]
     fn sidebar_icon_gradient() {
         let g = coreicon::Gradient::linear_two(
@@ -378,10 +413,22 @@ mod tests {
         assert!(icon.to_path(false).is_some());
     }
 
+    #[cfg(feature = "coreicon")]
     #[test]
     fn sidebar_builder() {
         let sb = Sidebar::new()
             .item("Wi-Fi", SidebarIcon::sf("wifi.circle.fill", Color::from_rgb(0, 122, 255)))
+            .selected(0)
+            .width(220.0);
+        assert_eq!(sb.items.len(), 1);
+        assert_eq!(sb.selected, 0);
+    }
+
+    #[cfg(not(feature = "coreicon"))]
+    #[test]
+    fn sidebar_builder() {
+        let sb = Sidebar::new()
+            .item("Wi-Fi", "wifi.circle.fill.png")
             .selected(0)
             .width(220.0);
         assert_eq!(sb.items.len(), 1);
