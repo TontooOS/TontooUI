@@ -112,11 +112,10 @@ impl SidebarIcon {
         let mut canvas = coreicon::generator::IconCanvas::new()
             .background(bg)
             .corner_radius(220.0)
-            .padding(120.0)
             .layer(
                 coreicon::generator::Layer::new(coreicon::generator::LayerContent::icon(sf))
-                    .position(0.0, 0.0)
-                    .size(1024.0, 1024.0)
+                    .position(120.0, 120.0)
+                    .size(784.0, 784.0)
                     .tint(white),
             );
 
@@ -285,12 +284,19 @@ impl ViewContent for Sidebar {
         container.append(&tl.to_gtk());
 
         if self.show_search {
+            let search_outer = gtk::Box::new(Orientation::Vertical, 0);
+            search_outer.set_margin_top(6);
+            search_outer.set_margin_bottom(4);
+            search_outer.set_margin_start(14);
+            search_outer.set_margin_end(14);
+
             let entry = gtk::SearchEntry::new();
             entry.set_placeholder_text(Some(&self.search_placeholder));
-            let ecss = ".sb-search {{ background-color: rgba(255,255,255,0.08); border-radius: 8px; border: none; padding: 6px 10px; margin: 0 14px 8px 14px; font-family: 'SF Pro Display'; font-size: 13px; color: rgba(235,235,245,0.6); }}";
+            let ecss = ".sb-search {{ background-color: rgba(255,255,255,0.08); border-radius: 8px; border: none; padding: 4px 10px; min-height: 0px; font-family: 'SF Pro Display'; font-size: 13px; color: rgba(235,235,245,0.6); }}";
             uikit::widget::apply_css(&entry, ecss);
             entry.add_css_class("sb-search");
-            container.append(&entry);
+            search_outer.append(&entry);
+            container.append(&search_outer);
         }
 
         let items_box = gtk::Box::new(Orientation::Vertical, 0);

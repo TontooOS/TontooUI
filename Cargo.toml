@@ -9,8 +9,8 @@ keywords = ["tontoo", "ui", "swiftui", "declarative", "gtk4"]
 categories = ["gui"]
 
 [dependencies]
-uikit = { path = "../UIKit" }
-coreicon = { path = "../CoreIcon", optional = true }
+uikit = { path = "/Library/System/uikit" }
+coreicon = { path = "/Library/System/coreicon", optional = true }
 gtk = { package = "gtk4", version = "0.9", features = ["v4_12"] }
 glib = "0.20"
 cairo-rs = "0.20"
@@ -19,5 +19,8 @@ serde_json = "1"
 
 [features]
 default = ["coreicon"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [dev-dependencies]

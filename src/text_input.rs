@@ -52,7 +52,7 @@ impl TextInput {
             position_mode: PositionMode::Auto,
             position: Position::new(),
             width: 300.0,
-            height: 44.0,
+            height: 32.0,
         }
     }
 
@@ -143,14 +143,14 @@ impl ViewContent for TextInput {
         entry.set_visibility(!self.is_password);
         entry.set_sensitive(!self.is_disabled);
 
+        entry.set_hexpand(false);
+        entry.set_vexpand(false);
+        entry.set_halign(gtk::Align::Start);
+
         let w = if self.width > 0.0 { self.width } else { frame.width };
-        let h = if self.height > 0.0 { self.height } else { frame.height };
 
         if w > 0.0 {
             entry.set_width_request(w as i32);
-        }
-        if h > 0.0 {
-            entry.set_height_request(h as i32);
         }
 
         let accent_hex = format!(
@@ -169,7 +169,8 @@ impl ViewContent for TextInput {
                 color: #ececec;
                 border-radius: 8px;
                 border: 1px solid {border_color};
-                padding: 8px 12px;
+                padding: 4px 10px;
+                min-height: 0px;
                 font-family: 'SF Pro Display';
                 font-size: 13px;
                 caret-color: {accent};
@@ -210,7 +211,7 @@ impl ViewContent for TextInput {
     }
 
     fn size_that_fits(&self, _available: Size) -> Size {
-        Size::new(self.width, self.height)
+        Size::new(self.width, 0.0)
     }
 }
 
@@ -238,16 +239,13 @@ impl Widget for TextInput {
         entry.set_visibility(!self.is_password);
         entry.set_sensitive(!self.is_disabled);
 
+        entry.set_hexpand(false);
+        entry.set_vexpand(false);
+
         if let Some(w) = self.position.width {
             entry.set_width_request(w as i32);
         } else if self.width > 0.0 {
             entry.set_width_request(self.width as i32);
-        }
-
-        if let Some(h) = self.position.height {
-            entry.set_height_request(h as i32);
-        } else if self.height > 0.0 {
-            entry.set_height_request(self.height as i32);
         }
 
         let accent_hex = format!(
@@ -266,7 +264,8 @@ impl Widget for TextInput {
                 color: #ececec;
                 border-radius: 8px;
                 border: 1px solid {border_color};
-                padding: 8px 12px;
+                padding: 4px 10px;
+                min-height: 0px;
                 font-family: 'SF Pro Display';
                 font-size: 13px;
                 caret-color: {accent};
