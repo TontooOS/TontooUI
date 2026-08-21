@@ -18,6 +18,9 @@ fn main() {
             coreicon::Gradient::linear_two(
                 coreicon::Color::new(1.0, 0.27, 0.23, 1.0),
                 coreicon::Color::new(1.0, 0.62, 0.04, 1.0))))
+        .background_gradient(coreicon::Gradient::linear_two(
+            coreicon::Color::new(0.04, 0.18, 0.08, 1.0),
+            coreicon::Color::new(0.12, 0.50, 0.24, 1.0)))
         .selected(0)
         .on_select(|i| println!("Sidebar selected: {}", i));
 
@@ -68,7 +71,12 @@ fn main() {
                     .value(0.42)
                     .label("Foo")
                     .sub_label("bar")
-                    .accent_color(Color::from_rgb(0, 122, 255))))
+                    .accent_color(Color::from_rgb(0, 122, 255)))
+                .child(Text::new("Content Unavailable:").font_size(16.0).bold())
+                .child(ContentUnavailableView::new()
+                    .query("foo")
+                    .width(320.0)
+                    .height(250.0)))
     );
 
     app.run();

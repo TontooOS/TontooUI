@@ -123,16 +123,8 @@ impl TextInput {
         &self.placeholder
     }
 
-    /// Create a View wrapping this TextInput.
-    pub fn to_view(self) -> View {
-        let w = self.width;
-        let h = self.height;
-        View::new(self).with_frame(0.0, 0.0, w, h)
-    }
-}
-
-impl ViewContent for TextInput {
-    fn render(&self, frame: Rect) -> gtk::Widget {
+    /// Build the underlying GTK entry with all styling and handlers applied.
+    fn build_entry(&self, width: f32) -> gtk::Entry {
         let entry = Entry::new();
         entry.set_placeholder_text(Some(&self.placeholder));
 
@@ -147,10 +139,8 @@ impl ViewContent for TextInput {
         entry.set_vexpand(false);
         entry.set_halign(gtk::Align::Start);
 
-        let w = if self.width > 0.0 { self.width } else { frame.width };
-
-        if w > 0.0 {
-            entry.set_width_request(w as i32);
+        if width > 0.0 {
+            entry.set_width_request(width as i32);
         }
 
         let accent_hex = format!(
@@ -203,6 +193,46 @@ impl ViewContent for TextInput {
             });
         }
 
+        // Clear the text selection and drop keyboard focus when the user
+        // clicks anywhere else. GTK only moves focus to widgets that can take
+        // it, so a click on an ordinary box or label would otherwise leave the
+        // entry focused with its blue ring and selected text intact.
+        entry.connect_realize(|w| {
+            let Some(root) = w.root() else { return };
+            let Ok(window) = root.downcast::<gtk::Window>() else { return };
+            let press = gtk::GestureClick::new();
+            let weak = w.downgrade();
+            let win = window.clone();
+            press.connect_pressed(move |_g, _n, _x, _y| {
+                // Runs in the capture phase (before the clicked widget's own
+                // handlers), so clicking the entry itself still focuses it;
+                // clicking anywhere else clears the focus ring and the text
+                // selection.
+                if let Some(entry) = weak.upgrade() {
+                    if entry.has_focus() {
+                        entry.select_region(0, 0);
+                    }
+                }
+                gtk::prelude::GtkWindowExt::set_focus(&win, None::<&gtk::Widget>);
+            });
+            window.add_controller(press);
+        });
+
+        entry
+    }
+
+    /// Create a View wrapping this TextInput.
+    pub fn to_view(self) -> View {
+        let w = self.width;
+        let h = self.height;
+        View::new(self).with_frame(0.0, 0.0, w, h)
+    }
+}
+
+impl ViewContent for TextInput {
+    fn render(&self, frame: Rect) -> gtk::Widget {
+        let w = if self.width > 0.0 { self.width } else { frame.width };
+        let entry = self.build_entry(w);
         entry.upcast()
     }
 
@@ -229,74 +259,12 @@ impl Widget for TextInput {
     }
 
     fn to_gtk(&self) -> gtk::Widget {
-        let entry = Entry::new();
-        entry.set_placeholder_text(Some(&self.placeholder));
-
-        if !self.text.is_empty() {
-            entry.set_text(&self.text);
-        }
-
-        entry.set_visibility(!self.is_password);
-        entry.set_sensitive(!self.is_disabled);
-
-        entry.set_hexpand(false);
-        entry.set_vexpand(false);
-
-        if let Some(w) = self.position.width {
-            entry.set_width_request(w as i32);
-        } else if self.width > 0.0 {
-            entry.set_width_request(self.width as i32);
-        }
-
-        let accent_hex = format!(
-            "#{:02x}{:02x}{:02x}",
-            (self.accent_color.r * 255.0) as u8,
-            (self.accent_color.g * 255.0) as u8,
-            (self.accent_color.b * 255.0) as u8,
-        );
-
-        let bg_color = if self.is_disabled { "#1a1a1c" } else { "#2a2a2c" };
-        let border_color = if self.is_disabled { "#2a2a2c" } else { "#3a3a3d" };
-
-        let css = format!(
-            "entry {{
-                background-color: {bg_color};
-                color: #ececec;
-                border-radius: 8px;
-                border: 1px solid {border_color};
-                padding: 4px 10px;
-                min-height: 0px;
-                font-family: 'SF Pro Display';
-                font-size: 13px;
-                caret-color: {accent};
-            }}
-            entry:hover {{
-                border-color: #4a4a4e;
-            }}
-            entry:focus {{
-                border-color: {accent};
-            }}",
-            bg_color = bg_color,
-            border_color = border_color,
-            accent = accent_hex,
-        );
-        uikit::widget::apply_css(&entry, &css);
-
-        if let Some(handler) = &self.on_change {
-            let handler = handler.clone();
-            entry.connect_changed(move |e| {
-                let value = e.text().to_string();
-                handler(value);
-            });
-        }
-
-        if let Some(handler) = &self.on_submit {
-            let handler = handler.clone();
-            entry.connect_activate(move |e| {
-                let value = e.text().to_string();
-                handler(value);
-            });
-        }
+        let w = if let Some(w) = self.position.width {
+            w as f32
+        } else {
+            self.width
+        };
+        let entry = self.build_entry(w);
 
         if self.position_mode == PositionMode::Absolute {
             let mut css = String::from("entry {");

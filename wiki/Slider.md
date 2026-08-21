@@ -1,6 +1,6 @@
 # Slider
 
-Slider is a macOS-style slider with spring physics, pill-shaped white thumb, and grow/squish animation. The thumb scales up on press and wobbles on release using elastic easing.
+Slider is a macOS-style slider with spring physics, a solid white pill thumb, and grow/squish animation. The thumb is white and opaque at rest; while pressed it grows and turns into dark frosted glass — more transparent, with a dark blur, a subtle light edge and an inner highlight. The widget stays fully see-through: only the track, the fill and the thumb are visible on top of whatever is behind it. The thumb scales up on press and wobbles on release using elastic easing.
 
 ## Constructor
 
@@ -55,13 +55,32 @@ let slider = Slider::new(0.0, 100.0)
     .on_change(|val| println!("Value: {}", val));
 ```
 
+## Animation Loop
+
+Slider runs a 60 FPS tick loop only while the physics are active: while the
+thumb is pressed, wobbling after a release, or any spring (grow/squish/value)
+is still moving. As soon as everything settles the loop stops itself and is
+restarted by the next interaction. An idle slider therefore does not wake the
+main loop or invalidate layout at 60 FPS forever.
+
+The thumb's glass-effect CSS is applied through a single cached
+`gtk::CssProvider` that is updated in place via `load_from_string`, instead of
+registering a new provider on every frame.
+
 ## Features
 
+- Fully transparent widget: the container, header, track area and overlay are
+  all explicitly `background: transparent`; only the track, fill and thumb are
+  drawn, so the slider blends into any wallpaper or panel behind it
 - Spring physics value following (stiffness: 47.1, damping: 10.8)
-- Pill-shaped white thumb (1.5x wider than tall)
+- Solid white pill thumb (1.5x wider than tall) at rest
 - Thumb grows 1.25x on press with spring animation
-- Squish/stretch on drag (velocity-based)
-- Elastic wobble on release
+- Dark frosted-glass thumb while pressed: blends from solid white into dark
+  glass (background color fades 255 -> 110 grey, alpha 1.0 -> 0.60, 1px light
+  border, inner top highlight) as the grow amount animates from 1.0 to 1.25
+- Squish/stretch on drag (velocity-based): the thumb stretches vertically and
+  narrows horizontally while moving, then springs back
+- Elastic wobble on release (vertical stretch, horizontal squeeze)
 - CSS-only rendering (no cairo -- WSLg compatible)
 - Full-width click/drag hit zone
 

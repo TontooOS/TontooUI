@@ -20,8 +20,9 @@ Creates a 260x600 sidebar with dark background, white-tinted border, and search 
 | `search_placeholder` | `search_placeholder(self, text) -> Self` | Placeholder for the search bar |
 | `no_search` | `no_search(self) -> Self` | Remove the search bar |
 | `background_color` | `background_color(self, c: Color) -> Self` | Sidebar fill (Dark: #1d1d1f, Light: #ececec) |
-| `border_color` | `border_color(self, c: Color) -> Self` | Outer border color |
-| `glow_color` | `glow_color(self, c: Color) -> Self` | Outer glow (box-shadow) color |
+| `background_gradient` | `background_gradient(self, g: Gradient) -> Self` | Sidebar fill as a CoreIcon gradient (overrides `background_color`) |
+| `border_color` | `border_color(self, c: Color) -> Self` | Outer border color (auto-adapts to background if not set) |
+| `glow_color` | `glow_color(self, c: Color) -> Self` | Outer glow (box-shadow) color (auto-adapts to background if not set) |
 | `selected_color` | `selected_color(self, c: Color) -> Self` | Background of the selected row |
 | `icons_dir` | `icons_dir(self, dir) -> Self` | Path to icon PNG directory |
 | `width` | `width(self, w: f32) -> Self` | Sidebar width |
@@ -64,14 +65,42 @@ let sidebar = Sidebar::new()
     .on_select(|i| println!("Selected: {}", i));
 ```
 
+With a gradient background (requires the `coreicon` feature, default):
+
+```rust
+use tontooui::prelude::*;
+
+let sidebar = Sidebar::new()
+    .item("Wi-Fi", SidebarIcon::sf("wifi.circle.fill", Color::from_rgb(0, 122, 255)))
+    .selected(0)
+    .background_gradient(coreicon::Gradient::linear_two(
+        coreicon::Color::new(0.09, 0.09, 0.11, 1.0),
+        coreicon::Color::new(0.04, 0.10, 0.22, 1.0),
+    ))
+    .on_select(|i| println!("Selected: {}", i));
+```
+
+The gradient direction maps from `GradientDirection` to a CSS
+`linear-gradient(...)` (`CenterRadial` renders a `radial-gradient` instead).
+`background_gradient` overrides `background_color`; the solid color stays as a
+fallback.
+
 ## Features
 
 - Traffic lights drawn as CSS circles (red/yellow/green, 12px)
-- Search bar with frosted translucent background
+- Search bar styled like `TextInput` (dark `#2a2a2c` fill, `#3a3a3d` border, blue focus accent) instead of a translucent white field
 - Scrollable item list with icon PNGs + SF Pro Display labels
 - Selection highlight with customizable color
 - Rounded corners (12px) with white glow border
 - Customizable background for Dark/Light mode adaptation
+- Gradient background via `background_gradient(coreicon::Gradient)` with
+  direction-aware CSS gradients (linear or radial)
+- Auto-adaptive frame: the border and glow take their color from the
+  background fill. With a gradient, the frame uses the gradient's own hue
+  (average of the stop colors), lightened for dark fills and darkened for
+  light fills; with a solid color it is plain white on dark fills and plain
+  black on light fills. Explicit `border_color` / `glow_color` calls override
+  this.
 
 ## Cross References
 

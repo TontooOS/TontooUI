@@ -184,8 +184,10 @@ pub struct Sidebar {
     search_placeholder: String,
     show_search: bool,
     background_color: Color,
-    border_color: Color,
-    glow_color: Color,
+    #[cfg(feature = "coreicon")]
+    background_gradient: Option<coreicon::Gradient>,
+    border_color: Option<Color>,
+    glow_color: Option<Color>,
     selected_color: Color,
     width: f32,
     height: f32,
@@ -203,8 +205,10 @@ impl Sidebar {
             search_placeholder: "Search".into(),
             show_search: true,
             background_color: Color::new(0.15, 0.15, 0.15, 1.0),
-            border_color: Color::new(1.0, 1.0, 1.0, 0.15),
-            glow_color: Color::new(1.0, 1.0, 1.0, 0.05),
+            #[cfg(feature = "coreicon")]
+            background_gradient: None,
+            border_color: None,
+            glow_color: None,
             selected_color: Color::new(1.0, 1.0, 1.0, 0.1),
             width: 220.0,
             height: 0.0,
@@ -232,8 +236,11 @@ impl Sidebar {
     pub fn search_placeholder(mut self, text: impl Into<String>) -> Self { self.search_placeholder = text.into(); self }
     pub fn no_search(mut self) -> Self { self.show_search = false; self }
     pub fn background_color(mut self, c: Color) -> Self { self.background_color = c; self }
-    pub fn border_color(mut self, c: Color) -> Self { self.border_color = c; self }
-    pub fn glow_color(mut self, c: Color) -> Self { self.glow_color = c; self }
+    /// Set the sidebar background to a gradient (overrides `background_color`).
+    #[cfg(feature = "coreicon")]
+    pub fn background_gradient(mut self, g: coreicon::Gradient) -> Self { self.background_gradient = Some(g); self }
+    pub fn border_color(mut self, c: Color) -> Self { self.border_color = Some(c); self }
+    pub fn glow_color(mut self, c: Color) -> Self { self.glow_color = Some(c); self }
     pub fn selected_color(mut self, c: Color) -> Self { self.selected_color = c; self }
     pub fn width(mut self, w: f32) -> Self { self.width = w; self }
     pub fn height(mut self, h: f32) -> Self { self.height = h; self }
@@ -267,16 +274,94 @@ impl ViewContent for Sidebar {
         container.set_valign(gtk::Align::Fill);
 
         let bg = self.background_color;
-        let border = self.border_color;
-        let glow = self.glow_color;
         let bg_hex = format!("#{:02x}{:02x}{:02x}",
             (bg.r * 255.0) as u8, (bg.g * 255.0) as u8, (bg.b * 255.0) as u8);
+
+        // Border and glow adapt to the background automatically. For a gradient the
+        // frame takes the gradient's own hue (average of the stop colors) and
+        // is lightened or darkened for contrast; for a solid fill it is plain
+        // white on dark fills and plain black on light fills. Explicit
+        // `border_color` / `glow_color` calls override this.
+        #[cfg(feature = "coreicon")]
+        let gradient_avg: Option<Color> = self.background_gradient.as_ref().map(|g| {
+            let n = g.stops.len().max(1) as f32;
+            let (mut r, mut gr, mut b) = (0.0f32, 0.0f32, 0.0f32);
+            for s in &g.stops {
+                r += s.color.r;
+                gr += s.color.g;
+                b += s.color.b;
+            }
+            Color::new(r / n, gr / n, b / n, 1.0)
+        });
+        #[cfg(not(feature = "coreicon"))]
+        let gradient_avg: Option<Color> = None;
+
+        let base = gradient_avg.unwrap_or(bg);
+        let lum = (base.r + base.g + base.b) / 3.0;
+
+        let auto_border;
+        let auto_glow;
+        if let Some(c) = gradient_avg {
+            if lum < 0.5 {
+                // Dark gradient fill: keep the gradient's hue, lightly
+                // lightened toward white so the frame stays visible.
+                auto_border = Color::new(
+                    c.r + (1.0 - c.r) * 0.25, c.g + (1.0 - c.g) * 0.25, c.b + (1.0 - c.b) * 0.25, 0.60);
+                auto_glow = Color::new(
+                    c.r + (1.0 - c.r) * 0.15, c.g + (1.0 - c.g) * 0.15, c.b + (1.0 - c.b) * 0.15, 0.25);
+            } else {
+                // Light gradient fill: darken the gradient's hue toward black.
+                auto_border = Color::new(c.r * 0.75, c.g * 0.75, c.b * 0.75, 0.60);
+                auto_glow = Color::new(c.r * 0.85, c.g * 0.85, c.b * 0.85, 0.25);
+            }
+        } else if lum < 0.5 {
+            auto_border = Color::new(1.0, 1.0, 1.0, 0.15);
+            auto_glow = Color::new(1.0, 1.0, 1.0, 0.05);
+        } else {
+            auto_border = Color::new(0.0, 0.0, 0.0, 0.15);
+            auto_glow = Color::new(0.0, 0.0, 0.0, 0.05);
+        }
+        let border = self.border_color.unwrap_or(auto_border);
+        let glow = self.glow_color.unwrap_or(auto_glow);
+
         let border_rgba = format!("rgba({:.0},{:.0},{:.0},{:.2})",
             border.r * 255.0, border.g * 255.0, border.b * 255.0, border.a);
         let glow_rgba = format!("rgba({:.0},{:.0},{:.0},{:.2})",
             glow.r * 255.0, glow.g * 255.0, glow.b * 255.0, glow.a);
 
-        let css = format!(".sidebar {{ background-color: {bg_hex}; border-radius: 15px; border: 2px solid {border_rgba}; box-shadow: 0 0 20px {glow_rgba}; overflow: hidden; margin: 6px; }}");
+        #[cfg(feature = "coreicon")]
+        let bg_css = match &self.background_gradient {
+            Some(g) => {
+                let stops = g.stops.iter().map(|s| {
+                    format!("rgba({:.0},{:.0},{:.0},{:.2}) {:.0}%",
+                        s.color.r * 255.0, s.color.g * 255.0, s.color.b * 255.0, s.color.a,
+                        s.position * 100.0)
+                }).collect::<Vec<_>>().join(", ");
+                if matches!(g.direction, coreicon::GradientDirection::CenterRadial) {
+                    format!("radial-gradient(circle at center, {})", stops)
+                } else {
+                    let direction = match g.direction {
+                        coreicon::GradientDirection::TopToBottom => "to bottom",
+                        coreicon::GradientDirection::BottomToTop => "to top",
+                        coreicon::GradientDirection::LeftToRight => "to right",
+                        coreicon::GradientDirection::RightToLeft => "to left",
+                        coreicon::GradientDirection::TopLeadingToBottomTrailing => "to bottom right",
+                        coreicon::GradientDirection::TopTrailingToBottomLeading => "to bottom left",
+                        coreicon::GradientDirection::CenterRadial => "to bottom",
+                    };
+                    format!("linear-gradient({}, {})", direction, stops)
+                }
+            }
+            None => String::new(),
+        };
+        #[cfg(not(feature = "coreicon"))]
+        let bg_css = String::new();
+
+        let css = if bg_css.is_empty() {
+            format!(".sidebar {{ background-color: {bg_hex}; border-radius: 15px; border: 2px solid {border_rgba}; box-shadow: 0 0 20px {glow_rgba}; overflow: hidden; margin: 6px; }}")
+        } else {
+            format!(".sidebar {{ background-color: {bg_hex}; background-image: {bg_css}; border-radius: 15px; border: 2px solid {border_rgba}; box-shadow: 0 0 20px {glow_rgba}; overflow: hidden; margin: 6px; }}")
+        };
         uikit::widget::apply_css(&container, &css);
         container.add_css_class("sidebar");
 
@@ -292,8 +377,30 @@ impl ViewContent for Sidebar {
 
             let entry = gtk::SearchEntry::new();
             entry.set_placeholder_text(Some(&self.search_placeholder));
-            let ecss = ".sb-search {{ background-color: rgba(255,255,255,0.08); border-radius: 8px; border: none; padding: 4px 10px; min-height: 0px; font-family: 'SF Pro Display'; font-size: 13px; color: rgba(235,235,245,0.6); }}";
-            uikit::widget::apply_css(&entry, ecss);
+            // Match the visual style of `TextInput` so the sidebar search does
+            // not look like a light/white field next to the dark inputs.
+            let accent_hex = "#0c85ee";
+            let ecss = format!(
+                ".sb-search {{
+                    background-color: #2a2a2c;
+                    color: #ececec;
+                    border-radius: 8px;
+                    border: 1px solid #3a3a3d;
+                    padding: 4px 10px;
+                    min-height: 0px;
+                    font-family: 'SF Pro Display';
+                    font-size: 13px;
+                    caret-color: {accent};
+                }}
+                .sb-search:hover {{
+                    border-color: #4a4a4e;
+                }}
+                .sb-search:focus {{
+                    border-color: {accent};
+                }}",
+                accent = accent_hex,
+            );
+            uikit::widget::apply_css(&entry, &ecss);
             entry.add_css_class("sb-search");
             search_outer.append(&entry);
             container.append(&search_outer);
@@ -428,6 +535,18 @@ mod tests {
             .width(220.0);
         assert_eq!(sb.items.len(), 1);
         assert_eq!(sb.selected, 0);
+    }
+
+    #[cfg(feature = "coreicon")]
+    #[test]
+    fn sidebar_background_gradient() {
+        let g = coreicon::Gradient::linear_two(
+            to_ci(Color::from_rgb(30, 30, 34)),
+            to_ci(Color::from_rgb(0, 122, 255)),
+        );
+        let sb = Sidebar::new().background_gradient(g.clone());
+        assert!(sb.background_gradient.is_some());
+        assert_eq!(sb.background_gradient.as_ref().unwrap().stops.len(), 2);
     }
 
     #[cfg(not(feature = "coreicon"))]

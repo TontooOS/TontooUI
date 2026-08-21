@@ -345,62 +345,90 @@ impl ViewContent for WheelPicker {
         // Timestamp of the last scroll event, used to detect scroll-stop.
         let last_scroll = Rc::new(std::cell::Cell::new(std::time::Instant::now()));
 
-        // ── Tick loop: spring + item layout ──
-        {
+        // Self-stopping 60 FPS tick loop. An idle wheel produces no work: the
+        // loop stops itself (and its source is dropped) as soon as the spring
+        // settles, and the gesture handlers below restart it. Without this the
+        // wheel would keep relaying out all item labels at 60 FPS forever.
+        let timer: Rc<RefCell<Option<glib::SourceId>>> = Rc::new(RefCell::new(None));
+        let last_fired_idx = Rc::new(std::cell::Cell::new(self.selected_index));
+
+        let start_tick = {
             let state = state.clone();
+            let timer = timer.clone();
             let labels = labels.clone();
             let items = self.items.clone();
             let cb = self.on_change.clone();
             let last_scroll = last_scroll.clone();
-            let mut last_fired_idx = self.selected_index;
-
-            glib::timeout_add_local(std::time::Duration::from_millis(16), move || {
-                {
-                    let mut s = state.borrow_mut();
-                    // Lock onto the nearest item shortly after scrolling stops.
-                    // The accumulated target (not the lagging offset) decides
-                    // the lock, so a fast scroll keeps its momentum.
-                    if s.is_scrolling && last_scroll.get().elapsed() > std::time::Duration::from_millis(120)
+            let last_fired_idx = last_fired_idx.clone();
+            move || {
+                if timer.borrow().is_some() {
+                    return;
+                }
+                let st = state.clone();
+                let tm = timer.clone();
+                let lbs = labels.clone();
+                let its = items.clone();
+                let cbe = cb.clone();
+                let ls = last_scroll.clone();
+                let lfi = last_fired_idx.clone();
+                let id = glib::timeout_add_local(std::time::Duration::from_millis(16), move || {
                     {
-                        s.is_scrolling = false;
-                        s.target_offset = s
-                            .target_offset
-                            .round()
-                            .clamp(0.0, (num_items as f32) - 1.0);
+                        let mut s = st.borrow_mut();
+                        // Lock onto the nearest item shortly after scrolling stops.
+                        // The accumulated target (not the lagging offset) decides
+                        // the lock, so a fast scroll keeps its momentum.
+                        if s.is_scrolling && ls.get().elapsed() > std::time::Duration::from_millis(120)
+                        {
+                            s.is_scrolling = false;
+                            s.target_offset = s
+                                .target_offset
+                                .round()
+                                .clamp(0.0, (num_items as f32) - 1.0);
+                        }
+                        s.tick(1.0 / 60.0);
                     }
-                    s.tick(1.0 / 60.0);
-                }
 
-                let s = state.borrow();
-                let center = s.scroll_offset;
-                let new_idx = s.selected_index(num_items);
-                drop(s);
+                    let s = st.borrow();
+                    let center = s.scroll_offset;
+                    let new_idx = s.selected_index(num_items);
+                    let settled = !s.is_dragging && !s.is_scrolling
+                        && s.scroll_velocity.abs() < 0.01
+                        && (s.scroll_offset - s.target_offset).abs() < 0.001;
+                    drop(s);
 
-                let mid = h / 2.0;
-                for (i, label) in labels.iter().enumerate() {
-                    let dist = (i as f32 - center).abs();
-                    let y = mid + (i as f32 - center) * item_h - item_h / 2.0;
-                    label.set_margin_top(y.round() as i32);
-                    style_item(label, dist);
-                }
-
-                // Fire callback only when the selected index changes.
-                if new_idx != last_fired_idx && new_idx < items.len() {
-                    last_fired_idx = new_idx;
-                    if let Some(ref cb) = cb {
-                        cb(items[new_idx].clone());
+                    if settled {
+                        *tm.borrow_mut() = None;
+                        return glib::ControlFlow::Break;
                     }
-                }
 
-                glib::ControlFlow::Continue
-            });
-        }
+                    let mid = h / 2.0;
+                    for (i, label) in lbs.iter().enumerate() {
+                        let dist = (i as f32 - center).abs();
+                        let y = mid + (i as f32 - center) * item_h - item_h / 2.0;
+                        label.set_margin_top(y.round() as i32);
+                        style_item(label, dist);
+                    }
+
+                    // Fire callback only when the selected index changes.
+                    if new_idx != lfi.get() && new_idx < its.len() {
+                        lfi.set(new_idx);
+                        if let Some(ref cb) = cbe {
+                            cb(its[new_idx].clone());
+                        }
+                    }
+
+                    glib::ControlFlow::Continue
+                });
+                *timer.borrow_mut() = Some(id);
+            }
+        };
 
         // ── Drag gesture: lock the wheel while the mouse is held ──
         let press = gtk::GestureClick::new();
         press.set_button(1);
         {
             let state = state.clone();
+            let start_tick = start_tick.clone();
             press.connect_pressed(move |_g, _n, _x, y| {
                 let mut s = state.borrow_mut();
                 s.is_dragging = true;
@@ -408,14 +436,19 @@ impl ViewContent for WheelPicker {
                 s.drag_start_offset = s.scroll_offset;
                 s.scroll_velocity = 0.0;
                 s.last_offset = s.scroll_offset;
+                drop(s);
+                start_tick();
             });
         }
         {
             let state = state.clone();
+            let start_tick = start_tick.clone();
             press.connect_released(move |_g, _n, _x, _y| {
                 let mut s = state.borrow_mut();
                 s.is_dragging = false;
                 s.snap(num_items);
+                drop(s);
+                start_tick();
             });
         }
         overlay.add_controller(press);
@@ -424,6 +457,7 @@ impl ViewContent for WheelPicker {
         let motion = gtk::EventControllerMotion::new();
         {
             let state = state.clone();
+            let start_tick = start_tick.clone();
             motion.connect_motion(move |_m, _x, y| {
                 let mut s = state.borrow_mut();
                 if !s.is_dragging {
@@ -433,6 +467,8 @@ impl ViewContent for WheelPicker {
                 let delta_items = -dy / item_h;
                 let max = (num_items as f32) - 1.0;
                 s.scroll_offset = (s.drag_start_offset + delta_items).clamp(0.0, max.max(0.0));
+                drop(s);
+                start_tick();
             });
         }
         overlay.add_controller(motion);
@@ -442,6 +478,7 @@ impl ViewContent for WheelPicker {
         {
             let state = state.clone();
             let last_scroll = last_scroll.clone();
+            let start_tick = start_tick.clone();
             scroll.connect_scroll(move |_c, dx, dy| {
                 let mut s = state.borrow_mut();
                 if num_items == 0 {
@@ -454,6 +491,8 @@ impl ViewContent for WheelPicker {
                 let max = (num_items as f32) - 1.0;
                 s.is_scrolling = true;
                 s.target_offset = (s.target_offset - delta as f32).clamp(0.0, max);
+                drop(s);
+                start_tick();
                 glib::Propagation::Stop
             });
         }

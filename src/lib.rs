@@ -32,25 +32,31 @@
 //! | [`Slider`] | Slider with spring physics and squish animation |
 //! | [`ProgressView`] | Loading indicator: spinner or progress ring |
 //! | [`Sidebar`] | macOS-style sidebar with traffic lights, search, and item list |
+//! | [`ContentUnavailableView`] | Empty state with icon, title and hint message |
+//! | [`CircularGauge`] | iOS/macOS accessory circular gauge with live value |
 
 pub mod text_input;
 pub mod wheel_picker;
 pub mod slider;
 pub mod progress_view;
 pub mod sidebar;
+pub mod content_unavailable_view;
+pub mod circular_gauge;
 
 pub use text_input::TextInput;
 pub use wheel_picker::WheelPicker;
 pub use slider::Slider;
 pub use progress_view::ProgressView;
 pub use sidebar::Sidebar;
+pub use content_unavailable_view::ContentUnavailableView;
+pub use circular_gauge::{CircularGauge, CircularGaugeCenter};
 #[cfg(feature = "coreicon")]
 pub use sidebar::SidebarIcon;
 
 pub const TONTOO_UI_VERSION: (u32, u32, u32) = (0, 1, 0);
 
 pub mod prelude {
-    pub use crate::{TextInput, WheelPicker, Slider, ProgressView, Sidebar, TONTOO_UI_VERSION};
+    pub use crate::{TextInput, WheelPicker, Slider, ProgressView, Sidebar, ContentUnavailableView, CircularGauge, CircularGaugeCenter, TONTOO_UI_VERSION};
     #[cfg(feature = "coreicon")]
     pub use crate::SidebarIcon;
 

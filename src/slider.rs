@@ -30,6 +30,31 @@ fn ease_out_elastic(t: f32) -> f32 {
     2.0_f32.powf(-10.0 * t) * ((t * 10.0 - 0.75) * std::f32::consts::PI * 2.0 / 3.0).sin() + 1.0
 }
 
+/// Apply CSS to a widget using a single cached [`gtk::CssProvider`].
+///
+/// Calling `uikit::widget::apply_css` every frame registers a brand-new
+/// provider on the widget each time, which accumulates for the lifetime of the
+/// widget and slows CSS matching down over time. Updating one cached provider
+/// in place (via `load_from_string`) avoids that growth entirely.
+fn update_cached_css(
+    widget: &impl IsA<gtk::Widget>,
+    css: &str,
+    cache: &Rc<RefCell<Option<gtk::CssProvider>>>,
+) {
+    let mut borrow = cache.borrow_mut();
+    if let Some(ref provider) = *borrow {
+        provider.load_from_string(css);
+    } else {
+        let provider = gtk::CssProvider::new();
+        provider.load_from_string(css);
+        widget.style_context().add_provider(
+            &provider,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION as u32,
+        );
+        *borrow = Some(provider);
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct SliderPhysics {
     is_dragging: bool,
@@ -78,16 +103,16 @@ impl SliderPhysics {
         let mut tsy = 1.0_f32;
         if self.is_dragging {
             let stretch = (self.drag_vel.abs() * 0.0375).min(0.56);
-            tsx = 1.0 + stretch;
-            tsy = 1.0 - stretch * 0.8;
+            tsx = 1.0 - stretch;
+            tsy = 1.0 + stretch * 0.8;
             self.drag_vel *= 0.85;
         } else if self.wobbling {
             self.wobble_time += dt;
             let t = (self.wobble_time / WOBBLE_DURATION).min(1.0);
             let eased = ease_out_elastic(t);
             let wobble = (t * std::f32::consts::PI * 5.0).sin() * (1.0 - eased) * 0.44;
-            tsx = 1.0 + wobble;
-            tsy = 1.0 - wobble;
+            tsx = 1.0 - wobble;
+            tsy = 1.0 + wobble;
             if t >= 1.0 { self.wobbling = false; }
         }
 
@@ -175,6 +200,9 @@ impl ViewContent for Slider {
 
         let css = format!(
             ".sl-c {{ background: transparent; }}
+             .sl-head {{ background: transparent; }}
+             .sl-outer {{ background: transparent; }}
+             .sl-bar {{ background: transparent; }}
              .sl-lbl {{ color: rgba(255,255,255,0.6); font-family: 'SF Pro Display'; font-size: 13px; }}
              .sl-val {{ color: {accent_hex}; font-family: 'SF Pro Display'; font-size: 28px; font-weight: 600; }}
              .sl-track {{ background: {track_hex}; border-radius: 3px; min-height: 4px; }}
@@ -187,6 +215,7 @@ impl ViewContent for Slider {
         // Header
         let header = gtk::Box::new(Orientation::Horizontal, 8);
         header.set_hexpand(true);
+        header.add_css_class("sl-head");
         if let Some(ref lbl) = self.label {
             let l = GtkLabel::new(Some(lbl)); l.add_css_class("sl-lbl"); header.append(&l);
         }
@@ -201,11 +230,13 @@ impl ViewContent for Slider {
         track_outer.set_hexpand(true);
         track_outer.set_valign(gtk::Align::Center);
         track_outer.set_height_request(30);
+        track_outer.add_css_class("sl-outer");
 
         // Track bar
         let track_bar = gtk::Overlay::new();
         track_bar.set_hexpand(true);
         track_bar.set_height_request(4);
+        track_bar.add_css_class("sl-bar");
 
         let track_bg = gtk::Box::new(Orientation::Horizontal, 0);
         track_bg.set_hexpand(true); track_bg.set_height_request(4);
@@ -246,70 +277,128 @@ impl ViewContent for Slider {
             thumb.set_margin_start(thumb_px.max(0.0) as i32);
         }
 
-        // Tick loop
-        {
+        // Single cached provider for the thumb so per-frame updates do not
+        // register a new CSS provider on every tick.
+        let thumb_css: Rc<RefCell<Option<gtk::CssProvider>>> = Rc::new(RefCell::new(None));
+
+        // Self-stopping 60 FPS tick loop. An idle slider produces no work: the
+        // loop stops itself (and its source is dropped) as soon as the physics
+        // settle, and the interaction handlers below restart it. Without this,
+        // every slider would wake the main loop at 60 FPS forever, invalidate
+        // layout and leak CSS providers while the app just sits there.
+        let timer: Rc<RefCell<Option<glib::SourceId>>> = Rc::new(RefCell::new(None));
+        let last_fired = Rc::new(std::cell::Cell::new(self.initial_value));
+
+        let start_tick = {
             let state = state.clone();
+            let timer = timer.clone();
+            let last_fired = last_fired.clone();
+            let thumb_css = thumb_css.clone();
             let val_label = val_label.clone();
             let fill_bar = fill_bar.clone();
             let thumb = thumb.clone();
             let cb = self.on_change.clone();
             let step_c = self.step;
             let tw = w - 30.0;
-            let mut last_fired = self.initial_value;
-
-            glib::timeout_add_local(std::time::Duration::from_millis(16), move || {
-                let mut s = state.borrow_mut();
-                s.tick(1.0 / 60.0);
-                let new_v = s.display_value;
-                let norm = s.value_norm();
-                let grow = s.grow;
-                let sx = s.squish_x;
-                let sy = s.squish_y;
-                let is_dragging = s.is_dragging;
-                drop(s);
-
-                // Position fill + thumb
-                let fill_px = norm * tw;
-                let thumb_px = norm * tw;
-                fill_bar.set_width_request(fill_px.max(0.0) as i32);
-                thumb.set_margin_start(thumb_px.max(0.0) as i32);
-
-                // Thumb size (grow + squish)
-                let thumb_w = (30.0 * grow * sx) as i32;
-                let thumb_h = (20.0 * grow * sy) as i32;
-                thumb.set_size_request(thumb_w.max(10), thumb_h.max(6));
-                let radius = (thumb_h / 2).min(thumb_w / 2);
-                let tcss = format!(".sl-thumb {{ border-radius: {}px; }}", radius);
-                uikit::widget::apply_css(&thumb, &tcss);
-
-                // Value label
-                let text = if step_c > 0.0 && step_c.fract() == 0.0 { format!("{:.0}", new_v) }
-                    else if step_c > 0.0 {
-                        let st = format!("{:.10}", step_c);
-                        let dec = st.trim_end_matches('0').split('.').last().unwrap_or("0").len();
-                        format!("{:.prec$}", new_v, prec = dec)
-                    }
-                    else { format!("{:.1}", new_v) };
-                val_label.set_text(&text);
-
-                // Only fire callback when user is dragging AND value changed meaningfully
-                let threshold = if step_c > 0.0 { step_c } else { 0.1 };
-                if is_dragging && (new_v - last_fired).abs() >= threshold {
-                    last_fired = new_v;
-                    if let Some(ref h) = cb { h(new_v); }
+            move || {
+                if timer.borrow().is_some() {
+                    return;
                 }
-                glib::ControlFlow::Continue
-            });
-        }
+                let st = state.clone();
+                let tm = timer.clone();
+                let lf = last_fired.clone();
+                let tc = thumb_css.clone();
+                let vl = val_label.clone();
+                let fb = fill_bar.clone();
+                let tb = thumb.clone();
+                let cbe = cb.clone();
+                let id = glib::timeout_add_local(std::time::Duration::from_millis(16), move || {
+                    let mut s = st.borrow_mut();
+                    s.tick(1.0 / 60.0);
+
+                    // The tick only has work to do while the knob is being
+                    // dragged, wobbling after a release, or any spring is still
+                    // moving. Once everything settles the loop stops itself.
+                    let target_grow = if s.is_dragging { 1.25 } else { 1.0 };
+                    let settled = (s.display_value - s.target_value).abs() < 0.01
+                        && (s.grow - target_grow).abs() < 0.01
+                        && s.squish_vel_x.abs() < 0.001
+                        && s.squish_vel_y.abs() < 0.001
+                        && !s.wobbling;
+                    if settled {
+                        *tm.borrow_mut() = None;
+                        return glib::ControlFlow::Break;
+                    }
+
+                    let new_v = s.display_value;
+                    let norm = s.value_norm();
+                    let grow = s.grow;
+                    let sx = s.squish_x;
+                    let sy = s.squish_y;
+                    let is_dragging = s.is_dragging;
+                    drop(s);
+
+                    // Position fill + thumb
+                    let fill_px = norm * tw;
+                    let thumb_px = norm * tw;
+                    fb.set_width_request(fill_px.max(0.0) as i32);
+                    tb.set_margin_start(thumb_px.max(0.0) as i32);
+
+                    // Thumb size (grow + squish)
+                    let thumb_w = (30.0 * grow * sx) as i32;
+                    let thumb_h = (20.0 * grow * sy) as i32;
+                    tb.set_size_request(thumb_w.max(10), thumb_h.max(6));
+                    let radius = (thumb_h / 2).min(thumb_w / 2);
+                    // Glass effect: solid white pill at rest; while grown (pressed)
+                    // it turns into dark frosted glass — more transparent,
+                    // with a dark blur and a subtle light edge.
+                    let glass = ((grow - 1.0) / 0.25).clamp(0.0, 1.0);
+                    let c = 255.0 - (255.0 - 110.0) * glass;
+                    let bg_a = 1.0 - (1.0 - 0.60) * glass;
+                    let border_a = 0.25 * glass;
+                    let highlight_a = 0.35 - 0.25 * glass;
+                    let shadow_a = 0.30 - 0.10 * glass;
+                    let shadow_spread = 8.0 + 6.0 * glass;
+                    let tcss = format!(
+                        ".sl-thumb {{ border-radius: {}px; background: rgba({:.0},{:.0},{:.0},{:.2}); \
+                         border: 1px solid rgba(255,255,255,{:.2}); \
+                         box-shadow: 0 2px {:.0}px rgba(0,0,0,{:.2}), inset 0 1px 0 rgba(255,255,255,{:.2}); }}",
+                        radius, c, c, c, bg_a, border_a, shadow_spread, shadow_a, highlight_a
+                    );
+                    update_cached_css(&tb, &tcss, &tc);
+
+                    // Value label
+                    let text = if step_c > 0.0 && step_c.fract() == 0.0 { format!("{:.0}", new_v) }
+                        else if step_c > 0.0 {
+                            let fmt = format!("{:.10}", step_c);
+                            let dec = fmt.trim_end_matches('0').split('.').last().unwrap_or("0").len();
+                            format!("{:.prec$}", new_v, prec = dec)
+                        }
+                        else { format!("{:.1}", new_v) };
+                    vl.set_text(&text);
+
+                    // Only fire callback when user is dragging AND value changed meaningfully
+                    let threshold = if step_c > 0.0 { step_c } else { 0.1 };
+                    if is_dragging && (new_v - lf.get()).abs() >= threshold {
+                        lf.set(new_v);
+                        if let Some(ref h) = cbe { h(new_v); }
+                    }
+                    glib::ControlFlow::Continue
+                });
+                *timer.borrow_mut() = Some(id);
+            }
+        };
 
         // Click + drag on track
         {
             let state = state.clone();
+            let start_tick = start_tick.clone();
             let press = gtk::GestureClick::new();
             press.set_button(1);
 
             {
                 let state = state.clone();
+                let start_tick = start_tick.clone();
                 let tw = w - 30.0;
                 press.connect_pressed(move |_g, _n, x, _y| {
                     let mut s = state.borrow_mut();
@@ -319,15 +408,20 @@ impl ViewContent for Slider {
                     s.prev_mouse_x = x as f32;
                     s.target_value = s.x_to_value(x as f32, tw + 30.0);
                     s.display_value = s.target_value;
+                    drop(s);
+                    start_tick();
                 });
             }
             {
                 let state = state.clone();
+                let start_tick = start_tick.clone();
                 press.connect_released(move |_g, _n, _x, _y| {
                     let mut s = state.borrow_mut();
                     s.is_dragging = false;
                     s.wobbling = true;
                     s.wobble_time = 0.0;
+                    drop(s);
+                    start_tick();
                 });
             }
             track_outer.add_controller(press);
@@ -335,6 +429,7 @@ impl ViewContent for Slider {
 
         {
             let state = state.clone();
+            let start_tick = start_tick.clone();
             let motion = gtk::EventControllerMotion::new();
             let tw = w - 30.0;
             motion.connect_motion(move |_m, x, _y| {
@@ -344,6 +439,8 @@ impl ViewContent for Slider {
                 s.prev_mouse_x = x as f32;
                 s.target_value = s.x_to_value(x as f32, tw + 30.0);
                 s.display_value = s.target_value;
+                drop(s);
+                start_tick();
             });
             track_outer.add_controller(motion);
         }

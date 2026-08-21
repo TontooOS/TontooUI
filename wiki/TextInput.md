@@ -52,6 +52,14 @@ let input = TextInput::new("Search...")
     .on_submit(|text| println!("Submitted: {}", text));
 ```
 
+## Features
+
+- Single-line text entry wrapping GTK4's `Entry`
+- TontooOS styling: dark `#2a2a2c` fill, `#3a3a3d` border, SF Pro font, accent color focus ring
+- Focus dismissal: clicking anywhere outside the input drops keyboard focus
+  and clears the text selection, so the blue focus ring and highlighted text
+  never linger after clicking another widget or empty space
+
 ## Cross References
 
 - [MAIN.md](MAIN.md) -- library overview

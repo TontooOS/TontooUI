@@ -14,6 +14,7 @@ coreicon = { path = "/Library/System/coreicon", optional = true }
 gtk = { package = "gtk4", version = "0.9", features = ["v4_12"] }
 glib = "0.20"
 cairo-rs = "0.20"
+image = "0.25"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

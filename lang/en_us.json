@@ -13,6 +13,12 @@
     },
     "sidebar": {
       "name": "Sidebar"
+    },
+    "content_unavailable_view": {
+      "name": "Content Unavailable",
+      "title_prefix": "No Results for",
+      "message": "Check the spelling or try a new search.",
+      "placeholder_default": "Search"
     }
   }
 }

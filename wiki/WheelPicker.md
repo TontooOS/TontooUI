@@ -98,6 +98,13 @@ let picker = WheelPicker::new()
     .on_change(|value| println!("Selected: {}", value));
 ```
 
+## Animation Loop
+
+WheelPicker runs a 60 FPS tick loop only while the drum is dragging,
+scrolling, or the spring is still settling. As soon as everything settles the
+loop stops itself and is restarted by the next gesture. An idle wheel therefore
+does not relayout all item labels at 60 FPS forever.
+
 ## Features
 
 - Spring physics snap-to-center with fling on release (stiffness: 280, damping: 26)
