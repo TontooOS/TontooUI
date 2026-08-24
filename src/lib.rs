@@ -27,6 +27,11 @@
 //!
 //! | Element | Description |
 //! |---|---|
+//! | [`Button`] | SwiftUI-style push button: roles, styles, tint, border shapes, sizing |
+//! | [`Toolbar`] | Glass capsule toolbar bar with items and spacers |
+//! | [`RenameButton`] | System button that triggers a standard rename action |
+//! | [`EditButton`] | System button that toggles between Edit and Done |
+//! | [`PasteButton`] | System button that reads text from the clipboard |
 //! | [`TextInput`] | Single-line text input field |
 //! | [`WheelPicker`] | macOS/iOS style scroll wheel picker |
 //! | [`Slider`] | Slider with spring physics and squish animation |
@@ -37,26 +42,30 @@
 
 pub mod text_input;
 pub mod wheel_picker;
-pub mod slider;
 pub mod progress_view;
 pub mod sidebar;
 pub mod content_unavailable_view;
 pub mod circular_gauge;
+pub mod elements;
 
 pub use text_input::TextInput;
 pub use wheel_picker::WheelPicker;
-pub use slider::Slider;
 pub use progress_view::ProgressView;
 pub use sidebar::Sidebar;
 pub use content_unavailable_view::ContentUnavailableView;
 pub use circular_gauge::{CircularGauge, CircularGaugeCenter};
+pub use elements::buttons::{Button, ButtonRole, ButtonStyle, ButtonBorderShape, ButtonSizing, RenameButton, EditButton, PasteButton};
+pub use elements::toolbars::{Toolbar, ToolbarItem, ToolbarSpacer, ToolbarItemPlacement, ToolbarSpacerSizing};
 #[cfg(feature = "coreicon")]
 pub use sidebar::SidebarIcon;
 
 pub const TONTOO_UI_VERSION: (u32, u32, u32) = (0, 1, 0);
 
 pub mod prelude {
-    pub use crate::{TextInput, WheelPicker, Slider, ProgressView, Sidebar, ContentUnavailableView, CircularGauge, CircularGaugeCenter, TONTOO_UI_VERSION};
+    pub use crate::{TextInput, WheelPicker, ProgressView, Sidebar, ContentUnavailableView, CircularGauge, CircularGaugeCenter, TONTOO_UI_VERSION};
+    pub use crate::elements::sliders::Slider;
+    pub use crate::elements::buttons::{Button, ButtonRole, ButtonStyle, ButtonBorderShape, ButtonSizing, RenameButton, EditButton, PasteButton};
+    pub use crate::elements::toolbars::{Toolbar, ToolbarItem, ToolbarSpacer, ToolbarItemPlacement, ToolbarSpacerSizing};
     #[cfg(feature = "coreicon")]
     pub use crate::SidebarIcon;
 

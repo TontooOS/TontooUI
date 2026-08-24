@@ -148,6 +148,9 @@ pub struct Slider {
     accent_color: Color,
     track_color: Color,
     label: Option<String>,
+    ticks: usize,
+    min_label: Option<String>,
+    max_label: Option<String>,
     width: f32,
     on_change: Option<Arc<dyn Fn(f32) + Send + Sync>>,
     position_mode: PositionMode,
@@ -158,7 +161,7 @@ impl Slider {
     pub fn new(min: f32, max: f32) -> Self {
         Self { id: next_widget_id(), min, max, initial_value: min, step: 0.0,
             accent_color: Color::new(0.016, 0.525, 0.941, 1.0), track_color: Color::from_rgb(51, 51, 51),
-            label: None, width: 300.0,
+            label: None, ticks: 0, min_label: None, max_label: None, width: 300.0,
             on_change: None, position_mode: PositionMode::Auto, position: Position::new() }
     }
     pub fn value(mut self, v: f32) -> Self { self.initial_value = v; self }
@@ -166,6 +169,9 @@ impl Slider {
     pub fn accent_color(mut self, c: Color) -> Self { self.accent_color = c; self }
     pub fn track_color(mut self, c: Color) -> Self { self.track_color = c; self }
     pub fn label(mut self, l: impl Into<String>) -> Self { self.label = Some(l.into()); self }
+    pub fn ticks(mut self, n: usize) -> Self { self.ticks = n; self }
+    pub fn min_label(mut self, l: impl Into<String>) -> Self { self.min_label = Some(l.into()); self }
+    pub fn max_label(mut self, l: impl Into<String>) -> Self { self.max_label = Some(l.into()); self }
     pub fn width(mut self, w: f32) -> Self { self.width = w; self }
     pub fn on_change(mut self, h: impl Fn(f32) + Send + Sync + 'static) -> Self { self.on_change = Some(Arc::new(h)); self }
     pub fn frame(mut self, w: f32, _h: f32) -> Self { self.width = w; self }
@@ -198,30 +204,26 @@ impl ViewContent for Slider {
         let container = gtk::Box::new(Orientation::Vertical, 8);
         container.set_width_request(w as i32);
 
-        let css = format!(
-            ".sl-c {{ background: transparent; }}
-             .sl-head {{ background: transparent; }}
-             .sl-outer {{ background: transparent; }}
-             .sl-bar {{ background: transparent; }}
-             .sl-lbl {{ color: rgba(255,255,255,0.6); font-family: 'SF Pro Display'; font-size: 13px; }}
-             .sl-val {{ color: {accent_hex}; font-family: 'SF Pro Display'; font-size: 28px; font-weight: 600; }}
-             .sl-track {{ background: {track_hex}; border-radius: 3px; min-height: 4px; }}
-             .sl-fill {{ background: {accent_hex}; border-radius: 3px; min-height: 4px; }}
-             .sl-thumb {{ background: white; border-radius: 15px; min-width: 30px; min-height: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }}"
-        );
-        uikit::widget::apply_css(&container, &css);
-        container.add_css_class("sl-c");
+        // GTK4 note: a CssProvider attached to a widget styles ONLY that
+        // widget, not its descendants. Every styled part gets its own
+        // provider attached directly to it.
 
         // Header
         let header = gtk::Box::new(Orientation::Horizontal, 8);
         header.set_hexpand(true);
-        header.add_css_class("sl-head");
         if let Some(ref lbl) = self.label {
-            let l = GtkLabel::new(Some(lbl)); l.add_css_class("sl-lbl"); header.append(&l);
+            let l = GtkLabel::new(Some(lbl));
+            l.add_css_class("sl-lbl");
+            uikit::widget::apply_css(&l, ".sl-lbl { color: rgba(255,255,255,0.6); font-family: 'SF Pro Display'; font-size: 13px; }");
+            header.append(&l);
         }
         let spacer = gtk::Box::new(Orientation::Horizontal, 0); spacer.set_hexpand(true); header.append(&spacer);
         let val_label = GtkLabel::new(Some(&self.value_text(self.initial_value)));
         val_label.add_css_class("sl-val");
+        uikit::widget::apply_css(&val_label, &format!(
+            ".sl-val {{ color: {accent_hex}; font-family: 'SF Pro Display'; font-size: 28px; font-weight: 600; }}",
+            accent_hex = accent_hex,
+        ));
         header.append(&val_label);
         container.append(&header);
 
@@ -241,12 +243,20 @@ impl ViewContent for Slider {
         let track_bg = gtk::Box::new(Orientation::Horizontal, 0);
         track_bg.set_hexpand(true); track_bg.set_height_request(4);
         track_bg.add_css_class("sl-track");
+        uikit::widget::apply_css(&track_bg, &format!(
+            ".sl-track {{ background: {track_hex}; border-radius: 3px; min-height: 4px; }}",
+            track_hex = track_hex,
+        ));
         track_bar.set_child(Some(&track_bg));
 
         let fill_bar = gtk::Box::new(Orientation::Horizontal, 0);
         fill_bar.set_hexpand(false); fill_bar.set_height_request(4);
         fill_bar.set_halign(gtk::Align::Start);
         fill_bar.add_css_class("sl-fill");
+        uikit::widget::apply_css(&fill_bar, &format!(
+            ".sl-fill {{ background: {accent_hex}; border-radius: 3px; min-height: 4px; }}",
+            accent_hex = accent_hex,
+        ));
         track_bar.add_overlay(&fill_bar);
 
         // Thumb (overlays on track)
@@ -255,10 +265,50 @@ impl ViewContent for Slider {
         thumb.set_halign(gtk::Align::Start);
         thumb.set_valign(gtk::Align::Center);
         thumb.add_css_class("sl-thumb");
+        uikit::widget::apply_css(&thumb, ".sl-thumb { background: white; border-radius: 15px; min-width: 30px; min-height: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }");
         track_bar.add_overlay(&thumb);
 
         track_outer.append(&track_bar);
-        container.append(&track_outer);
+
+        // Tick marks below the track, evenly distributed.
+        if self.ticks > 0 {
+            let row = gtk::Box::new(Orientation::Horizontal, 0);
+            row.set_hexpand(true);
+            row.set_margin_top(5);
+            row.set_homogeneous(true);
+            for _ in 0..self.ticks {
+                let cell = gtk::Box::new(Orientation::Horizontal, 0);
+                let dot = gtk::Box::new(Orientation::Horizontal, 0);
+                dot.set_halign(gtk::Align::Center);
+                dot.set_valign(gtk::Align::Center);
+                dot.add_css_class("sl-tick");
+                uikit::widget::apply_css(&dot, ".sl-tick { background: rgba(255,255,255,0.35); border-radius: 2px; min-width: 3px; min-height: 3px; }");
+                cell.append(&dot);
+                row.append(&cell);
+            }
+            track_outer.append(&row);
+        }
+
+        // Optional min/max labels flanking the track.
+        let track_row = gtk::Box::new(Orientation::Horizontal, 6);
+        track_row.set_hexpand(true);
+        track_row.set_valign(gtk::Align::Center);
+        if let Some(ref ml) = self.min_label {
+            let l = GtkLabel::new(Some(ml));
+            l.add_css_class("sl-lbl");
+            uikit::widget::apply_css(&l, ".sl-lbl { color: rgba(255,255,255,0.6); font-family: 'SF Pro Display'; font-size: 13px; }");
+            l.set_valign(gtk::Align::Center);
+            track_row.append(&l);
+        }
+        track_row.append(&track_outer);
+        if let Some(ref xl) = self.max_label {
+            let l = GtkLabel::new(Some(xl));
+            l.add_css_class("sl-lbl");
+            uikit::widget::apply_css(&l, ".sl-lbl { color: rgba(255,255,255,0.6); font-family: 'SF Pro Display'; font-size: 13px; }");
+            l.set_valign(gtk::Align::Center);
+            track_row.append(&l);
+        }
+        container.append(&track_row);
 
         // State
         let state = Rc::new(RefCell::new(SliderPhysics::new(self.initial_value)));
@@ -473,6 +523,15 @@ mod tests {
         assert_eq!(s.max, 100.0);
         assert_eq!(s.initial_value, 50.0);
         assert_eq!(s.track_color, Color::from_rgb(10, 20, 30));
+    }
+
+    #[test]
+    fn slider_ticks_and_range_labels() {
+        let s = Slider::new(0.0, 100.0).ticks(10).min_label("0").max_label("100");
+        assert_eq!(s.ticks, 10);
+        assert_eq!(s.min_label.as_deref(), Some("0"));
+        assert_eq!(s.max_label.as_deref(), Some("100"));
+        assert_eq!(Slider::new(0.0, 1.0).ticks, 0);
     }
 
     #[test]

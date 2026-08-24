@@ -267,15 +267,23 @@ impl ViewContent for CircularGauge {
         container.set_halign(gtk::Align::Center);
         container.set_valign(gtk::Align::Center);
 
-        let css = format!(
-            ".cg-center-big {{ font-family: 'SF Pro Display'; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: {text}; }}
-             .cg-center-small {{ font-family: 'SF Pro Display'; font-size: 9px; color: {text}; }}
-             .cg-minmax {{ font-family: 'SF Pro Display'; font-size: 11px; font-weight: 500; color: {small}; }}
-             .cg-label {{ font-family: 'SF Pro Display'; font-size: 13px; font-weight: 500; letter-spacing: 0.3px; color: {text}; }}",
+        // GTK4: providers are self-scoped, so each label carries its own CSS.
+        let big_css = format!(
+            ".cg-center-big {{ font-family: 'SF Pro Display'; font-size: 22px; font-weight: 700; letter-spacing: -0.5px; color: {text}; }}",
             text = text_c,
+        );
+        let small_css = format!(
+            ".cg-center-small {{ font-family: 'SF Pro Display'; font-size: 9px; color: {text}; }}",
+            text = text_c,
+        );
+        let minmax_css = format!(
+            ".cg-minmax {{ font-family: 'SF Pro Display'; font-size: 11px; font-weight: 500; color: {small}; }}",
             small = small_c,
         );
-        uikit::widget::apply_css(&container, &css);
+        let label_css = format!(
+            ".cg-label {{ font-family: 'SF Pro Display'; font-size: 13px; font-weight: 500; letter-spacing: 0.3px; color: {text}; }}",
+            text = text_c,
+        );
 
         let overlay = Overlay::new();
         overlay.set_size_request(size as i32, size as i32);
@@ -291,8 +299,14 @@ impl ViewContent for CircularGauge {
         if self.center != CircularGaugeCenter::None {
             let lbl = GtkLabel::new(Some(&center_text(&self.center, *self.value.borrow())));
             match &self.center {
-                CircularGaugeCenter::Float(_) => lbl.add_css_class("cg-center-small"),
-                _ => lbl.add_css_class("cg-center-big"),
+                CircularGaugeCenter::Float(_) => {
+                    lbl.add_css_class("cg-center-small");
+                    uikit::widget::apply_css(&lbl, &small_css);
+                }
+                _ => {
+                    lbl.add_css_class("cg-center-big");
+                    uikit::widget::apply_css(&lbl, &big_css);
+                }
             }
             lbl.set_halign(gtk::Align::Center);
             lbl.set_valign(gtk::Align::Center);
@@ -303,6 +317,7 @@ impl ViewContent for CircularGauge {
         if let Some(ref m) = self.min_label {
             let lbl = GtkLabel::new(Some(m));
             lbl.add_css_class("cg-minmax");
+            uikit::widget::apply_css(&lbl, &minmax_css);
             lbl.set_halign(gtk::Align::Start);
             lbl.set_valign(gtk::Align::End);
             lbl.set_margin_start((14.0 * s) as i32);
@@ -312,6 +327,7 @@ impl ViewContent for CircularGauge {
         if let Some(ref m) = self.max_label {
             let lbl = GtkLabel::new(Some(m));
             lbl.add_css_class("cg-minmax");
+            uikit::widget::apply_css(&lbl, &minmax_css);
             lbl.set_halign(gtk::Align::End);
             lbl.set_valign(gtk::Align::End);
             lbl.set_margin_end((8.0 * s) as i32);
@@ -326,6 +342,7 @@ impl ViewContent for CircularGauge {
         if let Some(ref lbl_text) = self.label {
             let lbl = GtkLabel::new(Some(lbl_text));
             lbl.add_css_class("cg-label");
+            uikit::widget::apply_css(&lbl, &label_css);
             lbl.set_halign(gtk::Align::Center);
             container.append(&lbl);
         }

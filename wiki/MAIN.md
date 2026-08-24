@@ -12,6 +12,8 @@ TontooUI is a SwiftUI-inspired declarative UI layer for TontooOS, built on top o
 |---|---|---|
 | Main index | [MAIN.md](MAIN.md) | This page |
 | Rules | [RULE.md](RULE.md) | Wiki design system and conventions |
+| Button | [Button.md](Button.md) | SwiftUI-style button: roles, styles, tint, border shapes, sizing + RenameButton/EditButton/PasteButton |
+| Toolbar | [Toolbar.md](Toolbar.md) | Glass capsule toolbar: Toolbar, ToolbarItem, ToolbarSpacer, placements |
 | TextInput | [TextInput.md](TextInput.md) | Single-line text input field |
 | WheelPicker | [WheelPicker.md](WheelPicker.md) | macOS/iOS scroll wheel picker |
 | Slider | [Slider.md](Slider.md) | Spring-physics slider with white pill thumb, dark glass while pressed |
@@ -45,6 +47,11 @@ See [TextInput.md](TextInput.md), [WheelPicker.md](WheelPicker.md), and [Slider.
 ```
 tontooui (SwiftUI-style layer)
  |
+ +-- Button          (roles, styles, tint, border shapes, sizing)
+ +-- Toolbar         (glass capsule bar: items, spacers, placements)
+ +-- RenameButton    (system rename action)
+ +-- EditButton      (Edit/Done toggle)
+ +-- PasteButton     (clipboard read)
  +-- TextInput       (placeholder, password, on_change, on_submit)
  +-- WheelPicker     (spring physics, snap-to-center, 3D fade)
  +-- Slider          (spring physics, white pill thumb, dark glass while pressed)
@@ -75,6 +82,8 @@ TontooUI is designed so long-running apps do not accumulate work over time:
 
 ## Cross References
 
+- [Button.md](Button.md) -- SwiftUI-style button element
+- [Toolbar.md](Toolbar.md) -- glass capsule toolbar elements
 - [TextInput.md](TextInput.md) -- text input element
 - [WheelPicker.md](WheelPicker.md) -- scroll wheel picker
 - [Slider.md](Slider.md) -- spring-physics slider

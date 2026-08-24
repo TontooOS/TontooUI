@@ -12,7 +12,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tontooui = { path = "/Library/System/tontooui.library" }
+tontooui = { path = "/Library/System/tontooui" }
 ```
 
 ## License
