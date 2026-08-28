@@ -202,10 +202,6 @@ impl ViewContent for ProgressView {
         container.set_halign(gtk::Align::Center);
         container.set_valign(gtk::Align::Center);
 
-        let css = ".pv-label { color: rgba(235, 235, 245, 0.6); font-family: 'SF Pro Display'; font-size: 13px; }
-                   .pv-sub { color: rgba(235, 235, 245, 0.4); font-family: 'SF Pro Display'; font-size: 11px; }";
-        uikit::widget::apply_css(&container, &css);
-
         let da = DrawingArea::new();
         da.set_size_request(size as i32, size as i32);
 
@@ -244,12 +240,14 @@ impl ViewContent for ProgressView {
         if let Some(ref lbl) = self.label {
             let l = gtk::Label::new(Some(lbl));
             l.add_css_class("pv-label");
+            uikit::widget::apply_css(&l, ".pv-label { color: rgba(235, 235, 245, 0.6); font-family: 'SF Pro Display'; font-size: 13px; }");
             l.set_halign(gtk::Align::Center);
             container.append(&l);
         }
         if let Some(ref sub) = self.sub_label {
             let s = gtk::Label::new(Some(sub));
             s.add_css_class("pv-sub");
+            uikit::widget::apply_css(&s, ".pv-sub { color: rgba(235, 235, 245, 0.4); font-family: 'SF Pro Display'; font-size: 11px; }");
             s.set_halign(gtk::Align::Center);
             container.append(&s);
         }
