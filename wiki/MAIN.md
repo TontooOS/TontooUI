@@ -32,6 +32,15 @@ TontooUI is a SwiftUI-inspired declarative UI layer for TontooOS, built on top o
 | Color | [Color.md](Color.md) | Color category: opacity/gradient/variants + UIKit system palettes + semantic/standard colors |
 | Text | [Text.md](Text.md) | Text category: formatted text for non-string types (initializer Text Format) |
 | Material | [Material.md](Material.md) | Material category: frosted glass materials (type Materials) |
+| Link | [Link.md](Link.md) | Link category: HelpLink, TextFieldLink, CustomPreview ShareLink, ShareLink, Link |
+| ControlGroup | [ControlGroup.md](ControlGroup.md) | ControlGroup category: ControlGroup + Palette/Navigation/Menu/CompactMenu styles |
+| Navigation | [Navigation.md](Navigation.md) | Navigation category: NavigationSubtitle modifier |
+| View | [View.md](View.md) | View category: 10 modifiers — pickers, sheets, swipe, backgrounds, controlSize, glass |
+| TabView | [TabView.md](TabView.md) | TabView category: 22 elements — sections, styles, customization, badges, accessories |
+| Sheet | [Sheet.md](Sheet.md) | Sheet category: 12 modifiers — placement, dismiss, sizing, backgrounds, detents, presenters |
+| Shapes | [Shapes.md](Shapes.md) | Shapes category: 7 shapes — circle, ellipse, capsule, rectangles, container-relative |
+| Label | [Label.md](Label.md) | Label category: 3 initializers + 1 style — custom, image, system image, styles |
+| LabeledContent | [LabeledContent.md](LabeledContent.md) | LabeledContent category: 3 initializers — custom, formatted, plain |
 
 ## Quick Start
 
@@ -83,6 +92,15 @@ tontooui (SwiftUI-style layer)
    +-- Color           (opacity/gradient/variants + UIKit label/fill/separator/background/text + semantic/standard)
    +-- Text            (Text + TextFormat initializer for formatted non-string)
    +-- Material        (Materials — ultraThin … ultraThick, bar)
+   +-- Link            (HelpLink, TextFieldLink, CustomPreview ShareLink, ShareLink, Link)
+   +-- ControlGroup    (ControlGroup + Palette/Navigation/Menu/CompactMenu styles)
+   +-- Navigation      (NavigationSubtitle modifier)
+   +-- View            (MusicPicker, AppStoreOverlay, ManageSubscriptionsSheet, SwipeContainer, SwipeAction, NavSplitBg, NavContainerBg, ControlSize, BgExtension, Glass)
+   +-- TabView         (TabSection, TabBarOnly, TabView, SearchRole, Grouped/Page/Vertical/Sidebar styles, BottomAccessory, Collapse, Customization, Sidebar Footer/Header/BottomBar, Actions, Badge, HiddenIndex, Value, HideOnScroll)
+  +-- Sheet           (Placement, DisableDismiss, PageSize, FittedSizing, CornerRadius, PrioritizeScrolling, BgInteraction, Bg, DragIndicator, Size/Detents, Item, Boolean)
+  +-- Shapes          (Circle, Ellipse, Capsule, Rectangle, RoundedRectangle, UnevenRoundedRectangle, ContainerRelativeShape)
+  +-- Label           (CustomLabel, ImageLabel, SystemImageLabel, LabelStyles)
+  +-- LabeledContent  (CustomLabeledContent, FormattedLabeledContent, LabeledContent)
  |
  +-- uikit (backend)
       +-- View, Widget, ViewContent
@@ -126,3 +144,12 @@ TontooUI is designed so long-running apps do not accumulate work over time:
 - [Color.md](Color.md) -- color system (opacity/gradient/variants + UIKit palettes + semantic/standard)
 - [Text.md](Text.md) -- text and formatted text initializer
 - [Material.md](Material.md) -- frosted glass materials
+- [Link.md](Link.md) -- link & sharing controls
+- [ControlGroup.md](ControlGroup.md) -- control groups and styles
+- [Navigation.md](Navigation.md) -- navigation subtitle modifier
+- [View.md](View.md) -- view modifiers (music picker, sheets, swipe, backgrounds, glass)
+- [TabView.md](TabView.md) -- tab view containers, styles, modifiers (22 elements)
+- [Sheet.md](Sheet.md) -- sheet presentations and modifiers (12 elements)
+- [Shapes.md](Shapes.md) -- shape views (7 elements)
+- [Label.md](Label.md) -- label initializers and styles (4 elements)
+- [LabeledContent.md](LabeledContent.md) -- labeled informational views (3 elements)

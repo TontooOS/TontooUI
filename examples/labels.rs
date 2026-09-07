@@ -1,0 +1,57 @@
+//! TontooUI Label demo — all 4 Label elements directly on window.
+
+use tontooui::prelude::*;
+use tontooui::{CustomLabel, ImageLabel, LabelStyles, SystemImageLabel};
+
+fn cell(title: &str, desc: &str, badge: &str, preview: impl Widget + 'static) -> impl Widget {
+    let is_dark = uikit::app::ColorScheme::detect_system() == uikit::app::ColorScheme::Dark;
+    let title_c = if is_dark { Color::WHITE } else { Color::from_hex("#1d1d1d").unwrap() };
+    let desc_c = if is_dark { Color::from_hex("#98989d").unwrap() } else { Color::from_hex("#6c6c70").unwrap() };
+    VStack::new()
+        .spacing(8.0)
+        .child(
+            HStack::new().spacing(0.0).child(
+                Text::new(badge).font_size(7.0).bold().color(Color::from_hex("#0A84FF").unwrap()),
+            ),
+        )
+        .child(preview)
+        .child(Text::new(title).font_size(11.0).bold().color(title_c).max_width(200.0))
+        .child(Text::new(desc).font_size(9.0).color(desc_c).max_width(200.0))
+}
+
+fn main() {
+    let mut app = App::new("TontooUI Label", 1180, 900);
+    let title = Text::new("Label").font_size(18.0).bold().color(Color::from_hex("#7dd3e0").unwrap());
+
+    let row = HStack::new()
+        .spacing(24.0)
+        .child(cell(
+            "Custom Label",
+            "Creates a label with a custom title and icon.",
+            "initializer",
+            CustomLabel::new(),
+        ))
+        .child(cell(
+            "Image Label",
+            "Creates a label with an icon image and a title from a localized string.",
+            "initializer",
+            ImageLabel::new(),
+        ))
+        .child(cell(
+            "System Image Label",
+            "Creates a label with a system icon image and a localized title.",
+            "initializer",
+            SystemImageLabel::new(),
+        ))
+        .child(cell(
+            "Label Styles",
+            "Sets the style for labels within this view.",
+            "style",
+            LabelStyles::new(),
+        ));
+
+    let grid = VStack::new().spacing(28.0).child(row);
+    let root = VStack::new().spacing(18.0).child(title).child(grid);
+    app.set_root(root);
+    app.run();
+}
