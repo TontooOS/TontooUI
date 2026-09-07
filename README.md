@@ -12,7 +12,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tontooui = { path = "/Library/System/tontooui" }
+sdk = { path = "/Library/System/sdk", features = ["TontooUI"] }
+```
+
+Then at the crate root:
+
+```rust
+sdk::preinclude!();
+use TontooUI::{ /* ... */ };
 ```
 
 ## License

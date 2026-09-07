@@ -20,6 +20,7 @@ use uikit::view::{View, ViewContent};
 use uikit::widget::{Position, PositionMode, Widget, WidgetId, next_widget_id};
 use gtk::prelude::*;
 use gtk::{self, Entry};
+use crate::elements::resolve_scheme;
 
 /// A SwiftUI-style text input field.
 pub struct TextInput {
@@ -150,13 +151,26 @@ impl TextInput {
             (self.accent_color.b * 255.0) as u8,
         );
 
-        let bg_color = if self.is_disabled { "#1a1a1c" } else { "#2a2a2c" };
-        let border_color = if self.is_disabled { "#2a2a2c" } else { "#3a3a3d" };
+        let is_dark = resolve_scheme(None) == uikit::app::ColorScheme::Dark;
+        // BG #1d1d1d dark / #ececec light per AGENTS.md — input field sits slightly above bg
+        let bg_color = if is_dark {
+            if self.is_disabled { "#1a1a1c" } else { "#2a2a2c" }
+        } else {
+            if self.is_disabled { "#e8e8ea" } else { "#ffffff" }
+        };
+        let border_color = if is_dark {
+            if self.is_disabled { "#2a2a2c" } else { "#3a3a3d" }
+        } else {
+            if self.is_disabled { "#e5e5e5" } else { "#d1d1d6" }
+        };
+        let text_color = if is_dark { "#ececec" } else { "#1d1d1d" };
+        let placeholder_color = if is_dark { "#8e8e93" } else { "#aeaeb2" };
+        let hover_color = if is_dark { "#4a4a4e" } else { "#aeaeb2" };
 
         let css = format!(
             "entry {{
                 background-color: {bg_color};
-                color: #ececec;
+                color: {text_color};
                 border-radius: 8px;
                 border: 1px solid {border_color};
                 padding: 4px 10px;
@@ -165,14 +179,26 @@ impl TextInput {
                 font-size: 13px;
                 caret-color: {accent};
             }}
+            entry placeholder {{
+                color: {placeholder_color};
+                opacity: 1;
+            }}
             entry:hover {{
-                border-color: #4a4a4e;
+                border-color: {hover_color};
             }}
             entry:focus {{
                 border-color: {accent};
+            }}
+            entry:disabled {{
+                background-color: {bg_color};
+                color: {placeholder_color};
+                border-color: {border_color};
             }}",
             bg_color = bg_color,
             border_color = border_color,
+            text_color = text_color,
+            placeholder_color = placeholder_color,
+            hover_color = hover_color,
             accent = accent_hex,
         );
         uikit::widget::apply_css(&entry, &css);

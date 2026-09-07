@@ -33,6 +33,8 @@ pub struct ContentUnavailableView {
     query: String,
     title_prefix: String,
     message: String,
+    icon_name: Option<String>,
+    button_label: Option<String>,
     width: f32,
     height: f32,
     color_scheme: Option<ColorScheme>,
@@ -48,6 +50,8 @@ impl ContentUnavailableView {
             query: String::new(),
             title_prefix: "No Results for".into(),
             message: "Check the spelling or try a new search.".into(),
+            icon_name: None,
+            button_label: None,
             width: 320.0,
             height: 240.0,
             color_scheme: None,
@@ -62,6 +66,11 @@ impl ContentUnavailableView {
     pub fn title(mut self, prefix: impl Into<String>) -> Self { self.title_prefix = prefix.into(); self }
     /// Set the hint message below the title.
     pub fn message(mut self, text: impl Into<String>) -> Self { self.message = text.into(); self }
+    /// Set the SF Symbol icon name (e.g. "tray", "envelope", "magnifyingglass").
+    /// Defaults to "magnifyingglass" for search variants.
+    pub fn icon(mut self, name: impl Into<String>) -> Self { self.icon_name = Some(name.into()); self }
+    /// Add a call-to-action button below the message (e.g. "Switch Account").
+    pub fn button(mut self, label: impl Into<String>) -> Self { self.button_label = Some(label.into()); self }
     /// Set the element size.
     pub fn frame(mut self, w: f32, h: f32) -> Self { self.width = w; self.height = h; self }
     pub fn width(mut self, w: f32) -> Self { self.width = w; self }
@@ -130,10 +139,16 @@ fn sf_icon_path(symbol: &str, color: coreicon::Color) -> Option<String> {
 }
 
 /// Build the title text: `No Results for "foo"` (a space when empty, matching
-/// the reference SwiftUI fallback behavior).
+/// the reference SwiftUI fallback behavior). When query is empty and prefix
+/// is a plain title like "No Mail", return the prefix as-is.
 fn title_text(prefix: &str, query: &str) -> String {
-    let shown = if query.trim().is_empty() { " " } else { query };
-    format!("{} \"{}\"", prefix, shown)
+    if query.trim().is_empty() {
+        if prefix != "No Results for" {
+            return prefix.to_string();
+        }
+        return format!("{} \"{}\"", prefix, " ");
+    }
+    format!("{} \"{}\"", prefix, query)
 }
 
 impl ViewContent for ContentUnavailableView {
@@ -162,11 +177,16 @@ impl ViewContent for ContentUnavailableView {
             } else {
                 coreicon::Color::new(0.63, 0.63, 0.67, 1.0) // zinc-400
             };
-            if let Some(p) = sf_icon_path("magnifyingglass", icon_color) {
+            let icon_key = self.icon_name.as_deref().unwrap_or("magnifyingglass");
+            if let Some(p) = sf_icon_path(icon_key, icon_color) {
                 let icon = gtk::Image::from_file(&p);
                 icon.set_pixel_size(64);
                 center.append(&icon);
             }
+        }
+        #[cfg(not(feature = "coreicon"))]
+        {
+            let _ = &self.icon_name;
         }
 
         let title = GtkLabel::new(Some(&title_text(&self.title_prefix, &self.query)));
@@ -200,6 +220,14 @@ impl ViewContent for ContentUnavailableView {
         );
         uikit::widget::apply_css(&msg, &mcss);
         center.append(&msg);
+
+        if let Some(ref btn_text) = self.button_label {
+            let btn = gtk::Button::with_label(btn_text);
+            btn.set_halign(gtk::Align::Center);
+            // SF Pro, blue pill, white text — works on both #1d1d1d / #ececec
+            uikit::widget::apply_css(&btn, "button { background: #0A84FF; color: white; font-family: 'SF Pro Display'; font-size: 12px; font-weight: 600; border-radius: 999px; padding: 6px 14px; border: none; margin-top: 12px; } button:hover { background: #0070E0; }");
+            center.append(&btn);
+        }
 
         container.append(&center);
 

@@ -19,6 +19,75 @@
       "title_prefix": "No Results for",
       "message": "Check the spelling or try a new search.",
       "placeholder_default": "Search"
+    },
+    "wheel_picker": {
+      "name": "Wheel Picker"
+    },
+    "picker": {
+      "name": "Picker",
+      "custom_value_label": "Custom Value Label Picker",
+      "custom_value_label_desc": "Creates a picker that generates its label from a localized string key and accepts a selection binding.",
+      "multiple_sources": "Multiple Sources Picker",
+      "multiple_sources_desc": "Creates a picker that updates the selected property for all sources.",
+      "picker_with_assets": "Picker",
+      "picker_with_assets_desc": "Creates pickers with title, image, systemImage, and custom label.",
+      "tabs_style": "TabsPickerStyle",
+      "tabs_style_desc": "A picker style that presents options as segmented tabs. On macOS, this style uses a tab view.",
+      "wheel_style": "WheelPickerStyle",
+      "wheel_style_desc": "A picker style that presents the options in a scrollable wheel that shows the selected value in the center.",
+      "segmented_style": "SegmentedPickerStyle",
+      "segmented_style_desc": "A picker style that presents the options in a segmented control. Use this style for a small number of options.",
+      "palette_style": "PalettePickerStyle",
+      "palette_style_desc": "A picker style that presents the options as a row of compact elements. When the palette is expanded, options are shown in a grid.",
+      "radio_group_style": "RadioGroupPickerStyle",
+      "radio_group_style_desc": "A picker style that presents the options as a group of radio buttons.",
+      "navigation_link_style": "NavigationLinkPickerStyle",
+      "navigation_link_style_desc": "A picker style represented by a navigation link that presents the options in a list when tapped.",
+      "menu_style": "MenuPickerStyle",
+      "menu_style_desc": "A picker style that presents the options as a menu when the user presses the picker.",
+      "inline_style": "InlinePickerStyle",
+      "inline_style_desc": "A PickerStyle where each option is displayed inline with other views in the container.",
+      "wheel_item_height": "Wheel Picker Item Height",
+      "wheel_item_height_desc": "Sets the default wheel-style picker item height.",
+      "horizontal_radio": "Horizontal Radio Group Layout",
+      "horizontal_radio_desc": "Sets the style for radio group style pickers within this view to be horizontal.",
+      "picker_section": "Picker Section",
+      "picker_section_desc": "A Section inside a Picker.",
+      "picker_divider": "Picker Divider",
+      "picker_divider_desc": "A Picker with a Divider."
+    },
+    "color": {
+      "name": "Color",
+      "color_opacity": "Color Opacity",
+      "color_opacity_desc": "The Color opacity modifier",
+      "color_gradient": "Color Gradient",
+      "color_gradient_desc": "The Color gradient modifier",
+      "color_variants": "Color Variants",
+      "color_variants_desc": "HierarchicalShapeStyle, a shape style that maps to one of the numbered content styles",
+      "separator_colors": "UIKit Separator Colors",
+      "separator_colors_desc": "The UIKit separator colors that are also used in other components, such as the separator in List",
+      "content_background_colors": "UIKit Content Background colors",
+      "content_background_colors_desc": "The UIKit colors that are also used in other components like in List and Form backgrounds",
+      "text_colors": "UIKit Text Colors",
+      "text_colors_desc": "The UIKit text colors that are also used in other components, such as the placeholder in TextField",
+      "fill_colors": "UIKit Fill Colors",
+      "fill_colors_desc": "The UIKit fill colors that indicate the fill of a view",
+      "label_colors": "UIKit Label Colors",
+      "label_colors_desc": "The UIKit label colors for text",
+      "semantic_colors": "Semantic Colors",
+      "semantic_colors_desc": "The semantic colors that adapt to the current color scheme",
+      "standard_colors": "Standard Colors",
+      "standard_colors_desc": "The SwiftUI standard colors"
+    },
+    "text": {
+      "name": "Text",
+      "text_format": "Text Format",
+      "text_format_desc": "Creates a text view that displays the formatted representation of a non-string type"
+    },
+    "material": {
+      "name": "Material",
+      "materials": "Materials",
+      "materials_desc": "All materials"
     }
   }
 }

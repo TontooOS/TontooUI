@@ -15,7 +15,7 @@ fn section(title: &str, desc: &str, preview: impl Widget + 'static) -> impl Widg
 fn main() {
     let mut app = App::new("TontooUI Sliders", 1080, 560);
 
-    let blue = Color::from_rgb(10, 132, 255);
+    let _blue = Color::from_rgb(10, 132, 255);
     let red = Color::from_rgb(255, 69, 58);
 
     // 1 — SliderTickContentForEach: ticks from a collection

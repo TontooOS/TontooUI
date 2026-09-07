@@ -369,13 +369,49 @@ impl ViewContent for Slider {
                     // The tick only has work to do while the knob is being
                     // dragged, wobbling after a release, or any spring is still
                     // moving. Once everything settles the loop stops itself.
+                    // Require !is_dragging so the timer never stops mid-drag
+                    // (holding still would otherwise leave the thumb stuck at 1.25×).
                     let target_grow = if s.is_dragging { 1.25 } else { 1.0 };
-                    let settled = (s.display_value - s.target_value).abs() < 0.01
+                    let settled = !s.is_dragging
+                        && !s.wobbling
+                        && (s.display_value - s.target_value).abs() < 0.01
                         && (s.grow - target_grow).abs() < 0.01
                         && s.squish_vel_x.abs() < 0.001
                         && s.squish_vel_y.abs() < 0.001
-                        && !s.wobbling;
+                        && (s.squish_x - 1.0).abs() < 0.01
+                        && (s.squish_y - 1.0).abs() < 0.01;
                     if settled {
+                        // Snap to exact rest state and paint it before stopping,
+                        // otherwise the last painted frame (e.g. grow 1.01) would
+                        // remain visible forever.
+                        s.grow = 1.0;
+                        s.squish_x = 1.0;
+                        s.squish_y = 1.0;
+                        s.squish_vel_x = 0.0;
+                        s.squish_vel_y = 0.0;
+                        let norm = s.value_norm();
+                        let display = s.display_value;
+                        drop(s);
+                        let fill_px = norm * tw;
+                        let thumb_px = norm * tw;
+                        fb.set_width_request(fill_px.max(0.0) as i32);
+                        tb.set_margin_start(thumb_px.max(0.0) as i32);
+                        tb.set_size_request(30, 20);
+                        update_cached_css(
+                            &tb,
+                            ".sl-thumb { border-radius: 15px; background: white; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }",
+                            &tc,
+                        );
+                        let text = if step_c > 0.0 && step_c.fract() == 0.0 {
+                            format!("{:.0}", display)
+                        } else if step_c > 0.0 {
+                            let fmt = format!("{:.10}", step_c);
+                            let dec = fmt.trim_end_matches('0').split('.').last().unwrap_or("0").len();
+                            format!("{:.prec$}", display, prec = dec)
+                        } else {
+                            format!("{:.1}", display)
+                        };
+                        vl.set_text(&text);
                         *tm.borrow_mut() = None;
                         return glib::ControlFlow::Break;
                     }
@@ -439,13 +475,21 @@ impl ViewContent for Slider {
             }
         };
 
-        // Click + drag on track
+        // One gesture on track_outer is enough — the thumb is an Overlay
+        // child that would otherwise steal the hit-test. With
+        // PropagationPhase::Capture the ancestor receives the event before
+        // the child, and the thumb is marked non-targetable so it never
+        // consumes the press. Attaching the same gesture to thumb/bar caused
+        // triple firing with different local x coordinates (flackern).
+        thumb.set_can_target(false);
+        track_bar.set_can_target(false);
+
         {
             let state = state.clone();
             let start_tick = start_tick.clone();
             let press = gtk::GestureClick::new();
             press.set_button(1);
-
+            press.set_propagation_phase(gtk::PropagationPhase::Capture);
             {
                 let state = state.clone();
                 let start_tick = start_tick.clone();
@@ -467,9 +511,36 @@ impl ViewContent for Slider {
                 let start_tick = start_tick.clone();
                 press.connect_released(move |_g, _n, _x, _y| {
                     let mut s = state.borrow_mut();
+                    if !s.is_dragging { return; }
                     s.is_dragging = false;
-                    s.wobbling = true;
+                    // Kurze Release-Animation statt instant Snap oder 1s Wobble:
+                    // Squish sofort neutralisieren (verhinderte das 1s Dickbleiben),
+                    // Grow animiert im Tick schnell auf 1.0 zurück (~200ms).
+                    s.squish_x = 1.0;
+                    s.squish_y = 1.0;
+                    s.squish_vel_x = 0.0;
+                    s.squish_vel_y = 0.0;
+                    s.wobbling = false;
                     s.wobble_time = 0.0;
+                    s.drag_vel = 0.0;
+                    drop(s);
+                    start_tick();
+                });
+            }
+            {
+                let state = state.clone();
+                let start_tick = start_tick.clone();
+                press.connect_cancel(move |_g, _seq| {
+                    let mut s = state.borrow_mut();
+                    if !s.is_dragging { return; }
+                    s.is_dragging = false;
+                    s.squish_x = 1.0;
+                    s.squish_y = 1.0;
+                    s.squish_vel_x = 0.0;
+                    s.squish_vel_y = 0.0;
+                    s.wobbling = false;
+                    s.wobble_time = 0.0;
+                    s.drag_vel = 0.0;
                     drop(s);
                     start_tick();
                 });
@@ -481,6 +552,7 @@ impl ViewContent for Slider {
             let state = state.clone();
             let start_tick = start_tick.clone();
             let motion = gtk::EventControllerMotion::new();
+            motion.set_propagation_phase(gtk::PropagationPhase::Capture);
             let tw = w - 30.0;
             motion.connect_motion(move |_m, x, _y| {
                 let mut s = state.borrow_mut();

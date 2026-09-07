@@ -19,6 +19,75 @@
       "title_prefix": "Keine Ergebnisse fuer",
       "message": "Ueberpruefe die Schreibweise oder versuche eine neue Suche.",
       "placeholder_default": "Suchen"
+    },
+    "wheel_picker": {
+      "name": "Wheel Picker"
+    },
+    "picker": {
+      "name": "Picker",
+      "custom_value_label": "Picker mit benutzerdefiniertem Label",
+      "custom_value_label_desc": "Erzeugt einen Picker, dessen Label aus einem lokalisierten Schluessel generiert wird.",
+      "multiple_sources": "Picker mit mehreren Quellen",
+      "multiple_sources_desc": "Erzeugt einen Picker, der die Auswahl fuer alle Quellen aktualisiert.",
+      "picker_with_assets": "Picker",
+      "picker_with_assets_desc": "Erzeugt Picker mit Titel, Bild, System-Bild und benutzerdefiniertem Label.",
+      "tabs_style": "TabsPickerStyle",
+      "tabs_style_desc": "Ein Picker-Stil, der Optionen als segmentierte Tabs darstellt.",
+      "wheel_style": "WheelPickerStyle",
+      "wheel_style_desc": "Ein Picker-Stil, der Optionen in einem scrollbaren Rad mit zentrierter Auswahl darstellt.",
+      "segmented_style": "SegmentedPickerStyle",
+      "segmented_style_desc": "Ein Picker-Stil als segmentiertes Steuerelement.",
+      "palette_style": "PalettePickerStyle",
+      "palette_style_desc": "Ein Picker-Stil, der Optionen als Reihe kompakter Elemente darstellt.",
+      "radio_group_style": "RadioGroupPickerStyle",
+      "radio_group_style_desc": "Ein Picker-Stil, der Optionen als Gruppe von Radio-Buttons darstellt.",
+      "navigation_link_style": "NavigationLinkPickerStyle",
+      "navigation_link_style_desc": "Ein Picker-Stil als Navigations-Link, der Optionen in einer Liste zeigt.",
+      "menu_style": "MenuPickerStyle",
+      "menu_style_desc": "Ein Picker-Stil, der Optionen als Menue beim Druecken zeigt.",
+      "inline_style": "InlinePickerStyle",
+      "inline_style_desc": "Ein Picker-Stil, bei dem jede Option inline mit anderen Views angezeigt wird.",
+      "wheel_item_height": "Wheel Picker Elementhoehe",
+      "wheel_item_height_desc": "Setzt die Standard-Zeilenhoehe fuer Wheel-Picker.",
+      "horizontal_radio": "Horizontales Radio-Gruppen-Layout",
+      "horizontal_radio_desc": "Setzt den Stil fuer Radio-Gruppen-Picker auf horizontales Layout.",
+      "picker_section": "Picker Abschnitt",
+      "picker_section_desc": "Ein Abschnitt innerhalb eines Pickers.",
+      "picker_divider": "Picker Trennlinie",
+      "picker_divider_desc": "Ein Picker mit Trennlinie."
+    },
+    "color": {
+      "name": "Farbe",
+      "color_opacity": "Farb-Deckkraft",
+      "color_opacity_desc": "Der Farb-Deckkraft-Modifikator",
+      "color_gradient": "Farbverlauf",
+      "color_gradient_desc": "Der Farbverlauf-Modifikator",
+      "color_variants": "Farbvarianten",
+      "color_variants_desc": "HierarchicalShapeStyle, ein Form-Stil fuer nummerierte Inhaltsstile",
+      "separator_colors": "UIKit Trennfarben",
+      "separator_colors_desc": "Die UIKit-Trennfarben fuer Listen-Separatoren",
+      "content_background_colors": "UIKit Hintergrundfarben",
+      "content_background_colors_desc": "Die UIKit-Hintergrundfarben fuer Listen und Formulare",
+      "text_colors": "UIKit Textfarben",
+      "text_colors_desc": "Die UIKit-Textfarben fuer Platzhalter",
+      "fill_colors": "UIKit Fuellfarben",
+      "fill_colors_desc": "Die UIKit-Fuellfarben fuer Views",
+      "label_colors": "UIKit Labelfarben",
+      "label_colors_desc": "Die UIKit-Labelfarben fuer Text",
+      "semantic_colors": "Semantische Farben",
+      "semantic_colors_desc": "Adaptive semantische Farben",
+      "standard_colors": "Standardfarben",
+      "standard_colors_desc": "Die SwiftUI Standardfarben"
+    },
+    "text": {
+      "name": "Text",
+      "text_format": "Text Format",
+      "text_format_desc": "Erzeugt eine Textansicht fuer formatierte Nicht-String-Werte"
+    },
+    "material": {
+      "name": "Material",
+      "materials": "Materialien",
+      "materials_desc": "Alle Materialien"
     }
   }
 }

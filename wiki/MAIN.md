@@ -14,13 +14,24 @@ TontooUI is a SwiftUI-inspired declarative UI layer for TontooOS, built on top o
 | Rules | [RULE.md](RULE.md) | Wiki design system and conventions |
 | Button | [Button.md](Button.md) | SwiftUI-style button: roles, styles, tint, border shapes, sizing + RenameButton/EditButton/PasteButton |
 | Toolbar | [Toolbar.md](Toolbar.md) | Glass capsule toolbar: Toolbar, ToolbarItem, ToolbarSpacer, placements |
+| Toggle | [Toggle.md](Toggle.md) | SwiftUI-style toggle: switch style and checkbox style |
 | TextInput | [TextInput.md](TextInput.md) | Single-line text input field |
 | WheelPicker | [WheelPicker.md](WheelPicker.md) | macOS/iOS scroll wheel picker |
+| Picker | [Picker.md](Picker.md) | SwiftUI-style picker: wheel, segmented, palette, radio, menu, inline, tabs, navigation + sections/dividers |
 | Slider | [Slider.md](Slider.md) | Spring-physics slider with white pill thumb, dark glass while pressed |
-| ProgressView | [ProgressView.md](ProgressView.md) | Loading indicator: spinner or progress ring |
+| ProgressView | [ProgressView.md](ProgressView.md) | Loading indicator: spinner/ring or linear bar (Circular/Linear, Light/Dark) |
 | Sidebar | [Sidebar.md](Sidebar.md) | macOS-style sidebar with traffic lights, search, items, color/gradient background |
 | ContentUnavailableView | [ContentUnavailableView.md](ContentUnavailableView.md) | Empty state with icon, title and hint message |
-| CircularGauge | [CircularGauge.md](CircularGauge.md) | iOS/macOS accessory circular gauge with live value |
+| Gauge | [Gauge.md](Gauge.md) | SwiftUI-style gauge: linear/circular, capacity/marker, accessory styles, tint/gradient |
+| Menu | [Menu.md](Menu.md) | Liquid Glass menu (items, dividers, sections, nested) + ContextMenu with custom preview |
+| ViewThatFits | [ViewThatFits.md](ViewThatFits.md) | Adaptive container that picks first child fitting available space (Vertical/Horizontal) |
+| Divider | [Divider.md](Divider.md) | Separator line (Horizontal/Vertical, thickness, Light/Dark) |
+| List | [List.md](List.md) | List with sections, rows, Outline/Disclosure, styles, separators, badges, swipe actions |
+| GroupBox | [GroupBox.md](GroupBox.md) | Inset grouped container (label, custom background, Light/Dark) |
+| ScrollView | [ScrollView.md](ScrollView.md) | Scrollable container with Hard/Soft edge effect (Light/Dark) |
+| Color | [Color.md](Color.md) | Color category: opacity/gradient/variants + UIKit system palettes + semantic/standard colors |
+| Text | [Text.md](Text.md) | Text category: formatted text for non-string types (initializer Text Format) |
+| Material | [Material.md](Material.md) | Material category: frosted glass materials (type Materials) |
 
 ## Quick Start
 
@@ -49,16 +60,29 @@ tontooui (SwiftUI-style layer)
  |
  +-- Button          (roles, styles, tint, border shapes, sizing)
  +-- Toolbar         (glass capsule bar: items, spacers, placements)
+ +-- Toggle          (switch style + checkbox style)
  +-- RenameButton    (system rename action)
  +-- EditButton      (Edit/Done toggle)
  +-- PasteButton     (clipboard read)
  +-- TextInput       (placeholder, password, on_change, on_submit)
  +-- WheelPicker     (spring physics, snap-to-center, 3D fade)
- +-- Slider          (spring physics, white pill thumb, dark glass while pressed)
- +-- ProgressView    (indeterminate spinner / determinate ring)
- +-- Sidebar         (traffic lights, search, selectable item list)
-+-- ContentUnavailableView (empty state with icon, title, message)
-+-- CircularGauge (270-degree ring gauge, live value)
+ +-- Picker          (all picker styles: wheel, segmented, palette, radio, menu, inline, tabs, nav + sections/dividers)
+ +-- PickerItem      (title / image / systemImage / custom label per row)
+ +-- PickerSection   (section inside a picker)
+  +-- Slider          (spring physics, white pill thumb, dark glass while pressed)
+   +-- ProgressView    (Circular spinner/ring or Linear bar, tint, Light/Dark)
+   +-- Sidebar         (traffic lights, search, selectable item list)
+   +-- ContentUnavailableView (empty state with icon, title, message, button)
+   +-- Gauge           (linear/circular/capacity/accessory styles, tint/gradient)
+   +-- Menu            (Liquid Glass items/dividers/sections/nested) + ContextMenu (custom preview)
+   +-- ViewThatFits    (Vertical/Horizontal adaptive, picks first fitting child)
+   +-- Divider         (Horizontal/Vertical separator, thickness, Light/Dark)
+   +-- List            (Plain/Inset/InsetGrouped/Sidebar/Elliptical/Carousel/Bordered + Outline/Disclosure + badges/separators/swipe)
+   +-- GroupBox        (label + inset rounded rect, custom background, Light/Dark)
+   +-- ScrollView      (vertical/horizontal, Hard vs Soft edge, Light/Dark)
+   +-- Color           (opacity/gradient/variants + UIKit label/fill/separator/background/text + semantic/standard)
+   +-- Text            (Text + TextFormat initializer for formatted non-string)
+   +-- Material        (Materials — ultraThin … ultraThick, bar)
  |
  +-- uikit (backend)
       +-- View, Widget, ViewContent
@@ -84,10 +108,21 @@ TontooUI is designed so long-running apps do not accumulate work over time:
 
 - [Button.md](Button.md) -- SwiftUI-style button element
 - [Toolbar.md](Toolbar.md) -- glass capsule toolbar elements
+- [Toggle.md](Toggle.md) -- switch/checkbox toggle element
 - [TextInput.md](TextInput.md) -- text input element
 - [WheelPicker.md](WheelPicker.md) -- scroll wheel picker
+- [Picker.md](Picker.md) -- all picker styles (wheel, segmented, palette, radio, menu, inline, tabs, navigation)
 - [Slider.md](Slider.md) -- spring-physics slider
-- [ProgressView.md](ProgressView.md) -- loading indicator
+- [ProgressView.md](ProgressView.md) -- loading indicator (Circular/Linear)
 - [Sidebar.md](Sidebar.md) -- sidebar with traffic lights and item list
-- [ContentUnavailableView.md](ContentUnavailableView.md) -- empty state with icon, title, message
-- [CircularGauge.md](CircularGauge.md) -- 270-degree ring gauge with live value
+- [ContentUnavailableView.md](ContentUnavailableView.md) -- empty state with icon, title, message, button
+- [Gauge.md](Gauge.md) -- gauge with all SwiftUI styles and tint support
+- [Menu.md](Menu.md) -- Liquid Glass menu + context menu
+- [ViewThatFits.md](ViewThatFits.md) -- adaptive fitting container
+- [Divider.md](Divider.md) -- separator line
+- [List.md](List.md) -- list with all styles and 32 modifiers
+- [GroupBox.md](GroupBox.md) -- inset grouped container
+- [ScrollView.md](ScrollView.md) -- scrollable with edge effect
+- [Color.md](Color.md) -- color system (opacity/gradient/variants + UIKit palettes + semantic/standard)
+- [Text.md](Text.md) -- text and formatted text initializer
+- [Material.md](Material.md) -- frosted glass materials
