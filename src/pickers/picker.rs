@@ -896,12 +896,12 @@ fn render_menu(picker: &Picker, dark: bool) -> gtk::Widget {
     inner.append(&chev);
     btn.set_child(Some(&inner));
 
-    let bg = if dark { "#2c2c2e" } else { "#ffffff" };
-    let border = if dark { "#3a3a3c" } else { "#d0d0d2" };
+    // Transparent like a SwiftUI Menu picker: plain label + chevron, no box,
+    // no border, no focus outline — matches the other borderless styles.
     btn.add_css_class("pk-menu-btn");
     uikit::widget::apply_css(
         &btn,
-        &format!(".pk-menu-btn {{ background: {bg}; border-radius: 10px; border: 1px solid {border}; padding: 8px 12px; }}"),
+        ".pk-menu-btn { background: transparent; border: none; outline: none; padding: 8px 12px; border-radius: 10px; } .pk-menu-btn:focus { outline: none; }",
     );
 
     let pop = gtk::Popover::new();
@@ -1536,32 +1536,10 @@ impl ViewContent for Picker {
             PickerStyle::Tabs => render_tabs(self, dark),
         };
 
-        // For styles that embed their own label, just attach the widget.
-        // For inline/tabs/nav/wheel the widget already contains everything.
-        match self.style {
-            PickerStyle::Inline | PickerStyle::Tabs | PickerStyle::NavigationLink | PickerStyle::Wheel => {
-                container.append(&widget);
-            }
-            _ => {
-                // Add optional header label for automatic/menu/segmented etc. when label differs from display.
-                let header_needed = matches!(
-                    self.style,
-                    PickerStyle::Automatic | PickerStyle::Menu | PickerStyle::Segmented | PickerStyle::Palette | PickerStyle::RadioGroup
-                ) && !self.label.is_empty();
-                if header_needed && self.style != PickerStyle::Segmented && self.style != PickerStyle::Palette && self.style != PickerStyle::RadioGroup {
-                    let hdr = GtkLabel::new(Some(&self.display_label()));
-                    hdr.set_halign(gtk::Align::Start);
-                    let fg = if dark { "#ececec" } else { "#1d1d1d" };
-                    hdr.add_css_class("pk-hdr");
-                    uikit::widget::apply_css(
-                        &hdr,
-                        &format!(".pk-hdr {{ color: {fg}; font-family: 'SF Pro Display'; font-size: 13px; font-weight: 600; }}"),
-                    );
-                    container.append(&hdr);
-                }
-                container.append(&widget);
-            }
-        }
+        // Every style renders just its own control — no extra header label.
+        // The menu button already shows the display label inside itself, so
+        // Menu pickers look like all other styles: transparent, no extra box.
+        container.append(&widget);
 
         // Ensure container knows its size.
         if h > 0.0 && self.style != PickerStyle::Inline && self.style != PickerStyle::NavigationLink {

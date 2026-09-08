@@ -5,6 +5,8 @@
 
 pub mod buttons;
 pub mod colors;
+pub mod async_images;
+pub mod concentric_rectangles;
 pub mod control_groups;
 pub mod dividers;
 pub mod gauges;
@@ -16,12 +18,17 @@ pub mod lists;
 pub mod materials;
 pub mod menus;
 pub mod navigation;
+pub mod product_views;
 pub mod scroll_views;
 pub mod shapes;
 pub mod sliders;
 pub mod sheets;
+pub mod store_product;
+pub mod store_views;
+pub mod subscription_store_views;
 pub mod tab_views;
 pub mod text;
+pub mod text_fields;
 pub mod toggles;
 pub mod toolbars;
 pub mod view_that_fits;
@@ -39,6 +46,11 @@ pub use control_groups::{
     CompactMenuControlGroupStyle, ControlGroup, ControlGroupStyle, MenuControlGroupStyle,
     NavigationControlGroupStyle, PaletteControlGroupStyle,
 };
+pub use concentric_rectangles::{ConcentricRectangle, UniformConcentricRectangle};
+pub use async_images::{
+    AsyncImagePhase, AsyncURLImage, CustomPhasesAsyncImage, CustomPlaceholderAsyncImage,
+    CustomSessionAsyncImage,
+};
 pub use dividers::*;
 pub use gauges::*;
 pub use group_boxes::GroupBox;
@@ -49,12 +61,25 @@ pub use lists::*;
 pub use materials::{Material, Materials};
 pub use menus::*;
 pub use navigation::NavigationSubtitle;
+pub use product_views::{
+    CompactProductViewStyle, CustomIconProductView, LargeProductViewStyle,
+    PlaceholderIconProductView, ProductViewElement, RegularProductViewStyle,
+};
 pub use scroll_views::{ScrollView, ScrollEdgeEffect};
 pub use shapes::{
     Capsule, Circle, ContainerRelativeShape, Ellipse, RectangleShape,
     RoundedRectangle, UnevenRoundedRectangle,
 };
 pub use sliders::*;
+pub use store_product::StoreProduct;
+pub use store_views::{
+    CustomIconStoreView, IconPhaseStoreView, PlaceholderIconStoreView, RestorePurchasesButton,
+    StoreCancellationButton, StoreIconPhase, StoreViewElement,
+};
+pub use subscription_store_views::{
+    CustomGroupSubscriptionStoreView, CustomHeaderSubscriptionStoreView, GroupSubscriptionStoreView,
+    SingleSubscriptionStoreView, SubscriptionStoreViewElement, UpgradeOnlySubscriptionStoreView,
+};
 pub use sheets::{
     BooleanSheet, DisableSheetDismissSwipe, FittedSheetSizing, ItemSheet,
     PageScreenSheetSize, PrioritizeSheetContentScrolling, SheetBackground,
@@ -71,6 +96,7 @@ pub use tab_views::{
     TabViewSideBarFooter, TabViewSideBarHeader, ValueTabView, VerticalPageTabViewStyle,
 };
 pub use text::{TextFormat, TextFormatKind};
+pub use text_fields::CapsuleTextField;
 pub use toggles::{Toggle, ToggleStyle};
 pub use toolbars::*;
 pub use view_that_fits::*;

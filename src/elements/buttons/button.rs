@@ -180,7 +180,9 @@ impl ViewContent for Button {
         let w = self
             .width
             .unwrap_or((text_w + icon_w + 28.0).max(34.0));
-        let h = self.height.unwrap_or(if self.border_shape == ButtonBorderShape::Circle {
+        let circle = super::common::effective_shape(self.border_shape, !label.is_empty())
+            == super::common::ButtonBorderShape::Circle;
+        let h = self.height.unwrap_or(if circle {
             w
         } else {
             32.0

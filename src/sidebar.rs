@@ -260,6 +260,37 @@ impl Sidebar {
 
 impl Default for Sidebar { fn default() -> Self { Self::new() } }
 
+/// Move a color toward white by `t` (0.0 keeps, 1.0 white), with alpha `a`.
+fn lighten_toward_white(c: Color, t: f32, a: f32) -> Color {
+    Color::new(c.r + (1.0 - c.r) * t, c.g + (1.0 - c.g) * t, c.b + (1.0 - c.b) * t, a)
+}
+
+/// Move a color toward black by `t` (0.0 keeps, 1.0 black), with alpha `a`.
+fn darken_toward_black(c: Color, t: f32, a: f32) -> Color {
+    Color::new(c.r * (1.0 - t), c.g * (1.0 - t), c.b * (1.0 - t), a)
+}
+
+/// Automatic border + glow for a background: plain white/black for solid
+/// fills, and a subtle whisper of the gradient's own hue for gradients
+/// (strongly lightened/darkened, low alpha — never a saturated frame).
+/// Pure helper so the math stays unit-testable without GTK.
+fn auto_frame_colors(base: Color, is_gradient: bool) -> (Color, Color) {
+    let lum = (base.r + base.g + base.b) / 3.0;
+    if is_gradient {
+        if lum < 0.5 {
+            // Dark gradient: near-white tinted with the hue.
+            (lighten_toward_white(base, 0.85, 0.18), lighten_toward_white(base, 0.70, 0.08))
+        } else {
+            // Light gradient: near-black tinted with the hue.
+            (darken_toward_black(base, 0.10, 0.18), darken_toward_black(base, 0.05, 0.08))
+        }
+    } else if lum < 0.5 {
+        (Color::new(1.0, 1.0, 1.0, 0.15), Color::new(1.0, 1.0, 1.0, 0.05))
+    } else {
+        (Color::new(0.0, 0.0, 0.0, 0.15), Color::new(0.0, 0.0, 0.0, 0.05))
+    }
+}
+
 impl ViewContent for Sidebar {
     fn render(&self, frame: Rect) -> gtk::Widget {
         let w = if self.width > 0.0 { self.width } else { frame.width };
@@ -297,30 +328,8 @@ impl ViewContent for Sidebar {
         let gradient_avg: Option<Color> = None;
 
         let base = gradient_avg.unwrap_or(bg);
-        let lum = (base.r + base.g + base.b) / 3.0;
 
-        let auto_border;
-        let auto_glow;
-        if let Some(c) = gradient_avg {
-            if lum < 0.5 {
-                // Dark gradient fill: keep the gradient's hue, lightly
-                // lightened toward white so the frame stays visible.
-                auto_border = Color::new(
-                    c.r + (1.0 - c.r) * 0.25, c.g + (1.0 - c.g) * 0.25, c.b + (1.0 - c.b) * 0.25, 0.60);
-                auto_glow = Color::new(
-                    c.r + (1.0 - c.r) * 0.15, c.g + (1.0 - c.g) * 0.15, c.b + (1.0 - c.b) * 0.15, 0.25);
-            } else {
-                // Light gradient fill: darken the gradient's hue toward black.
-                auto_border = Color::new(c.r * 0.75, c.g * 0.75, c.b * 0.75, 0.60);
-                auto_glow = Color::new(c.r * 0.85, c.g * 0.85, c.b * 0.85, 0.25);
-            }
-        } else if lum < 0.5 {
-            auto_border = Color::new(1.0, 1.0, 1.0, 0.15);
-            auto_glow = Color::new(1.0, 1.0, 1.0, 0.05);
-        } else {
-            auto_border = Color::new(0.0, 0.0, 0.0, 0.15);
-            auto_glow = Color::new(0.0, 0.0, 0.0, 0.05);
-        }
+        let (auto_border, auto_glow) = auto_frame_colors(base, gradient_avg.is_some());
         let border = self.border_color.unwrap_or(auto_border);
         let glow = self.glow_color.unwrap_or(auto_glow);
 
@@ -408,6 +417,7 @@ impl ViewContent for Sidebar {
 
         let items_box = gtk::Box::new(Orientation::Vertical, 0);
         items_box.set_margin_top(4);
+        items_box.add_css_class("sb-list");
 
         let sel = self.selected;
         let cb = self.on_select.clone();
@@ -419,6 +429,7 @@ impl ViewContent for Sidebar {
             row.set_margin_start(14);
             row.set_margin_end(14);
             row.set_valign(gtk::Align::Center);
+            row.add_css_class("sb-row");
 
             #[cfg(feature = "coreicon")]
             match item.icon.to_path(i == sel) {
@@ -443,6 +454,10 @@ impl ViewContent for Sidebar {
             let label = GtkLabel::new(Some(&item.label));
             label.set_halign(gtk::Align::Start);
             label.set_hexpand(true);
+            // Truncate long labels with an ellipsis instead of letting the
+            // text overflow the row and get hard-clipped mid-letter by the
+            // sidebar's `overflow: hidden` + rounded corners.
+            label.set_ellipsize(gtk::pango::EllipsizeMode::End);
             let lcss = ".sb-lbl {{ font-family: 'SF Pro Display'; font-size: 13px; color: rgba(235,235,245,0.8); }}";
             uikit::widget::apply_css(&label, lcss);
             label.add_css_class("sb-lbl");
@@ -452,7 +467,7 @@ impl ViewContent for Sidebar {
                 let sc = sel_color;
                 let sel_hex = format!("rgba({:.0},{:.0},{:.0},{:.2})",
                     sc.r * 255.0, sc.g * 255.0, sc.b * 255.0, sc.a);
-                let scss = format!(".sb-sel {{ background-color: {sel_hex}; border-radius: 8px; }}");
+                let scss = format!(".sb-row.sb-sel {{ background-color: {sel_hex}; background-image: none; border-radius: 8px; }}");
                 uikit::widget::apply_css(&row, &scss);
                 row.add_css_class("sb-sel");
             }
@@ -471,6 +486,55 @@ impl ViewContent for Sidebar {
         scroll.set_hscrollbar_policy(gtk::PolicyType::Never);
         scroll.set_vscrollbar_policy(gtk::PolicyType::Automatic);
         scroll.set_vexpand(true);
+        // Keep the whole list area transparent so the sidebar
+        // `background_gradient` stays visible behind the items: the
+        // app-level CSS paints every scrolledwindow/viewport with the
+        // solid window background (#1d1d1d dark / #ececec light), which
+        // would otherwise cover the gradient exactly in the item area
+        // (top area outside the scroll keeps showing the gradient).
+        // Each layer gets its OWN provider matching ITSELF — ancestor
+        // descendant selectors alone do not reliably reach the internal
+        // viewport, so the provider is attached directly to the scroll,
+        // the viewport child and the list box. Rows stay untouched so
+        // the `.sb-sel` highlight keeps working.
+        scroll.add_css_class("sb-scroll");
+        uikit::widget::apply_css(
+            &scroll,
+            ".sb-scroll { background-color: transparent; background-image: none; \
+                border-color: transparent; box-shadow: none; }",
+        );
+        uikit::widget::apply_css(
+            &items_box,
+            ".sb-list { background-color: transparent; background-image: none; \
+                border-color: transparent; box-shadow: none; }",
+        );
+        // The Box child is wrapped in an internal GtkViewport; style that
+        // widget directly instead of relying on cascade selectors.
+        let mut child = scroll.first_child();
+        while let Some(w) = child {
+            let next = w.next_sibling();
+            if let Ok(viewport) = w.clone().downcast::<gtk::Viewport>() {
+                viewport.add_css_class("sb-viewport");
+                uikit::widget::apply_css(
+                    &viewport,
+                    ".sb-viewport { background-color: transparent; background-image: none; \
+                        border-color: transparent; box-shadow: none; }",
+                );
+            }
+            child = next;
+        }
+        // Backup: same transparency via the container so late-created
+        // internal nodes are covered as well.
+        let sb_provider = gtk::CssProvider::new();
+        sb_provider.load_from_string(
+            ".sidebar scrolledwindow, .sidebar viewport, .sidebar .sb-list { \
+                background-color: transparent; background-image: none; \
+                border-color: transparent; box-shadow: none; }",
+        );
+        container.style_context().add_provider(
+            &sb_provider,
+            gtk::STYLE_PROVIDER_PRIORITY_USER as u32,
+        );
         container.append(&scroll);
 
         container.upcast()
@@ -564,5 +628,20 @@ mod tests {
     fn sidebar_no_search() {
         let sb = Sidebar::new().no_search();
         assert!(!sb.show_search);
+    }
+
+    #[test]
+    fn auto_frame_gradient_stays_subtle() {
+        // Demo gradient (dark green): frame must be near-white, low alpha —
+        // never a saturated green border.
+        let avg = Color::new(0.08, 0.34, 0.16, 1.0);
+        let (border, glow) = auto_frame_colors(avg, true);
+        assert_eq!(border.a, 0.18);
+        assert_eq!(glow.a, 0.08);
+        assert!(border.r > 0.8 && border.g > 0.8 && border.b > 0.8);
+        // Solid dark fill keeps the plain-white subtle frame.
+        let (b2, g2) = auto_frame_colors(Color::new(0.15, 0.15, 0.15, 1.0), false);
+        assert_eq!((b2.r, b2.g, b2.b, b2.a), (1.0, 1.0, 1.0, 0.15));
+        assert_eq!((g2.r, g2.g, g2.b, g2.a), (1.0, 1.0, 1.0, 0.05));
     }
 }

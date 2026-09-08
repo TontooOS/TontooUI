@@ -89,16 +89,30 @@ fallback.
 
 - Traffic lights drawn as CSS circles (red/yellow/green, 12px)
 - Search bar styled like `TextInput` (dark `#2a2a2c` fill, `#3a3a3d` border, blue focus accent) instead of a translucent white field
-- Scrollable item list with icon PNGs + SF Pro Display labels
+- Scrollable item list with icon PNGs + SF Pro Display labels. Labels are
+  left-aligned, expand to the row width and truncate with an end ellipsis
+  (`EllipsizeMode::End`) instead of overflowing the row and getting
+  hard-clipped mid-letter by the rounded `overflow: hidden` container.
 - Selection highlight with customizable color
 - Rounded corners (12px) with white glow border
 - Customizable background for Dark/Light mode adaptation
 - Gradient background via `background_gradient(coreicon::Gradient)` with
-  direction-aware CSS gradients (linear or radial)
+  direction-aware CSS gradients (linear or radial). The gradient covers the
+  full sidebar including the area behind the item list: the `ScrolledWindow`
+  (`sb-scroll`), its internal `GtkViewport` (`sb-viewport`) and the list box
+  (`sb-list`) each carry their own `background-color: transparent;
+  background-image: none` provider, because the app-level CSS otherwise
+  paints every `scrolledwindow`/`viewport` with the solid window background
+  (`#1d1d1d` dark / `#ececec` light) which would hide the gradient behind
+  the items. A container-level USER-priority rule backs the same selectors
+  up for late-created internal nodes. Rows stay untouched so the selected
+  row keeps its translucent `selected_color` fill and the gradient shines
+  through the highlight as well.
 - Auto-adaptive frame: the border and glow take their color from the
   background fill. With a gradient, the frame uses the gradient's own hue
-  (average of the stop colors), lightened for dark fills and darkened for
-  light fills; with a solid color it is plain white on dark fills and plain
+  (average of the stop colors), strongly lightened for dark fills and
+  slightly darkened for light fills, always at low alpha so the frame stays
+  subtle; with a solid color it is plain white on dark fills and plain
   black on light fills. Explicit `border_color` / `glow_color` calls override
   this.
 

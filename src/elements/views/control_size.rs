@@ -43,6 +43,8 @@ impl ViewContent for ControlSizeView {
             let lbl = gtk::Label::new(Some("Tap Me"));
             lbl.set_halign(gtk::Align::Center);
             lbl.set_valign(gtk::Align::Center);
+            lbl.set_hexpand(true);
+            lbl.set_vexpand(true);
             lbl.add_css_class("cs-lbl");
             uikit::widget::apply_css(&lbl, &format!(".cs-lbl {{ color: white; font-family: 'SF Pro Display'; font-size: {}px; }}", fs));
             pill.append(&lbl);

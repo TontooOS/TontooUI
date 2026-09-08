@@ -77,7 +77,8 @@ pub enum ButtonBorderShape {
 
 Mirrors `SwiftUI.ButtonBorderShape.Guts`. `Automatic` and `Capsule` render a
 fully rounded pill, `RoundedRectangle(radius)` a rounded rectangle, `Circle` a
-perfect circle sized by the `height` (for icon-only buttons).
+perfect circle sized by the `height` (for icon-only buttons). `Circle` with a
+label falls back to `Capsule` so text buttons render as normal pills.
 
 ## ButtonSizing
 

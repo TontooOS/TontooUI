@@ -75,7 +75,8 @@ pub enum ButtonBorderShape {
     Capsule,
     /// Rounded rectangle with the given corner radius.
     RoundedRectangle(f32),
-    /// Perfect circle (icon-only buttons).
+    /// Perfect circle for icon-only buttons. Falls back to capsule when a
+    /// label is present (a circle cannot fit text).
     Circle,
 }
 
@@ -231,6 +232,16 @@ pub(crate) fn border_radius(shape: ButtonBorderShape) -> String {
     }
 }
 
+/// Resolve the shape used for rendering/sizing: `Circle` only applies to
+/// icon-only buttons — with a label it degrades to `Capsule` so text buttons
+/// render as normal pills instead of stretched ellipses.
+pub(crate) fn effective_shape(shape: ButtonBorderShape, has_label: bool) -> ButtonBorderShape {
+    match shape {
+        ButtonBorderShape::Circle if has_label => ButtonBorderShape::Capsule,
+        other => other,
+    }
+}
+
 /// Shared GtkButton renderer used by [`crate::elements::buttons::Button`].
 pub(crate) fn render_button_widget(
     label: &str,
@@ -265,6 +276,7 @@ pub(crate) fn render_button_widget(
         btn.set_child(Some(&content));
     }
 
+    let shape = effective_shape(shape, !label.is_empty());
     let radius = border_radius(shape);
     let circle = shape == ButtonBorderShape::Circle;
     let side = height.unwrap_or(38.0).max(width.unwrap_or(0.0));
@@ -340,11 +352,26 @@ mod tests {
     }
 
     #[test]
-    fn effective_tint_maps_destructive_to_red() {
-        assert_eq!(effective_tint_hex(Some(ButtonRole::Destructive), None, true), RED_DARK);
+    fn effective_tint_maps_destructive_to_red() {        assert_eq!(effective_tint_hex(Some(ButtonRole::Destructive), None, true), RED_DARK);
         assert_eq!(effective_tint_hex(Some(ButtonRole::Cancel), None, true), BLUE_DARK);
         assert_eq!(effective_tint_hex(None, None, false), BLUE_LIGHT);
         let green = Color::from_rgb(48, 209, 88);
         assert_eq!(effective_tint_hex(None, Some(&green), true), "#30d158");
+    }
+
+    #[test]
+    fn circle_falls_back_to_capsule_with_label() {
+        assert_eq!(
+            effective_shape(ButtonBorderShape::Circle, true),
+            ButtonBorderShape::Capsule
+        );
+        assert_eq!(
+            effective_shape(ButtonBorderShape::Circle, false),
+            ButtonBorderShape::Circle
+        );
+        assert_eq!(
+            effective_shape(ButtonBorderShape::Capsule, true),
+            ButtonBorderShape::Capsule
+        );
     }
 }

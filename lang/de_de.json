@@ -253,6 +253,74 @@
       "formatted_desc": "Erzeugt eine Info-Ansicht aus einem formatierten Wert",
       "plain": "Labeled Content",
       "plain_desc": "Erzeugt eine beschriftete Info-Ansicht"
+    },
+    "concentric_rectangle": {
+      "name": "ConcentricRectangle",
+      "uniform": "Einheitliches konzentrisches Rechteck",
+      "uniform_desc": "Rechteck mit gleichem Eckenstil auf allen vier Ecken",
+      "concentric": "Konzentrisches Rechteck",
+      "concentric_desc": "Konzentrisches Rechteck mit Radien aus demselben Kreis"
+    },
+    "async_image": {
+      "name": "AsyncImage",
+      "custom_placeholder": "Async-Bild mit Platzhalter",
+      "custom_placeholder_desc": "Laedt ein anpassbares Bild per URL mit eigenem Platzhalter",
+      "custom_phases": "Async-Bild mit Phasen",
+      "custom_phases_desc": "Laedt ein anpassbares Bild per URL mit eigenen Phasen",
+      "url_image": "Async URL Bild",
+      "url_image_desc": "Laedt und zeigt ein Bild per URL-Ladeanfrage",
+      "custom_session": "Async-Bild mit Sitzung",
+      "custom_session_desc": "Modifikator mit URL-Sitzung fuer asynchrone Bilder"
+    },
+    "product_view": {
+      "name": "ProductView",
+      "placeholder_icon": "Produktansicht mit Platzhalter",
+      "placeholder_icon_desc": "Laedt ein App-Store-Produkt mit Platzhalter-Icon",
+      "custom_icon": "Produktansicht mit Icon",
+      "custom_icon_desc": "Laedt ein App-Store-Produkt mit eigenem Icon",
+      "product_view": "Produktansicht",
+      "product_view_desc": "Laedt und praesentiert ein App-Store-Produkt",
+      "compact_style": "Kompakter Stil",
+      "compact_style_desc": "Produktstil fuer enge Layouts",
+      "regular_style": "Standardstil",
+      "regular_style_desc": "Produktstil mit plattformueblichem Layout",
+      "large_style": "Grosser Stil",
+      "large_style_desc": "Produktstil als Hero-Inhalt fuer In-App-Kaeufe"
+    },
+    "store_view": {
+      "name": "StoreView",
+      "icon_phase": "Store mit Icon-Phasen",
+      "icon_phase_desc": "Laedt eine Produktsammlung mit Icon-Phasen",
+      "placeholder_icon": "Store mit Platzhaltern",
+      "placeholder_icon_desc": "Laedt eine Produktsammlung mit Platzhalter-Icons",
+      "custom_icon": "Store mit eigenen Icons",
+      "custom_icon_desc": "Laedt eine Produktsammlung mit eigenen Icons",
+      "store_view": "Storeansicht",
+      "store_view_desc": "Laedt und praesentiert eine Produktsammlung",
+      "cancellation_button": "Store-Abbrechen-Knopf",
+      "cancellation_button_desc": "Knopf zum Schliessen der Store-Ansicht",
+      "restore_button": "Kaeufe wiederherstellen",
+      "restore_button_desc": "Knopf zum Wiederherstellen von Kaeufen"
+    },
+    "subscription_store_view": {
+      "name": "SubscriptionStoreView",
+      "custom_group": "Abo-Store mit Gruppierung",
+      "custom_group_desc": "Abo-Store mit eigener Gruppierung",
+      "custom_header": "Abo-Store mit Kopfzeile",
+      "custom_header_desc": "Laedt alle Abos einer Gruppe mit eigener Kopfzeile",
+      "upgrade_only": "Nur-Upgrade Abo-Store",
+      "upgrade_only_desc": "Laedt nur Upgrade-Optionen einer Abo-Gruppe",
+      "group": "Gruppen Abo-Store",
+      "group_desc": "Laedt alle Abos einer Abo-Gruppe",
+      "single": "Einzel Abo-Store",
+      "single_desc": "Laedt Abos fuer ein einzelnes Produkt",
+      "plain": "Abo-Store",
+      "plain_desc": "Laedt Abos fuer eine Produktsammlung"
+    },
+    "text_field": {
+      "name": "TextField",
+      "capsule": "Kapsel-Textfeld",
+      "capsule_desc": "Gibt dem Textfeld eine Kapselform. Nur sichtbar auf macOS"
     }
   }
 }

@@ -151,6 +151,32 @@
 //! | [`CustomLabeledContent`] | Initializer: Standard labeled element with a custom value view |
 //! | [`FormattedLabeledContent`] | Initializer: Labeled informational view from a formatted value |
 //! | [`LabeledContent`] | Initializer: Creates a labeled informational view |
+//! | [`UniformConcentricRectangle`] | Initializer: Rectangle with the same corner style on four corners |
+//! | [`ConcentricRectangle`] | Initializer: Concentric rectangle with radii from the same circle |
+//! | [`CustomPlaceholderAsyncImage`] | Initializer: Modifiable async image with custom placeholder |
+//! | [`CustomPhasesAsyncImage`] | Initializer: Modifiable async image with custom phases |
+//! | [`AsyncURLImage`] | Initializer: Loads and displays an image from a URL request |
+//! | [`CustomSessionAsyncImage`] | Modifier: Adds a URL session for async images |
+//! | [`PlaceholderIconProductView`] | Initializer: Product view with placeholder icon |
+//! | [`CustomIconProductView`] | Initializer: Product view with custom icon |
+//! | [`ProductViewElement`] | Initializer: Loads and merchandises an App Store product |
+//! | [`CompactProductViewStyle`] | Style: Compact product view for tight layouts |
+//! | [`RegularProductViewStyle`] | Style: Standard platform-appropriate product layout |
+//! | [`LargeProductViewStyle`] | Style: Large hero product view layout |
+//! | [`IconPhaseStoreView`] | Initializer: Store collection with icon phases |
+//! | [`PlaceholderIconStoreView`] | Initializer: Store collection with placeholder icons |
+//! | [`CustomIconStoreView`] | Initializer: Store collection with custom icons |
+//! | [`StoreViewElement`] | Initializer: Loads and merchandises a product collection |
+//! | [`StoreProduct`] | Type: Purchasable product/option data shared by store views |
+//! | [`StoreCancellationButton`] | Modifier: Dismisses the current store presentation |
+//! | [`RestorePurchasesButton`] | Modifier: Restores previously purchased products |
+//! | [`CustomGroupSubscriptionStoreView`] | Initializer: Subscription store with custom grouping |
+//! | [`CustomHeaderSubscriptionStoreView`] | Initializer: Subscription store with custom header |
+//! | [`UpgradeOnlySubscriptionStoreView`] | Initializer: Subscription store showing upgrades only |
+//! | [`GroupSubscriptionStoreView`] | Initializer: Loads all subscriptions in a group |
+//! | [`SingleSubscriptionStoreView`] | Initializer: Loads subscriptions for a single product |
+//! | [`SubscriptionStoreViewElement`] | Initializer: Loads subscriptions for a product collection |
+//! | [`CapsuleTextField`] | Modifier: Gives your text field a capsule shape (macOS Liquid Glass) |
 
 pub mod pickers;
 pub mod text_input;
@@ -181,6 +207,24 @@ pub use elements::control_groups::{
     CompactMenuControlGroupStyle, ControlGroup, ControlGroupStyle, MenuControlGroupStyle,
     NavigationControlGroupStyle, PaletteControlGroupStyle,
 };
+pub use elements::concentric_rectangles::{ConcentricRectangle, UniformConcentricRectangle};
+pub use elements::async_images::{
+    AsyncImagePhase, AsyncURLImage, CustomPhasesAsyncImage, CustomPlaceholderAsyncImage,
+    CustomSessionAsyncImage,
+};
+pub use elements::product_views::{
+    CompactProductViewStyle, CustomIconProductView, LargeProductViewStyle,
+    PlaceholderIconProductView, ProductViewElement, RegularProductViewStyle,
+};
+pub use elements::store_views::{
+    CustomIconStoreView, IconPhaseStoreView, PlaceholderIconStoreView, RestorePurchasesButton,
+    StoreCancellationButton, StoreIconPhase, StoreViewElement,
+};
+pub use elements::subscription_store_views::{
+    CustomGroupSubscriptionStoreView, CustomHeaderSubscriptionStoreView, GroupSubscriptionStoreView,
+    SingleSubscriptionStoreView, SubscriptionStoreViewElement, UpgradeOnlySubscriptionStoreView,
+};
+pub use elements::text_fields::CapsuleTextField;
 pub use elements::links::{CustomPreviewShareLink, HelpLink, Link, ShareLink, TextFieldLink};
 pub use elements::labeled_contents::{CustomLabeledContent, FormattedLabeledContent, LabeledContent};
 pub use elements::labels::{CustomLabel, ImageLabel, LabelStyleKind, LabelStyles, SystemImageLabel};
@@ -209,6 +253,7 @@ pub use elements::shapes::{
     RoundedRectangle, UnevenRoundedRectangle,
 };
 pub use elements::sliders::Slider;
+pub use elements::store_product::StoreProduct;
 pub use elements::sheets::{
     BooleanSheet, DisableSheetDismissSwipe, FittedSheetSizing, ItemSheet,
     PageScreenSheetSize, PrioritizeSheetContentScrolling, SheetBackground,
@@ -248,11 +293,31 @@ pub mod prelude {
         TONTOO_UI_VERSION,
     };
     pub use crate::elements::dividers::{Divider, DividerOrientation};
+    pub use crate::elements::async_images::{
+        AsyncImagePhase, AsyncURLImage, CustomPhasesAsyncImage, CustomPlaceholderAsyncImage,
+        CustomSessionAsyncImage,
+    };
+    pub use crate::elements::product_views::{
+        CompactProductViewStyle, CustomIconProductView, LargeProductViewStyle,
+        PlaceholderIconProductView, ProductViewElement, RegularProductViewStyle,
+    };
+    pub use crate::elements::store_views::{
+        CustomIconStoreView, IconPhaseStoreView, PlaceholderIconStoreView, RestorePurchasesButton,
+        StoreCancellationButton, StoreIconPhase, StoreViewElement,
+    };
+    pub use crate::elements::subscription_store_views::{
+        CustomGroupSubscriptionStoreView, CustomHeaderSubscriptionStoreView,
+        GroupSubscriptionStoreView, SingleSubscriptionStoreView, SubscriptionStoreViewElement,
+        UpgradeOnlySubscriptionStoreView,
+    };
+    pub use crate::elements::text_fields::CapsuleTextField;
+    pub use crate::elements::concentric_rectangles::{ConcentricRectangle, UniformConcentricRectangle};
     pub use crate::elements::labeled_contents::{CustomLabeledContent, FormattedLabeledContent, LabeledContent};
     pub use crate::elements::labels::{CustomLabel, ImageLabel, LabelStyleKind, LabelStyles, SystemImageLabel};
     pub use crate::elements::group_boxes::GroupBox;
     pub use crate::elements::lists::{List, ListSection, ListRow, ListStyle, OutlineGroup, DisclosureGroup};
     pub use crate::elements::sliders::Slider;
+    pub use crate::elements::store_product::StoreProduct;
     pub use crate::elements::shapes::{
         Capsule, Circle, ContainerRelativeShape, Ellipse, RectangleShape,
         RoundedRectangle, UnevenRoundedRectangle,

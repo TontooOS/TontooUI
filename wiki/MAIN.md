@@ -41,6 +41,13 @@ TontooUI is a SwiftUI-inspired declarative UI layer for TontooOS, built on top o
 | Shapes | [Shapes.md](Shapes.md) | Shapes category: 7 shapes — circle, ellipse, capsule, rectangles, container-relative |
 | Label | [Label.md](Label.md) | Label category: 3 initializers + 1 style — custom, image, system image, styles |
 | LabeledContent | [LabeledContent.md](LabeledContent.md) | LabeledContent category: 3 initializers — custom, formatted, plain |
+| ConcentricRectangle | [ConcentricRectangle.md](ConcentricRectangle.md) | ConcentricRectangle category: 2 initializers — uniform, concentric |
+| AsyncImage | [AsyncImage.md](AsyncImage.md) | AsyncImage category: 3 initializers + 1 modifier — placeholder, phases, url, session |
+| ProductView | [ProductView.md](ProductView.md) | ProductView category: 3 initializers + 3 styles — placeholder/custom/product + compact/regular/large |
+| StoreView | [StoreView.md](StoreView.md) | StoreView category: 4 initializers + 2 modifiers — icon-phase/placeholder/custom/store + cancel/restore |
+| SubscriptionStoreView | [SubscriptionStoreView.md](SubscriptionStoreView.md) | SubscriptionStoreView category: 6 initializers — custom-group/header/upgrade/group/single/plain |
+| TextField | [TextField.md](TextField.md) | TextField category: 1 modifier — capsule shape (macOS Liquid Glass) |
+| Review | [Review.md](Review.md) | QA tool: one element at a time, Ja/Nein in temp/review/ with restart resume |
 
 ## Quick Start
 
@@ -101,6 +108,12 @@ tontooui (SwiftUI-style layer)
   +-- Shapes          (Circle, Ellipse, Capsule, Rectangle, RoundedRectangle, UnevenRoundedRectangle, ContainerRelativeShape)
   +-- Label           (CustomLabel, ImageLabel, SystemImageLabel, LabelStyles)
   +-- LabeledContent  (CustomLabeledContent, FormattedLabeledContent, LabeledContent)
+  +-- ConcentricRectangle (UniformConcentricRectangle, ConcentricRectangle)
+  +-- AsyncImage        (CustomPlaceholder, CustomPhases, AsyncURLImage, CustomSession)
+  +-- ProductView       (PlaceholderIcon, CustomIcon, ProductView + Compact/Regular/Large styles)
+  +-- StoreView         (IconPhase, PlaceholderIcon, CustomIcon, StoreView + Cancel/Restore buttons)
+  +-- SubscriptionStoreView (CustomGroup, CustomHeader, UpgradeOnly, Group, Single, Plain)
+  +-- TextField         (CapsuleTextField — capsule shape, macOS Liquid Glass)
  |
  +-- uikit (backend)
       +-- View, Widget, ViewContent
@@ -153,3 +166,10 @@ TontooUI is designed so long-running apps do not accumulate work over time:
 - [Shapes.md](Shapes.md) -- shape views (7 elements)
 - [Label.md](Label.md) -- label initializers and styles (4 elements)
 - [LabeledContent.md](LabeledContent.md) -- labeled informational views (3 elements)
+- [ConcentricRectangle.md](ConcentricRectangle.md) -- concentric rectangle shapes (2 elements)
+- [AsyncImage.md](AsyncImage.md) -- asynchronous URL images (4 elements)
+- [ProductView.md](ProductView.md) -- App Store product views and styles (6 elements)
+- [StoreView.md](StoreView.md) -- App Store collection views and buttons (6 elements)
+- [SubscriptionStoreView.md](SubscriptionStoreView.md) -- subscription store views (6 elements)
+- [TextField.md](TextField.md) -- text field styles (1 element)
+- [Review.md](Review.md) -- element review QA tool (temp/review state)
