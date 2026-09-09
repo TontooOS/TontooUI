@@ -12,7 +12,8 @@
       "name": "Ladeanzeige"
     },
     "sidebar": {
-      "name": "Seitenleiste"
+      "name": "Seitenleiste",
+      "search_placeholder": "Suchen"
     },
     "content_unavailable_view": {
       "name": "Keine Ergebnisse",
@@ -145,6 +146,8 @@
     },
     "tab_view": {
       "name": "Tab-Ansicht",
+      "tab": "Tab",
+      "tab_desc": "Ein einzelner Tab mit Titel, Bild/Systembild und Detailinhalt.",
       "tab_section": "Tab-Abschnitt",
       "tab_section_desc": "Container fuer Hierarchie innerhalb einer Tab-Ansicht",
       "tab_bar_only_style": "Nur-Leiste-Stil",

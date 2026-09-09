@@ -1,6 +1,29 @@
 # TabView
 
-SwiftUI-style TabView category for TontooUI, recreating the `TabView` containers, styles, and modifiers from the macOS 26 interface. The category contains 22 elements (4 `initializer`, 5 `style`, 13 `modifier`). All elements render directly on the window background (#1d1d1d dark / #ececec light) with no extra card, using `SF Pro Display`.
+SwiftUI-style TabView category for TontooUI, recreating the `TabView` containers, styles, and modifiers from the macOS 26 interface. The category contains 23 elements (5 `initializer`, 5 `style`, 13 `modifier`). All elements render directly on the window background (#1d1d1d dark / #ececec light) with no extra card, using `SF Pro Display`.
+
+## Tab
+
+```rust
+pub struct Tab { /* ... */ }
+impl Tab {
+    pub fn new(content: impl Widget + 'static) -> Self;
+    pub fn title(self, title: impl Into<String>) -> Self;
+    pub fn system_image(self, name: impl Into<String>) -> Self;
+    pub fn image(self, path: impl Into<String>) -> Self;
+    pub fn label_text(&self) -> &str;
+    pub fn has_sidebar_label(&self) -> bool;
+}
+```
+
+Initializer — a single tab with title, image/systemImage and detail content.
+`content` is any `Widget` (e.g. `Text`) shown in the detail area when the tab
+is selected. `title` sets the sidebar label (empty = icon-only/empty row, like
+SwiftUI's `Tab { Text("0") }`). `system_image` takes an SF Symbol name and
+renders a monochrome sidebar glyph (transparent background, white/black tint —
+like Apple's sidebar tabs, not Settings-style color tiles).
+`image` takes a PNG file path; missing files render as an empty icon slot
+instead of a broken image.
 
 ## TabSection
 
@@ -8,11 +31,20 @@ SwiftUI-style TabView category for TontooUI, recreating the `TabView` containers
 pub struct TabSection { /* ... */ }
 impl TabSection {
     pub fn new() -> Self;
+    pub fn header(self, title: impl Into<String>) -> Self;
+    pub fn tab(self, tab: Tab) -> Self;
+    pub fn header_text(&self) -> Option<&str>;
+    pub fn tabs(&self) -> &[Tab];
+    pub fn tab_count(&self) -> usize;
     pub fn to_view(self) -> View;
 }
 ```
 
-Initializer — a container that you can use to add hierarchy within a tab view. `180×80` preview with pill bar and hierarchy hint, directly on window.
+Initializer — a container that you can use to add hierarchy within a tab view.
+`header("Foo")` mirrors SwiftUI's `TabSection("Foo")`. Without tabs the element
+keeps its `180x80` preview (pill bar and hierarchy hint, directly on window).
+With tabs, `to_view` renders a static sidebar fragment (header plus rows,
+first tab highlighted).
 
 ## TabBarOnlyTabViewStyle
 
@@ -32,11 +64,29 @@ Initializer — a tab view style that displays a tab bar when possible. `180×80
 pub struct TabView { /* ... */ }
 impl TabView {
     pub fn new() -> Self;
+    pub fn title(self, title: impl Into<String>) -> Self;
+    pub fn tab(self, tab: Tab) -> Self;
+    pub fn section(self, section: TabSection) -> Self;
+    pub fn selected(self, index: usize) -> Self;
+    pub fn on_select(self, handler: impl Fn(usize) + Send + Sync + 'static) -> Self;
+    pub fn sidebar_width(self, w: f32) -> Self;
+    pub fn show_toggle(self, show: bool) -> Self;
+    pub fn tab_count(&self) -> usize;
+    pub fn is_empty(&self) -> bool;
     pub fn to_view(self) -> View;
 }
 ```
 
-Initializer — creates Tabs with title, image, systemImage and custom Label. `180×80`, shows three tabs `◉ ▭ ⬡` with badge.
+Initializer — creates Tabs with title, image, systemImage and custom Label.
+Without tabs the element keeps its `180×80` preview (three tabs `◉ ▭ ⬡` with
+badge). With tabs it renders the functional Apple `.sidebarAdaptable`
+container: a 48px title bar (traffic lights, sidebar toggle, bold title),
+a sidebar (tabs and section headers, Apple-blue selection, monochrome
+glyphs) with a 1px separator, and the selected tab's detail content on the
+right. Clicking a row swaps the detail view immediately and fires `on_select`
+with the flat tab index (top-level tabs first, then section tabs in order).
+The toggle button collapses the sidebar. Empty sections are ignored.
+`to_view` sizes the functional container to `780×520`.
 
 ## SearchTabRole
 
@@ -270,6 +320,38 @@ All `TabView` elements use the same preview shell: title `10px Semibold`, pill `
 
 ## Usage / Example
 
+Functional sidebar tabs (ports the SwiftUI `.sidebarAdaptable` reference):
+
+```rust
+use tontooui::prelude::*;
+use tontooui::{Tab, TabSection, TabView};
+
+let view = TabView::new()
+    .title("ExploreSwiftUISandbox")
+    .tab(Tab::new(Text::new("0").font_size(28.0)))
+    .section(TabSection::new().header("Foo").tab(
+        Tab::new(Text::new("1").font_size(28.0))
+            .title("1")
+            .system_image("1.circle"),
+    ))
+    .tab(Tab::new(Text::new("2").font_size(28.0))
+        .title("2")
+        .image("cats24x24"))
+    .tab(Tab::new(Text::new("3").font_size(28.0))
+        .title("3")
+        .system_image("3.circle"))
+    .selected(0)
+    .on_select(|i| println!("Tab selected: {}", i))
+    .to_view();
+```
+
+Run the live demo (needs a display; hide the system bar so the
+container draws its own title bar, like the Apple reference):
+
+```bash
+cargo run --example sidebar_tabs
+```
+
 Run the gallery demo (recreates the 22-card screenshots):
 
 ```bash
@@ -297,6 +379,7 @@ Category folder layout:
 ```
 src/elements/tab_views/
   mod.rs
+  tab.rs
   tab_section.rs
   tab_bar_only_style.rs
   tab_view.rs
@@ -324,5 +407,5 @@ src/elements/tab_views/
 ## Cross References
 
 - [List.md](List.md) -- `TabSection` hierarchy mirrors `ListSection`
-- [Sidebar.md](Sidebar.md) -- sidebar adaptable style uses sidebar
+- [Sidebar.md](Sidebar.md) -- standalone sidebar (traffic lights, search, sections, Apple-blue selection)
 - [View.md](View.md) -- view modifiers category

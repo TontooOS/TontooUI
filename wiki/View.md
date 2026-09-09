@@ -193,6 +193,23 @@ Run the gallery demo (recreates the 10-card screenshot):
 cargo run --example views
 ```
 
+Run the focused glass demo (GlassEffect tints, core modifier chain, glass buttons, glass toolbar):
+
+```bash
+cargo run --example glass_demo
+```
+
+Run the glass material playground (large live-composited glass card over an
+image background, 16 sliders + 8 toggles for tint, blur sigma, refraction,
+depth, dispersion, saturation, brightness, contrast, specular, rim, grain):
+
+```bash
+cargo run --example glass_playground
+```
+
+The playground backdrop is `examples/assets/glass_bg.jpg` (Unsplash photo
+`Wocy2asXI7k`); without the asset it falls back to a procedural scene.
+
 Minimal usage:
 
 ```rust
@@ -237,4 +254,5 @@ uikit/src/view_modifiers.rs            // core backing
 
 - [ScrollView.md](ScrollView.md) -- `SwipeContainer` uses scrollable container semantics
 - [Material.md](Material.md) -- `GlassEffect` uses frosted material + shader
+- [GlassContainer.md](GlassContainer.md) -- apply liquid glass behind any content
 - [ControlGroup.md](ControlGroup.md) -- `ControlSize` also affects control groups

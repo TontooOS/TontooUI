@@ -10,6 +10,7 @@ pub mod concentric_rectangles;
 pub mod control_groups;
 pub mod dividers;
 pub mod gauges;
+pub mod glass;
 pub mod group_boxes;
 pub mod labeled_contents;
 pub mod labels;
@@ -53,6 +54,7 @@ pub use async_images::{
 };
 pub use dividers::*;
 pub use gauges::*;
+pub use glass::{GlassBehind, GlassContainer, GlassMaterial, GlassStyle, ClearGlass, render_clear_glass, render_glass};
 pub use group_boxes::GroupBox;
 pub use labeled_contents::{CustomLabeledContent, FormattedLabeledContent, LabeledContent};
 pub use labels::{CustomLabel, ImageLabel, LabelStyleKind, LabelStyles, SystemImageLabel};
@@ -90,7 +92,7 @@ pub use sheets::{
 pub use tab_views::{
     BottomAccessory, DefaultAdaptableTabBarPlacement, DefaultCollapsedTabSection,
     GroupedTabViewStyle, HiddenIndexPageTabViewStyle, HideTabBarOnScrollDown, PageTabViewStyle,
-    SearchTabRole, SidebarAdaptableTabViewStyle, TabBadge, TabBarOnlyTabViewStyle,
+    SearchTabRole, SidebarAdaptableTabViewStyle, Tab, TabBadge, TabBarOnlyTabViewStyle,
     TabBarSectionActions, TabSection, TabView, TabViewBottomAccessoryPlacement,
     TabViewCustomization, TabViewCustomizationBehavior, TabViewSideBarBottomBar,
     TabViewSideBarFooter, TabViewSideBarHeader, ValueTabView, VerticalPageTabViewStyle,

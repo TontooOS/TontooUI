@@ -6,6 +6,7 @@
 //!
 //! | File | Element | Badge | Description |
 //! |---|---|---|--->
+//! | [`tab`] | [`Tab`] | `initializer` | A single tab with title, image/systemImage and detail content. |
 //! | [`tab_section`] | [`TabSection`] | `initializer` | A container that you can use to add hierarchy within a tab view. |
 //! | [`tab_bar_only_style`] | [`TabBarOnlyTabViewStyle`] | `initializer` | A tab view style that displays a tab bar when possible. |
 //! | [`tab_view`] | [`TabView`] | `initializer` | Creates Tabs with title, image, systemImage and custom Label. |
@@ -30,6 +31,7 @@
 //! | [`bottom_accessory`] | [`BottomAccessory`] | `modifier` | A modifier to place content above the tabs |
 
 pub mod tab_section;
+pub mod tab;
 pub mod tab_bar_only_style;
 pub mod tab_view;
 pub mod search_tab_role;
@@ -53,6 +55,7 @@ pub mod hide_on_scroll;
 pub mod bottom_accessory;
 
 pub use tab_section::TabSection;
+pub use tab::Tab;
 pub use tab_bar_only_style::TabBarOnlyTabViewStyle;
 pub use tab_view::TabView;
 pub use search_tab_role::SearchTabRole;

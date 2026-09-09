@@ -42,7 +42,7 @@ pub(crate) fn paint_switch(track: &gtk::Box, _knob: &gtk::Box, on: bool, dark: b
     uikit::widget::apply_css(
         track,
         &format!(
-            "box {{ background: {bg}; border-radius: 16px; transition: background 200ms cubic-bezier(0.32,0.72,0,1); }}",
+            "box {{ background: {bg}; border-radius: 15.5px; transition: background 200ms cubic-bezier(0.32,0.72,0,1); }}",
             bg = bg,
         ),
     );

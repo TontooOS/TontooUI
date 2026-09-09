@@ -2,8 +2,8 @@
 //!
 //! Mirrors the SwiftUI `Toggle` with the two non-list styles from the macOS 26
 //! dumps: `SwitchToggleStyle` (leading label, trailing switch) and
-//! `CheckboxToggleStyle` (checkbox followed by its label). Pressing the control
-//! makes only the white knob grow 0.25× and go translucent, staying in place.
+//! `CheckboxToggleStyle` (checkbox followed by its label). Apple-accurate
+//! switch: 51x31 track, 27px round white knob with 2px inset.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -95,7 +95,7 @@ impl Toggle {
     }
     /// Create a View wrapping this element.
     pub fn to_view(self) -> View {
-        View::new(self).with_frame(0.0, 0.0, 200.0, 32.0)
+        View::new(self).with_frame(0.0, 0.0, 199.5, 32.0)
     }
 }
 
@@ -131,11 +131,12 @@ impl ViewContent for Toggle {
             }
             area.upcast()
         };
-        const TRACK_W: f32 = 28.0;
-        const TRACK_H: f32 = 23.0;
-        const KNOB_W_REST: f32 = 30.0;
-        const KNOB_H: f32 = 20.0;
-        const KNOB_W_PRESSED: f32 = 40.0;
+        const TRACK_W: f32 = 51.0;
+        const TRACK_H: f32 = 31.0;
+        const KNOB_D: f32 = 27.0;
+        const INSET: f32 = 2.0;
+        const TRAVEL: f32 = 20.0;
+        const KNOB_W_PRESSED: f32 = 33.0;
         const CHECK_S: f32 = 16.0;
         match self.style {
             ToggleStyle::Switch => {
@@ -147,17 +148,16 @@ impl ViewContent for Toggle {
                 track.set_valign(gtk::Align::Center);
                 track.set_overflow(gtk::Overflow::Visible);
                 let knob = gtk::Box::new(Orientation::Horizontal, 0);
-                knob.set_width_request(KNOB_W_REST as i32);
-                knob.set_height_request(KNOB_H as i32);
+                knob.set_width_request(KNOB_D as i32);
+                knob.set_height_request(KNOB_D as i32);
                 knob.set_halign(gtk::Align::Start);
                 knob.set_valign(gtk::Align::Center);
                 knob.set_overflow(gtk::Overflow::Visible);
-                uikit::widget::apply_css(&knob, "box { background: white; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: background 120ms ease, box-shadow 120ms ease; }");
+                uikit::widget::apply_css(&knob, "box { background: white; border-radius: 9999px; box-shadow: 0 3px 8px rgba(0,0,0,0.15), 0 0 1px rgba(0,0,0,0.1); transition: background 120ms ease, box-shadow 120ms ease; }");
                 track.set_child(Some(&track_bg));
                 track.add_overlay(&knob);
                 paint_switch(&track_bg, &knob, self.initial_value, dark);
-                let travel: f32 = 30.0;
-                knob.set_margin_start((0.0 + if self.initial_value { travel } else { 0.0 }) as i32);
+                knob.set_margin_start((INSET + if self.initial_value { TRAVEL } else { 0.0 }) as i32);
                 row.append(&label_area);
                 let spacer = gtk::Box::new(Orientation::Horizontal, 0);
                 spacer.set_hexpand(true);
@@ -213,9 +213,9 @@ impl ViewContent for Toggle {
                     if let Some(old) = anim_id_c1.borrow_mut().take() {
                         old.remove();
                     }
-                    // 0.25 Breite + 0.25 Höhe = in allen Richtungen etwas größer, poppt über Rand.
-                    knob_c1.set_size_request(KNOB_W_PRESSED as i32, (KNOB_H * 1.33) as i32);
-                    uikit::widget::apply_css(&knob_c1, "box { background: rgba(255,255,255,0.22); border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.45); border: 1px solid rgba(255,255,255,0.22); }");
+                    // Apple press: knob wird minimal breiter, bleibt weiß mit Schatten.
+                    knob_c1.set_size_request(KNOB_W_PRESSED as i32, KNOB_D as i32);
+                    uikit::widget::apply_css(&knob_c1, "box { background: white; border-radius: 9999px; box-shadow: 0 3px 8px rgba(0,0,0,0.2), 0 0 1px rgba(0,0,0,0.1); }");
                 });
                 let track_bg_c2 = track_bg.clone();
                 let knob_c2 = knob.clone();
@@ -224,8 +224,7 @@ impl ViewContent for Toggle {
                     if (dx as f32).abs() < 5.0 { return; }
                     let target_on = (dx as f32) > 0.0;
                     paint_switch(&track_bg_c2, &knob_c2, target_on, dark);
-                    let travel2: f32 = TRACK_W - KNOB_W_REST - -24.0;
-                    knob_c2.set_margin_start((2.0 + if target_on { travel2 } else { 0.0 }) as i32);
+                    knob_c2.set_margin_start((INSET + if target_on { TRAVEL } else { 0.0 }) as i32);
                 });
                 let track_bg_c3 = track_bg.clone();
                 let knob_c3 = knob.clone();
@@ -243,11 +242,10 @@ impl ViewContent for Toggle {
                     } else if (dx as f32) < -10.0 {
                         target_on = false;
                     }
-                    knob_c3.set_size_request(KNOB_W_REST as i32, KNOB_H as i32);
-                    uikit::widget::apply_css(&knob_c3, "box { background: white; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: background 120ms ease, box-shadow 120ms ease; }");
+                    knob_c3.set_size_request(KNOB_D as i32, KNOB_D as i32);
+                    uikit::widget::apply_css(&knob_c3, "box { background: white; border-radius: 9999px; box-shadow: 0 3px 8px rgba(0,0,0,0.15), 0 0 1px rgba(0,0,0,0.1); transition: background 120ms ease, box-shadow 120ms ease; }");
                     paint_switch(&track_bg_c3, &knob_c3, target_on, dark);
-                    let travel2: f32 = TRACK_W - KNOB_W_REST - -30.0;
-                    let target_margin = (2.0 + if target_on { travel2 } else { 0.0 }) as i32;
+                    let target_margin = (INSET + if target_on { TRAVEL } else { 0.0 }) as i32;
                     animate_c3(knob_c3.clone(), target_margin);
                     if target_on != *value_c3.borrow() {
                         *value_c3.borrow_mut() = target_on;
@@ -295,7 +293,7 @@ impl ViewContent for Toggle {
     fn can_become_first_responder(&self) -> bool { true }
     fn size_that_fits(&self, _available: Size) -> Size {
         let text_w = self.label.chars().count() as f32 * 8.0;
-        let w = if self.width > 0.0 { self.width } else { text_w + 60.0 };
+        let w = if self.width > 0.0 { self.width } else { text_w + 59.5 };
         Size::new(w, 32.0)
     }
 }

@@ -20,7 +20,7 @@ Mirrors the SwiftUI toggle style hierarchy (`SwitchToggleStyle`,
 
 | Style | Layout | Control |
 |---|---|---|
-| `Switch` | label leading, switch trailing (row expands when `width` set) | 44x26 pill, green when on, gray when off, white 22px knob |
+| `Switch` | label leading, switch trailing (row expands when `width` set) | 51x31 pill, green when on, gray when off, white 27px round knob with 2px inset |
 | `Checkbox` | checkbox leading, label trailing | 20x20 rounded square, system blue filled with white checkmark when on, hairline outline when off |
 
 ## Toggle
@@ -48,7 +48,7 @@ Builder API. Behavior notes:
 - On flip the track/knob or checkbox is repainted in place (CSS provider on
   the control widget itself, per the GTK4 self-scoping rule) and
   `on_change` fires with the new state.
-- The switch knob slides via `margin-start` (2 px off, 20 px on).
+- The switch knob slides via `margin-start` (2 px off, 22 px on, 20 px travel).
 - The checkmark glyph is loaded from the CoreIcon assets (feature `coreicon`)
   and recolored white; without the feature the checkbox toggles without a
   visible glyph.

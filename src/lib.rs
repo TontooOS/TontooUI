@@ -43,10 +43,14 @@
 //! | [`ProgressView`] | Loading indicator: spinner/ring or linear bar |
 //! | [`ProgressViewStyle`] | ProgressView style (Circular / Linear) |
 //! | [`Sidebar`] | macOS-style sidebar with traffic lights, search, and item list |
+//! | [`TitleBar`] | macOS-style decoration bar with traffic lights, title and app content (standalone element, not part of `Sidebar`) |
 //! | [`ContentUnavailableView`] | Empty state with icon, title and hint message |
 //! | [`Gauge`] | SwiftUI-style gauge: linear/circular, capacity/marker, accessory styles, tint/gradient |
 //! | [`GaugeStyle`] | Gauge presentation style enum |
 //! | [`GaugeTint`] | Gauge tint (single color or gradient) |
+//! | [`GlassMaterial`] | Type: Frosted glass behavior (tint, sigma, refraction, dispersion, light, grain) |
+//! | [`ClearGlass`] | Type: Simple glass behavior (lift, edge light, edge dark) |
+//! | [`GlassContainer`] | Container: keeps its content, replaces the background with liquid glass |
 //! | [`Menu`] | SwiftUI-style menu with Liquid Glass (items, dividers, sections, nested) |
 //! | [`ContextMenu`] | Context menu (secondary gesture) with optional custom preview |
 //! | [`ViewThatFits`] | Adaptive container that picks first child fitting available space |
@@ -93,6 +97,7 @@
 //! | [`MenuControlGroupStyle`] | Style: presents content as a menu |
 //! | [`CompactMenuControlGroupStyle`] | Style: presents content as a compact menu |
 //! | [`NavigationSubtitle`] | Modifier: Configures the view's subtitle for navigation |
+//! | [`Tab`] | Initializer: A single tab with title, image/systemImage and detail content. |
 //! | [`TabSection`] | Initializer: A container that you can use to add hierarchy within a tab view. |
 //! | [`TabBarOnlyTabViewStyle`] | Initializer: A tab view style that displays a tab bar when possible. |
 //! | [`TabView`] | Initializer: Creates Tabs with title, image, systemImage and custom Label. |
@@ -185,6 +190,7 @@ pub mod wheel_picker;
 pub mod picker;
 pub mod progress_view;
 pub mod sidebar;
+pub mod titlebar;
 pub mod content_unavailable_view;
 pub mod elements;
 
@@ -194,6 +200,7 @@ pub use pickers::picker::{Picker, PickerItem, PickerSection, PickerStyle};
 pub use pickers::card::PickerCard;
 pub use progress_view::{ProgressView, ProgressViewStyle};
 pub use sidebar::Sidebar;
+pub use titlebar::{TitleBar, DEFAULT_BAR_HEIGHT};
 pub use content_unavailable_view::ContentUnavailableView;
 pub use elements::buttons::{Button, ButtonRole, ButtonStyle, ButtonBorderShape, ButtonSizing, RenameButton, EditButton, PasteButton};
 pub use elements::colors::{
@@ -233,7 +240,7 @@ pub use elements::navigation::NavigationSubtitle;
 pub use elements::tab_views::{
     BottomAccessory, DefaultAdaptableTabBarPlacement, DefaultCollapsedTabSection,
     GroupedTabViewStyle, HiddenIndexPageTabViewStyle, HideTabBarOnScrollDown, PageTabViewStyle,
-    SearchTabRole, SidebarAdaptableTabViewStyle, TabBadge, TabBarOnlyTabViewStyle,
+    SearchTabRole, SidebarAdaptableTabViewStyle, Tab, TabBadge, TabBarOnlyTabViewStyle,
     TabBarSectionActions, TabSection, TabView, TabViewBottomAccessoryPlacement,
     TabViewCustomization, TabViewCustomizationBehavior, TabViewSideBarBottomBar,
     TabViewSideBarFooter, TabViewSideBarHeader, ValueTabView, VerticalPageTabViewStyle,
@@ -262,6 +269,7 @@ pub use elements::sheets::{
     SheetPlacementKind, SheetSize,
 };
 pub use elements::gauges::{Gauge, GaugeStyle, GaugeTint};
+pub use elements::glass::{GlassBehind, GlassContainer, GlassMaterial, GlassStyle, ClearGlass, render_clear_glass, render_glass};
 pub use elements::menus::{Menu, MenuItem, MenuEntry, MenuRole, ContextMenu};
 pub use elements::toggles::{Toggle, ToggleStyle};
 pub use elements::toolbars::{Toolbar, ToolbarItem, ToolbarSpacer, ToolbarItemPlacement, ToolbarSpacerSizing};
@@ -281,7 +289,7 @@ pub mod prelude {
         Materials, MenuControlGroupStyle, MusicPicker, NavigationContainerBackground,
         NavigationSplitViewBackground, NavigationSubtitle, PageTabViewStyle, PaletteControlGroupStyle,
         SearchTabRole, SemanticColor, SemanticColors, ShareLink, SidebarAdaptableTabViewStyle,
-        StandardColor, StandardColors, SwipeAction, SwipeContainer, TabBadge,
+        StandardColor, StandardColors, SwipeAction, SwipeContainer, Tab, TabBadge,
         TabBarOnlyTabViewStyle, TabBarSectionActions, TabSection, TabView,
         TabViewBottomAccessoryPlacement, TabViewCustomization, TabViewCustomizationBehavior,
         TabViewSideBarBottomBar, TabViewSideBarFooter, TabViewSideBarHeader, TextFieldLink,
@@ -290,7 +298,7 @@ pub mod prelude {
         UIKitSeparatorColors, UIKitTextColor, UIKitTextColors, ValueTabView,
         VerticalPageTabViewStyle, TextInput, WheelPicker, Picker, PickerItem, PickerSection,
         PickerStyle, PickerCard, ProgressView, ProgressViewStyle, Sidebar, ContentUnavailableView,
-        TONTOO_UI_VERSION,
+        TitleBar, TONTOO_UI_VERSION,
     };
     pub use crate::elements::dividers::{Divider, DividerOrientation};
     pub use crate::elements::async_images::{
@@ -330,6 +338,7 @@ pub mod prelude {
         SheetPlacementKind, SheetSize,
     };
     pub use crate::elements::gauges::{Gauge, GaugeStyle, GaugeTint};
+    pub use crate::elements::glass::{GlassBehind, GlassContainer, GlassMaterial, GlassStyle, ClearGlass, render_clear_glass, render_glass};
     pub use crate::elements::menus::{Menu, MenuItem, MenuEntry, MenuRole, ContextMenu};
     pub use crate::elements::view_that_fits::{ViewThatFits, ViewThatFitsAxis};
     pub use crate::elements::buttons::{Button, ButtonRole, ButtonStyle, ButtonBorderShape, ButtonSizing, RenameButton, EditButton, PasteButton};

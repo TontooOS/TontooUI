@@ -27,10 +27,11 @@ Creates a new slider with the given range.
 
 | Constant | Value | Description |
 |---|---|---|
-| `SPRING_K` | 47.25 | Spring stiffness for squish animation |
-| `DAMP` | 10.8 | Damping for squish spring |
-| `VALUE_SPEED` | 18.0 | Speed of value following |
-| `WOBBLE_DURATION` | 0.259 | Duration of wobble animation (seconds) |
+| `SPRING_K` | 283.5 | Spring stiffness for squish animation (6x base, 3x previous) |
+| `DAMP` | 64.8 | Damping for squish spring (6x base, 3x previous) |
+| `VALUE_SPEED` | 108.0 | Speed of value following (6x base, 3x previous) |
+| `WOBBLE_DURATION` | 0.0432 | Duration of wobble animation in seconds (3x faster than previous) |
+| `GROW_SPEED` | 48.0 | Speed of press grow / glass transition (2x previous) |
 
 ## ViewContent Implementation
 
@@ -72,9 +73,9 @@ registering a new provider on every frame.
 - Fully transparent widget: the container, header, track area and overlay are
   all explicitly `background: transparent`; only the track, fill and thumb are
   drawn, so the slider blends into any wallpaper or panel behind it
-- Spring physics value following (stiffness: 47.1, damping: 10.8)
+- Spring physics value following (stiffness: 283.5, damping: 64.8, 3x previous speed)
 - Solid white pill thumb (1.5x wider than tall) at rest
-- Thumb grows 1.25x on press with spring animation
+- Thumb grows 1.25x on press with fast spring animation (2x previous glass speed)
 - Dark frosted-glass thumb while pressed: blends from solid white into dark
   glass (background color fades 255 -> 110 grey, alpha 1.0 -> 0.60, 1px light
   border, inner top highlight) as the grow amount animates from 1.0 to 1.25

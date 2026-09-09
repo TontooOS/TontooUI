@@ -20,7 +20,8 @@ TontooUI is a SwiftUI-inspired declarative UI layer for TontooOS, built on top o
 | Picker | [Picker.md](Picker.md) | SwiftUI-style picker: wheel, segmented, palette, radio, menu, inline, tabs, navigation + sections/dividers |
 | Slider | [Slider.md](Slider.md) | Spring-physics slider with white pill thumb, dark glass while pressed |
 | ProgressView | [ProgressView.md](ProgressView.md) | Loading indicator: spinner/ring or linear bar (Circular/Linear, Light/Dark) |
-| Sidebar | [Sidebar.md](Sidebar.md) | macOS-style sidebar with traffic lights, search, items, color/gradient background |
+| Sidebar | [Sidebar.md](Sidebar.md) | macOS-style sidebar with traffic lights, search filter, sections, Apple-blue selection |
+| TitleBar | [TitleBar.md](TitleBar.md) | macOS-style decoration bar with traffic lights, title and app content (standalone, not part of Sidebar) |
 | ContentUnavailableView | [ContentUnavailableView.md](ContentUnavailableView.md) | Empty state with icon, title and hint message |
 | Gauge | [Gauge.md](Gauge.md) | SwiftUI-style gauge: linear/circular, capacity/marker, accessory styles, tint/gradient |
 | Menu | [Menu.md](Menu.md) | Liquid Glass menu (items, dividers, sections, nested) + ContextMenu with custom preview |
@@ -36,7 +37,7 @@ TontooUI is a SwiftUI-inspired declarative UI layer for TontooOS, built on top o
 | ControlGroup | [ControlGroup.md](ControlGroup.md) | ControlGroup category: ControlGroup + Palette/Navigation/Menu/CompactMenu styles |
 | Navigation | [Navigation.md](Navigation.md) | Navigation category: NavigationSubtitle modifier |
 | View | [View.md](View.md) | View category: 10 modifiers — pickers, sheets, swipe, backgrounds, controlSize, glass |
-| TabView | [TabView.md](TabView.md) | TabView category: 22 elements — sections, styles, customization, badges, accessories |
+| TabView | [TabView.md](TabView.md) | TabView category: 23 elements — Tab, sections, functional sidebarAdaptable container, styles, customization, badges, accessories |
 | Sheet | [Sheet.md](Sheet.md) | Sheet category: 12 modifiers — placement, dismiss, sizing, backgrounds, detents, presenters |
 | Shapes | [Shapes.md](Shapes.md) | Shapes category: 7 shapes — circle, ellipse, capsule, rectangles, container-relative |
 | Label | [Label.md](Label.md) | Label category: 3 initializers + 1 style — custom, image, system image, styles |
@@ -47,6 +48,7 @@ TontooUI is a SwiftUI-inspired declarative UI layer for TontooOS, built on top o
 | StoreView | [StoreView.md](StoreView.md) | StoreView category: 4 initializers + 2 modifiers — icon-phase/placeholder/custom/store + cancel/restore |
 | SubscriptionStoreView | [SubscriptionStoreView.md](SubscriptionStoreView.md) | SubscriptionStoreView category: 6 initializers — custom-group/header/upgrade/group/single/plain |
 | TextField | [TextField.md](TextField.md) | TextField category: 1 modifier — capsule shape (macOS Liquid Glass) |
+| GlassContainer | [GlassContainer.md](GlassContainer.md) | Container that keeps content and replaces the background with liquid glass |
 | Review | [Review.md](Review.md) | QA tool: one element at a time, Ja/Nein in temp/review/ with restart resume |
 
 ## Quick Start
@@ -88,6 +90,7 @@ tontooui (SwiftUI-style layer)
   +-- Slider          (spring physics, white pill thumb, dark glass while pressed)
    +-- ProgressView    (Circular spinner/ring or Linear bar, tint, Light/Dark)
    +-- Sidebar         (traffic lights, search, selectable item list)
+   +-- TitleBar        (traffic lights, title, app content bar)
    +-- ContentUnavailableView (empty state with icon, title, message, button)
    +-- Gauge           (linear/circular/capacity/accessory styles, tint/gradient)
    +-- Menu            (Liquid Glass items/dividers/sections/nested) + ContextMenu (custom preview)
@@ -103,7 +106,7 @@ tontooui (SwiftUI-style layer)
    +-- ControlGroup    (ControlGroup + Palette/Navigation/Menu/CompactMenu styles)
    +-- Navigation      (NavigationSubtitle modifier)
    +-- View            (MusicPicker, AppStoreOverlay, ManageSubscriptionsSheet, SwipeContainer, SwipeAction, NavSplitBg, NavContainerBg, ControlSize, BgExtension, Glass)
-   +-- TabView         (TabSection, TabBarOnly, TabView, SearchRole, Grouped/Page/Vertical/Sidebar styles, BottomAccessory, Collapse, Customization, Sidebar Footer/Header/BottomBar, Actions, Badge, HiddenIndex, Value, HideOnScroll)
+   +-- TabView         (Tab, TabSection, TabBarOnly, TabView, SearchRole, Grouped/Page/Vertical/Sidebar styles, BottomAccessory, Collapse, Customization, Sidebar Footer/Header/BottomBar, Actions, Badge, HiddenIndex, Value, HideOnScroll)
   +-- Sheet           (Placement, DisableDismiss, PageSize, FittedSizing, CornerRadius, PrioritizeScrolling, BgInteraction, Bg, DragIndicator, Size/Detents, Item, Boolean)
   +-- Shapes          (Circle, Ellipse, Capsule, Rectangle, RoundedRectangle, UnevenRoundedRectangle, ContainerRelativeShape)
   +-- Label           (CustomLabel, ImageLabel, SystemImageLabel, LabelStyles)
@@ -114,6 +117,7 @@ tontooui (SwiftUI-style layer)
   +-- StoreView         (IconPhase, PlaceholderIcon, CustomIcon, StoreView + Cancel/Restore buttons)
   +-- SubscriptionStoreView (CustomGroup, CustomHeader, UpgradeOnly, Group, Single, Plain)
   +-- TextField         (CapsuleTextField — capsule shape, macOS Liquid Glass)
+  +-- GlassContainer    (keeps content, replaces background with liquid glass)
  |
  +-- uikit (backend)
       +-- View, Widget, ViewContent
@@ -146,6 +150,7 @@ TontooUI is designed so long-running apps do not accumulate work over time:
 - [Slider.md](Slider.md) -- spring-physics slider
 - [ProgressView.md](ProgressView.md) -- loading indicator (Circular/Linear)
 - [Sidebar.md](Sidebar.md) -- sidebar with traffic lights and item list
+- [TitleBar.md](TitleBar.md) -- decoration bar with traffic lights and app content
 - [ContentUnavailableView.md](ContentUnavailableView.md) -- empty state with icon, title, message, button
 - [Gauge.md](Gauge.md) -- gauge with all SwiftUI styles and tint support
 - [Menu.md](Menu.md) -- Liquid Glass menu + context menu
@@ -161,7 +166,7 @@ TontooUI is designed so long-running apps do not accumulate work over time:
 - [ControlGroup.md](ControlGroup.md) -- control groups and styles
 - [Navigation.md](Navigation.md) -- navigation subtitle modifier
 - [View.md](View.md) -- view modifiers (music picker, sheets, swipe, backgrounds, glass)
-- [TabView.md](TabView.md) -- tab view containers, styles, modifiers (22 elements)
+- [TabView.md](TabView.md) -- tab view containers, styles, modifiers (23 elements)
 - [Sheet.md](Sheet.md) -- sheet presentations and modifiers (12 elements)
 - [Shapes.md](Shapes.md) -- shape views (7 elements)
 - [Label.md](Label.md) -- label initializers and styles (4 elements)
@@ -172,4 +177,5 @@ TontooUI is designed so long-running apps do not accumulate work over time:
 - [StoreView.md](StoreView.md) -- App Store collection views and buttons (6 elements)
 - [SubscriptionStoreView.md](SubscriptionStoreView.md) -- subscription store views (6 elements)
 - [TextField.md](TextField.md) -- text field styles (1 element)
+- [GlassContainer.md](GlassContainer.md) -- liquid glass container + material
 - [Review.md](Review.md) -- element review QA tool (temp/review state)

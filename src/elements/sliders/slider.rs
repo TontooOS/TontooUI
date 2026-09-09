@@ -20,10 +20,10 @@ use gtk::prelude::*;
 use gtk::{self, Label as GtkLabel};
 use gtk::Orientation;
 
-const SPRING_K: f32 = 35.0 * 1.35;
-const DAMP: f32 = 8.0 * 1.35;
-const VALUE_SPEED: f32 = 18.0;
-const WOBBLE_DURATION: f32 = 0.259;
+const SPRING_K: f32 = 35.0 * 1.35 * 6.0;
+const DAMP: f32 = 8.0 * 1.35 * 6.0;
+const VALUE_SPEED: f32 = 108.0;
+const WOBBLE_DURATION: f32 = 0.0432;
 
 fn ease_out_elastic(t: f32) -> f32 {
     if t <= 0.0 || t >= 1.0 { return t; }
@@ -97,7 +97,7 @@ impl SliderPhysics {
                 let t = (self.wobble_time / WOBBLE_DURATION).min(1.0);
                 1.25 - 0.25 * ease_out_elastic(t)
             } else { 1.0 };
-        self.grow += (target_grow - self.grow) * 12.0 * dt;
+        self.grow += (target_grow - self.grow) * 48.0 * dt;
 
         let mut tsx = 1.0_f32;
         let mut tsy = 1.0_f32;
@@ -105,7 +105,7 @@ impl SliderPhysics {
             let stretch = (self.drag_vel.abs() * 0.0375).min(0.56);
             tsx = 1.0 - stretch;
             tsy = 1.0 + stretch * 0.8;
-            self.drag_vel *= 0.85;
+            self.drag_vel *= 0.377;
         } else if self.wobbling {
             self.wobble_time += dt;
             let t = (self.wobble_time / WOBBLE_DURATION).min(1.0);

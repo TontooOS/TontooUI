@@ -12,7 +12,8 @@
       "name": "Loading Indicator"
     },
     "sidebar": {
-      "name": "Sidebar"
+      "name": "Sidebar",
+      "search_placeholder": "Search"
     },
     "content_unavailable_view": {
       "name": "Content Unavailable",
@@ -145,6 +146,8 @@
     },
     "tab_view": {
       "name": "TabView",
+      "tab": "Tab",
+      "tab_desc": "A single tab with title, image/systemImage and detail content.",
       "tab_section": "TabSection",
       "tab_section_desc": "A container that you can use to add hierarchy within a tab view.",
       "tab_bar_only_style": "TabBarOnlyTabViewStyle",

@@ -36,6 +36,7 @@ pub struct TextInput {
     position: Position,
     width: f32,
     height: f32,
+    transparent: bool,
 }
 
 impl TextInput {
@@ -54,6 +55,7 @@ impl TextInput {
             position: Position::new(),
             width: 300.0,
             height: 32.0,
+            transparent: false,
         }
     }
 
@@ -91,6 +93,14 @@ impl TextInput {
     /// Set the width of the text input.
     pub fn width(mut self, width: f32) -> Self {
         self.width = width;
+        self
+    }
+
+    /// Paint no background or border so the field can sit on glass
+    /// (e.g. inside a `GlassContainer`). Text, placeholder and caret
+    /// colors are unchanged.
+    pub fn transparent(mut self) -> Self {
+        self.transparent = true;
         self
     }
 
@@ -152,20 +162,31 @@ impl TextInput {
         );
 
         let is_dark = resolve_scheme(None) == uikit::app::ColorScheme::Dark;
-        // BG #1d1d1d dark / #ececec light per AGENTS.md — input field sits slightly above bg
-        let bg_color = if is_dark {
+        // BG #1d1d1d dark / #ececec light per AGENTS.md — input field sits slightly above bg.
+        // Transparent mode paints nothing so a GlassContainer behind shows through.
+        let bg_color = if self.transparent {
+            "transparent"
+        } else if is_dark {
             if self.is_disabled { "#1a1a1c" } else { "#2a2a2c" }
         } else {
             if self.is_disabled { "#e8e8ea" } else { "#ffffff" }
         };
-        let border_color = if is_dark {
+        let border_color = if self.transparent {
+            "transparent"
+        } else if is_dark {
             if self.is_disabled { "#2a2a2c" } else { "#3a3a3d" }
         } else {
             if self.is_disabled { "#e5e5e5" } else { "#d1d1d6" }
         };
         let text_color = if is_dark { "#ececec" } else { "#1d1d1d" };
         let placeholder_color = if is_dark { "#8e8e93" } else { "#aeaeb2" };
-        let hover_color = if is_dark { "#4a4a4e" } else { "#aeaeb2" };
+        let hover_color = if self.transparent {
+            "transparent"
+        } else if is_dark {
+            "#4a4a4e"
+        } else {
+            "#aeaeb2"
+        };
 
         let css = format!(
             "entry {{
@@ -339,6 +360,14 @@ mod tests {
         let input = TextInput::new("Read only").disabled();
         assert!(input.is_disabled);
         assert!(!input.is_interactive());
+    }
+
+    #[test]
+    fn text_input_transparent() {
+        let input = TextInput::new("Search").transparent();
+        assert!(input.transparent);
+        let solid = TextInput::new("Search");
+        assert!(!solid.transparent);
     }
 
     #[test]

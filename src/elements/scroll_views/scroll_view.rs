@@ -99,6 +99,11 @@ impl Widget for ScrollView {
     }
     fn is_interactive(&self) -> bool { true }
     fn padding(&self) -> Padding { Padding::ZERO }
+    /// Forward into the scrolled content so views that hide the window bar
+    /// (e.g. `Sidebar`) are found even when nested in a `ScrollView`.
+    fn children(&self) -> Vec<&dyn Widget> {
+        self.content.iter().map(|c| c.as_ref()).collect()
+    }
 }
 
 #[cfg(test)]
@@ -108,5 +113,25 @@ mod tests {
     fn scroll_edge_hard() {
         let s = ScrollView::new().hard_edge();
         assert_eq!(s.edge_effect, ScrollEdgeEffect::Hard);
+    }
+
+    #[test]
+    fn scroll_view_forwards_children() {
+        struct Leaf;
+        impl Widget for Leaf {
+            fn id(&self) -> WidgetId {
+                0
+            }
+            fn to_gtk(&self) -> gtk::Widget {
+                unimplemented!()
+            }
+            fn hides_window_bar(&self) -> bool {
+                true
+            }
+        }
+        assert!(ScrollView::new().children().is_empty());
+        let s = ScrollView::new().content(Leaf);
+        assert_eq!(s.children().len(), 1);
+        assert!(s.hides_window_bar_recursive());
     }
 }
