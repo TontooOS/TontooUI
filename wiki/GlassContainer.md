@@ -44,7 +44,7 @@ flag gates a whole stage; a slider at its neutral value is equivalent.
 pub fn render_glass(mat: &GlassMaterial, backdrop: &RgbImage, w: u32, h: u32, radius: f32) -> (RgbImage, f32);
 ```
 
-Composites `w`x`h` liquid glass over `backdrop` behind a rounded rect
+Composites `w`x`h` frosted glass over `backdrop` behind a rounded rect
 with corner `radius` (capsule when `radius >= h / 2`). The backdrop is
 center-cropped when larger and cover-scaled when smaller. Returns the
 image plus the blur stage time in milliseconds for perf HUDs.
@@ -53,12 +53,38 @@ image plus the blur stage time in milliseconds for perf HUDs.
 - Pixels outside the mask are the pure backdrop, bit-identical.
 - `radius` above `h / 2` is clamped.
 
+## ClearGlass
+
+The simple glass: same color as what's behind, a micro lift brighter,
+light top/bottom edges, darker left/right edges. Full pass-through —
+no blur, no refraction, everything behind stays sharp.
+
+```rust
+pub struct ClearGlass {
+    pub lift: f32,        // 0..=30, default 14
+    pub edge_light: f32,  // 0..=100, default 70
+    pub edge_dark: f32,   // 0..=100, default 40
+}
+
+pub fn render_clear_glass(clear: &ClearGlass, backdrop: &RgbImage, w: u32, h: u32, radius: f32) -> RgbImage;
+```
+
+## GlassStyle
+
+```rust
+pub enum GlassStyle {
+    Clear(ClearGlass),      // default: simple glass
+    Frosted(GlassMaterial), // blur, refraction, dispersion, grain
+}
+```
+
 ## GlassContainer
 
 ```rust
 pub struct GlassContainer { /* ... */ }
 impl GlassContainer {
     pub fn new(content: impl Widget + 'static) -> Self;
+    pub fn clear(self, c: ClearGlass) -> Self;
     pub fn material(self, m: GlassMaterial) -> Self;
     pub fn tint(self, c: Color, alpha: f32) -> Self;
     pub fn sigma(self, s: f32) -> Self;
@@ -73,6 +99,9 @@ impl GlassContainer {
     pub fn padding(self, p: f32) -> Self;
     pub fn to_view(self) -> View;
 }
+
+`tint`, `sigma` and `refraction` switch to frosted glass; the default
+style is clear.
 ```
 
 Defaults: `320x64`, capsule radius, `8px` padding, lying directly on the
