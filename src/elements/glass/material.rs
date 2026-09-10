@@ -9,6 +9,7 @@
 use std::time::Instant;
 
 use image::RgbImage;
+use image::RgbaImage;
 
 // ── Parameters ───────────────────────────────────────────────────────
 
@@ -155,13 +156,14 @@ fn samp(src: &[u8], w: i32, h: i32, x: f32, y: f32) -> [f32; 3] {
 
 /// Composite liquid glass over `backdrop`.
 ///
-/// Renders a `w`×`h` image: the glass inside a rounded rect with corner
-/// `radius`, the pure backdrop outside the mask. The backdrop is
-/// center-cropped when larger and cover-scaled when smaller. Returns the
-/// image plus the blur stage time in milliseconds (for perf HUDs).
-pub fn render_glass(mat: &GlassMaterial, backdrop: &RgbImage, w: u32, h: u32, radius: f32) -> (RgbImage, f32) {
+/// Renders a `w`x`h` image: the glass inside a rounded rect with corner
+/// `radius`, transparent outside the mask — so no backdrop color guessing,
+/// the real window shines through. The backdrop is center-cropped when
+/// larger and cover-scaled when smaller. Returns the image plus the blur
+/// stage time in milliseconds for perf HUDs.
+pub fn render_glass(mat: &GlassMaterial, backdrop: &RgbImage, w: u32, h: u32, radius: f32) -> (RgbaImage, f32) {
     if w == 0 || h == 0 {
-        return (RgbImage::new(w, h), 0.0);
+        return (RgbaImage::new(w, h), 0.0);
     }
     // Cover-scale small backdrops up so there is always enough material.
     let fitted: RgbImage;
@@ -179,8 +181,7 @@ pub fn render_glass(mat: &GlassMaterial, backdrop: &RgbImage, w: u32, h: u32, ra
         backdrop
     };
 
-    // 1 — center-crop the backdrop behind the glass. `orig` stays sharp so
-    // pixels outside the mask show the pure backdrop.
+    // 1 — center-crop the backdrop behind the glass.
     let gx0 = (bg.width().saturating_sub(w)) / 2;
     let gy0 = (bg.height().saturating_sub(h)) / 2;
     let mut crop = RgbImage::new(w, h);
@@ -189,7 +190,6 @@ pub fn render_glass(mat: &GlassMaterial, backdrop: &RgbImage, w: u32, h: u32, ra
             crop.put_pixel(x, y, *bg.get_pixel(gx0 + x, gy0 + y));
         }
     }
-    let orig = crop.clone().into_raw();
 
     // 2 — backdrop dim (light absorbed before it enters the glass).
     if mat.dim_on && mat.dim > 0.5 {
@@ -226,7 +226,7 @@ pub fn render_glass(mat: &GlassMaterial, backdrop: &RgbImage, w: u32, h: u32, ra
 
     // 4 — per-pixel refraction, grade, tint, grain, specular, rim, mask.
     let sw = w as i32;
-    let mut out = vec![0u8; (w * h * 3) as usize];
+    let mut out = vec![0u8; (w * h * 4) as usize];
     let cx = w as f32 / 2.0;
     let cy = h as f32 / 2.0;
     let refr = if mat.refraction_on { mat.refraction / 100.0 } else { 0.0 };
@@ -331,15 +331,17 @@ pub fn render_glass(mat: &GlassMaterial, backdrop: &RgbImage, w: u32, h: u32, ra
                 }
             }
 
-            // Mask: crisp glass inside, pure backdrop outside.
+            // Mask: opaque glass inside, transparent outside (the real
+            // window shines through — no backdrop color guessing).
             let a = 1.0 - smoothstep(-1.2, 1.2, d);
-            let o = ((y * sw + x) * 3) as usize;
-            out[o] = clamp01(orig[o] as f32 * (1.0 - a) + col[0] * a);
-            out[o + 1] = clamp01(orig[o + 1] as f32 * (1.0 - a) + col[1] * a);
-            out[o + 2] = clamp01(orig[o + 2] as f32 * (1.0 - a) + col[2] * a);
+            let o = ((y * sw + x) * 4) as usize;
+            out[o] = clamp01(col[0]);
+            out[o + 1] = clamp01(col[1]);
+            out[o + 2] = clamp01(col[2]);
+            out[o + 3] = (a * 255.0).round().clamp(0.0, 255.0) as u8;
         }
     }
-    (RgbImage::from_raw(w, h, out).unwrap(), blur_ms)
+    (RgbaImage::from_raw(w, h, out).unwrap(), blur_ms)
 }
 
 // ── Clear glass ────────────────────────────────────────────────────
@@ -365,10 +367,10 @@ impl Default for ClearGlass {
 
 /// Composite clear glass over `backdrop`: sharp pass-through with a lift
 /// and directional edge light inside a rounded rect (`radius`, capsule
-/// when `radius >= h / 2`). Outside the mask is the pure backdrop.
-pub fn render_clear_glass(clear: &ClearGlass, backdrop: &RgbImage, w: u32, h: u32, radius: f32) -> RgbImage {
+/// when `radius >= h / 2`). Transparent outside the mask.
+pub fn render_clear_glass(clear: &ClearGlass, backdrop: &RgbImage, w: u32, h: u32, radius: f32) -> RgbaImage {
     if w == 0 || h == 0 {
-        return RgbImage::new(w, h);
+        return RgbaImage::new(w, h);
     }
     let fitted: RgbImage;
     let bg: &RgbImage = if backdrop.width() < w || backdrop.height() < h {
@@ -387,7 +389,7 @@ pub fn render_clear_glass(clear: &ClearGlass, backdrop: &RgbImage, w: u32, h: u3
     let gx0 = (bg.width().saturating_sub(w)) / 2;
     let gy0 = (bg.height().saturating_sub(h)) / 2;
 
-    let mut out = vec![0u8; (w * h * 3) as usize];
+    let mut out = vec![0u8; (w * h * 4) as usize];
     let cx = w as f32 / 2.0;
     let cy = h as f32 / 2.0;
     let band = (h as f32 * 0.16).clamp(6.0, 20.0);
@@ -396,7 +398,7 @@ pub fn render_clear_glass(clear: &ClearGlass, backdrop: &RgbImage, w: u32, h: u3
             let fx = x as f32;
             let fy = y as f32;
             let d = rounded_rect_sdf(fx, fy, w as f32, h as f32, radius);
-            let o = ((y * w as i32 + x) * 3) as usize;
+            let o = ((y * w as i32 + x) * 4) as usize;
             let b = bg.get_pixel(gx0 + x as u32, gy0 + y as u32).0;
             let mut col = [b[0] as f32, b[1] as f32, b[2] as f32];
 
@@ -420,14 +422,15 @@ pub fn render_clear_glass(clear: &ClearGlass, backdrop: &RgbImage, w: u32, h: u3
                 }
             }
 
-            // Mask: glass inside, pure backdrop outside.
+            // Mask: opaque glass inside, transparent outside.
             let a = 1.0 - smoothstep(-1.2, 1.2, d);
-            out[o] = clamp01(b[0] as f32 * (1.0 - a) + col[0] * a);
-            out[o + 1] = clamp01(b[1] as f32 * (1.0 - a) + col[1] * a);
-            out[o + 2] = clamp01(b[2] as f32 * (1.0 - a) + col[2] * a);
+            out[o] = clamp01(col[0]);
+            out[o + 1] = clamp01(col[1]);
+            out[o + 2] = clamp01(col[2]);
+            out[o + 3] = (a * 255.0).round().clamp(0.0, 255.0) as u8;
         }
     }
-    RgbImage::from_raw(w, h, out).unwrap()
+    RgbaImage::from_raw(w, h, out).unwrap()
 }
 #[cfg(test)]
 mod tests {
@@ -445,11 +448,13 @@ mod tests {
     }
 
     #[test]
-    fn corners_outside_mask_show_pure_backdrop() {
+    fn corners_outside_mask_are_transparent() {
         let bg = solid(200, 200, [11, 22, 33]);
         let (img, _) = render_glass(&GlassMaterial::default(), &bg, 100, 60, 30.0);
-        assert_eq!(img.get_pixel(0, 0).0, [11, 22, 33]);
-        assert_eq!(img.get_pixel(99, 59).0, [11, 22, 33]);
+        assert_eq!(img.get_pixel(0, 0).0[3], 0);
+        assert_eq!(img.get_pixel(99, 59).0[3], 0);
+        // Center is opaque glass.
+        assert_eq!(img.get_pixel(50, 30).0[3], 255);
     }
 
     #[test]
@@ -482,15 +487,17 @@ mod tests {
         let bg = solid(100, 100, [100, 100, 100]);
         let img = render_clear_glass(&ClearGlass::default(), &bg, 60, 40, 20.0);
         assert_eq!((img.width(), img.height()), (60, 40));
-        // Center is far from any edge: pure lift, no edge light.
-        assert_eq!(img.get_pixel(30, 20).0, [114, 114, 114]);
+        // Center is far from any edge: pure lift, no edge light, opaque.
+        let c = img.get_pixel(30, 20).0;
+        assert_eq!([c[0], c[1], c[2]], [114, 114, 114]);
+        assert_eq!(c[3], 255);
     }
 
     #[test]
-    fn clear_glass_outside_is_backdrop() {
+    fn clear_glass_outside_is_transparent() {
         let bg = solid(100, 100, [50, 60, 70]);
         let img = render_clear_glass(&ClearGlass::default(), &bg, 60, 40, 20.0);
-        assert_eq!(img.get_pixel(0, 0).0, [50, 60, 70]);
+        assert_eq!(img.get_pixel(0, 0).0[3], 0);
     }
 
     #[test]

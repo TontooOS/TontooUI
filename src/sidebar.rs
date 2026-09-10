@@ -628,8 +628,15 @@ impl ViewContent for Sidebar {
         // effective bar visibility before rendering, so in-app this stays
         // consistent with the auto-hide (see `hides_window_bar`).
         if self.show_traffic_lights && !uikit::app::is_window_bar_visible() {
-            let tl = uikit::widgets::TrafficLights::new().at(16.0, 12.0).size(14.0);
-            container.append(&tl.to_gtk());
+            let tl = uikit::widgets::TrafficLights::new().at(16.0, 18.0).size(21.0);
+            // Explicit margins: the sidebar stacks children in a plain box,
+            // so `at()` alone would not move the lights away from the roof.
+            let tl_widget = tl.to_gtk();
+            tl_widget.set_margin_top(18);
+            tl_widget.set_margin_start(16);
+            tl_widget.set_margin_end(16);
+            tl_widget.set_margin_bottom(4);
+            container.append(&tl_widget);
         }
 
         // Row + label colors for the Apple selection model. Every row carries
@@ -648,7 +655,7 @@ impl ViewContent for Sidebar {
 
         if self.show_search {
             let search_outer = gtk::Box::new(Orientation::Vertical, 0);
-            search_outer.set_margin_top(6);
+            search_outer.set_margin_top(10);
             search_outer.set_margin_bottom(4);
             search_outer.set_margin_start(10);
             search_outer.set_margin_end(10);

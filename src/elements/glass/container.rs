@@ -284,24 +284,9 @@ impl GlassContainer {
                 uikit::widget::apply_css(&fill, &css);
                 Some(fill.upcast())
             }
-            // No behind element: the app background itself.
-            None => {
-                let c = app_bg();
-                let fill = gtk::Box::new(gtk::Orientation::Vertical, 0);
-                fill.set_hexpand(true);
-                fill.set_vexpand(true);
-                fill.set_halign(gtk::Align::Fill);
-                fill.set_valign(gtk::Align::Fill);
-                let css = format!(
-                    ".gc-behind {{ background: rgb({},{},{}); }}",
-                    (c.r * 255.0) as u8,
-                    (c.g * 255.0) as u8,
-                    (c.b * 255.0) as u8
-                );
-                fill.add_css_class("gc-behind");
-                uikit::widget::apply_css(&fill, &css);
-                Some(fill.upcast())
-            }
+            // No behind element: nothing to show, the window itself plus
+            // the transparent glass corners shine through.
+            None => None,
         }
     }
 
@@ -330,7 +315,8 @@ impl ViewContent for GlassContainer {
             overlay.set_child(Some(&live));
         }
 
-        // Glass layer composited once at render time.
+        // Glass layer composited once at render time (RGBA: transparent
+        // outside the mask, the real window shines through).
         let bg = self.frost_source(w, h);
         let img = match &self.style {
             GlassStyle::Clear(c) => render_clear_glass(c, &bg, w, h, self.radius),
@@ -340,9 +326,9 @@ impl ViewContent for GlassContainer {
         let tex = gtk::gdk::MemoryTexture::new(
             w as i32,
             h as i32,
-            gtk::gdk::MemoryFormat::R8g8b8,
+            gtk::gdk::MemoryFormat::R8g8b8a8,
             &bytes,
-            (w * 3) as usize,
+            (w * 4) as usize,
         );
         let pic = gtk::Picture::for_paintable(&tex);
         pic.set_can_shrink(false);

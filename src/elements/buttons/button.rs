@@ -37,6 +37,7 @@ pub struct Button {
     border_shape: ButtonBorderShape,
     sizing: ButtonSizing,
     icon: Option<String>,
+    icon_size: Option<f32>,
     width: Option<f32>,
     height: Option<f32>,
     color_scheme: Option<ColorScheme>,
@@ -58,6 +59,7 @@ impl Button {
             border_shape: ButtonBorderShape::Automatic,
             sizing: ButtonSizing::Automatic,
             icon: None,
+            icon_size: None,
             width: None,
             height: None,
             color_scheme: None,
@@ -101,6 +103,12 @@ impl Button {
     /// An empty label with an icon renders an icon-only button.
     pub fn icon(mut self, symbol: impl Into<String>) -> Self {
         self.icon = Some(symbol.into());
+        self
+    }
+
+    /// Glyph size in pixels (default 15).
+    pub fn icon_size(mut self, px: f32) -> Self {
+        self.icon_size = Some(px);
         self
     }
 
@@ -160,6 +168,7 @@ impl ViewContent for Button {
         render_button_widget(
             &label,
             &self.icon,
+            self.icon_size.unwrap_or(15.0),
             &colors,
             self.border_shape,
             self.sizing,
@@ -246,6 +255,13 @@ mod tests {
         assert_eq!(b.sizing, ButtonSizing::Flexible);
         assert_eq!(b.icon.as_deref(), Some("checkmark"));
         assert_eq!(b.tint, Some(Color::from_rgb(48, 209, 88)));
+    }
+
+    #[test]
+    fn icon_size_builder() {
+        assert_eq!(Button::new("").icon_size, None);
+        let b = Button::new("").icon("plus").icon_size(40.0);
+        assert_eq!(b.icon_size, Some(40.0));
     }
 
     #[test]

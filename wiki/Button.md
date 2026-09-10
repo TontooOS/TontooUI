@@ -107,6 +107,7 @@ impl Button {
     pub fn border_shape(self, shape: ButtonBorderShape) -> Self;
     pub fn sizing(self, sizing: ButtonSizing) -> Self;
     pub fn icon(self, symbol: impl Into<String>) -> Self;
+    pub fn icon_size(self, px: f32) -> Self;
     pub fn size(self, width: f32, height: f32) -> Self;
     pub fn width(self, width: f32) -> Self;
     pub fn height(self, height: f32) -> Self;
@@ -127,6 +128,7 @@ Builder API. Behavior notes:
 - `.icon(...)` loads an SF Symbol PNG from the CoreIcon assets (feature
   `coreicon`), recolors it via its alpha mask and caches the result in the
   temp dir. An empty label with an icon renders an icon-only button.
+- `.icon_size(px)` sets the glyph size in pixels (default 15).
 - Hover raises brightness, pressing lowers it (mirrors the
   `isPressed` configuration behavior of `ButtonStyle.makeBody`).
 - Invalid icon symbols are skipped silently (no icon is rendered).

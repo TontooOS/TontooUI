@@ -148,7 +148,9 @@ cargo run --example sidebar_playground
 
 ## Features
 
-- Traffic lights drawn as CSS circles (red/yellow/green, 12px)
+- Traffic lights (red/yellow/green, 21px) with 18px roof clearance and
+  16px side margins, set explicitly because the plain stacking box
+  ignores the `at()` position
 - Search bar styled like `TextInput` with a blue focus accent, scheme-aware
   (dark `#3a3a3c` fill / light `#ffffff` fill), 14px radius, no border
 - Scrollable item list with icon PNGs + SF Pro Display labels. Icons are

@@ -14,7 +14,7 @@ use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 use gtk::prelude::*;
-use image::{Rgb, RgbImage};
+use image::{Rgb, RgbImage, RgbaImage};
 use tontooui::prelude::*;
 use uikit::widget::{Position, PositionMode, Widget, WidgetId, next_widget_id};
 
@@ -98,7 +98,7 @@ fn bg_path() -> std::path::PathBuf {
 
 // ── Glass compositor (library) ───────────────────────────────────────
 // Thin shim so the playground's flush path stays untouched.
-fn composite(p: &GlassMaterial, bg: &RgbImage) -> (RgbImage, f32) {
+fn composite(p: &GlassMaterial, bg: &RgbImage) -> (RgbaImage, f32) {
     render_glass(p, bg, GW, GH, GH as f32 / 2.0)
 }
 
@@ -145,9 +145,9 @@ fn flush_live() {
     let tex = gtk::gdk::MemoryTexture::new(
         GW as i32,
         GH as i32,
-        gtk::gdk::MemoryFormat::R8g8b8,
+        gtk::gdk::MemoryFormat::R8g8b8a8,
         &bytes,
-        (GW * 3) as usize,
+        (GW * 4) as usize,
     );
     LIVE.with(|l| {
         if let Some(st) = l.borrow().as_ref() {

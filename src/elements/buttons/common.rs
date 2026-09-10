@@ -246,6 +246,7 @@ pub(crate) fn effective_shape(shape: ButtonBorderShape, has_label: bool) -> Butt
 pub(crate) fn render_button_widget(
     label: &str,
     icon: &Option<String>,
+    icon_size: f32,
     colors: &ButtonColors,
     shape: ButtonBorderShape,
     sizing: ButtonSizing,
@@ -267,7 +268,7 @@ pub(crate) fn render_button_widget(
         content.set_valign(gtk::Align::Center);
         if let Some(path) = sf_icon_path(symbol, colors.icon) {
             let img = GtkImage::from_file(&path);
-            img.set_pixel_size(15);
+            img.set_pixel_size(icon_size.max(1.0) as i32);
             content.append(&img);
         }
         if !label.is_empty() {
