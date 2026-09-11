@@ -13,7 +13,7 @@ use uikit::widget::{Position, PositionMode, Widget, WidgetId, next_widget_id};
 use gtk::prelude::*;
 use gtk::Orientation;
 
-use super::common::{ToolbarItemPlacement, glass_capsule_css};
+use super::common::{ToolbarItemPlacement, glass_capsule_css, transparent_capsule_css};
 use super::toolbar_item::ToolbarItem;
 use super::toolbar_spacer::ToolbarSpacer;
 
@@ -28,6 +28,7 @@ pub struct Toolbar {
     entries: Vec<ToolbarEntry>,
     color_scheme: Option<ColorScheme>,
     width: Option<f32>,
+    transparent: bool,
     position_mode: PositionMode,
     position: Position,
 }
@@ -40,6 +41,7 @@ impl Toolbar {
             entries: Vec::new(),
             color_scheme: None,
             width: None,
+            transparent: false,
             position_mode: PositionMode::Auto,
             position: Position::new(),
         }
@@ -69,6 +71,18 @@ impl Toolbar {
         self
     }
 
+    /// Transparent groups: same pill shape, fully transparent
+    /// background, no border, no shadow.
+    pub fn transparent(mut self) -> Self {
+        self.transparent = true;
+        self
+    }
+
+    /// Whether groups render transparent.
+    pub fn is_transparent(&self) -> bool {
+        self.transparent
+    }
+
     /// Create a View wrapping this element.
     pub fn to_view(self) -> View {
         View::new(self).with_frame(0.0, 0.0, 120.0, 40.0)
@@ -83,10 +97,14 @@ impl Default for Toolbar {
 
 /// Seal the current group: style it as a glass capsule (when non-empty) and
 /// parent it to the bar.
-fn flush_group(group: &gtk::Box, bar: &gtk::Box, dark: bool) {
+fn flush_group(group: &gtk::Box, bar: &gtk::Box, dark: bool, transparent: bool) {
     if group.first_child().is_some() {
         group.add_css_class("tb-group");
-        uikit::widget::apply_css(group, &glass_capsule_css(dark));
+        if transparent {
+            uikit::widget::apply_css(group, &transparent_capsule_css());
+        } else {
+            uikit::widget::apply_css(group, &glass_capsule_css(dark));
+        }
         bar.append(group);
     }
 }
@@ -115,11 +133,11 @@ impl Toolbar {
                     }
                     let widget = item.to_gtk();
                     if item.placement_role() == ToolbarItemPlacement::Principal {
-                        flush_group(&group, &bar, dark);
+                        flush_group(&group, &bar, dark, self.transparent);
                         group = gtk::Box::new(Orientation::Horizontal, 0);
                         title_area.append(&widget);
                     } else if !item.shares_background() {
-                        flush_group(&group, &bar, dark);
+                        flush_group(&group, &bar, dark, self.transparent);
                         group = gtk::Box::new(Orientation::Horizontal, 0);
                         bar.append(&widget);
                     } else {
@@ -127,13 +145,13 @@ impl Toolbar {
                     }
                 }
                 ToolbarEntry::Spacer(spacer) => {
-                    flush_group(&group, &bar, dark);
+                    flush_group(&group, &bar, dark, self.transparent);
                     group = gtk::Box::new(Orientation::Horizontal, 0);
                     bar.append(&spacer.to_gtk());
                 }
             }
         }
-        flush_group(&group, &bar, dark);
+        flush_group(&group, &bar, dark, self.transparent);
 
         root.append(&title_area);
         root.append(&bar);
@@ -188,5 +206,16 @@ impl Widget for Toolbar {
 
     fn padding(&self) -> Padding {
         Padding::ZERO
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transparent_builder() {
+        assert!(!Toolbar::new().is_transparent());
+        assert!(Toolbar::new().transparent().is_transparent());
     }
 }

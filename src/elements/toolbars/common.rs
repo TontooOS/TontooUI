@@ -58,6 +58,19 @@ pub(crate) fn glass_capsule_css(dark: bool) -> String {
     )
 }
 
+/// CSS for a transparent capsule: same pill shape and padding, fully
+/// transparent background, no border, no shadow.
+pub(crate) fn transparent_capsule_css() -> String {
+    ".tb-group {{
+        background: transparent;
+        background-color: transparent;
+        border: 1px solid transparent;
+        border-radius: 9999px;
+        box-shadow: none;
+        padding: 3px 5px;
+    }}".to_string()
+}
+
 /// Tint for toolbar item glyphs as a `Color`.
 pub(crate) fn toolbar_tint(dark: bool) -> Color {
     if dark {
@@ -81,5 +94,13 @@ mod tests {
     fn capsule_css_contains_scheme_background() {
         assert!(glass_capsule_css(true).contains(GLASS_BG_DARK));
         assert!(glass_capsule_css(false).contains(GLASS_BG_LIGHT));
+    }
+
+    #[test]
+    fn transparent_capsule_has_no_background_or_shadow() {
+        let css = transparent_capsule_css();
+        assert!(css.contains("background: transparent"));
+        assert!(css.contains("box-shadow: none"));
+        assert!(css.contains("border-radius: 9999px"));
     }
 }
