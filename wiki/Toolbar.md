@@ -47,6 +47,8 @@ impl Toolbar {
     pub fn spacer(self, spacer: ToolbarSpacer) -> Self;
     pub fn color_scheme(self, c: ColorScheme) -> Self;
     pub fn width(self, width: f32) -> Self;
+    pub fn transparent(self) -> Self;
+    pub fn is_transparent(&self) -> bool;
     pub fn to_view(self) -> View;
 }
 ```
@@ -56,6 +58,8 @@ Renders a horizontal bar. Behavior notes:
 - Consecutive items sharing the background are wrapped into one glass
   capsule (`.tb-group` CSS class: translucent background, hairline border,
   full rounding).
+- `transparent()` keeps the pill shape and padding but renders groups
+  fully transparent with no border and no shadow.
 - A spacer seals the current capsule; `ToolbarSpacer::fixed()` inserts the
   standard 6 px group gap, `ToolbarSpacer::flexible()` inserts an expanding
   gap.
