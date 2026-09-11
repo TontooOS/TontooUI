@@ -369,6 +369,7 @@ impl ViewContent for List {
 
         let scroll = gtk::ScrolledWindow::new();
         scroll.set_policy(gtk::PolicyType::Never, gtk::PolicyType::Never);
+        uikit::smooth_scroll::apply_smooth_scrolling(&scroll);
         scroll.set_child(Some(&outer));
         scroll.set_vexpand(false);
         scroll.upcast()

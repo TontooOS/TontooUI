@@ -179,3 +179,10 @@ TontooUI is designed so long-running apps do not accumulate work over time:
 - [TextField.md](TextField.md) -- text field styles (1 element)
 - [GlassContainer.md](GlassContainer.md) -- liquid glass container + material
 - [Review.md](Review.md) -- element review QA tool (temp/review state)
+
+## Changelog
+
+- 2026-09-11: Smooth scrolling in all scroll containers (`ScrollView`,
+  `TabView` sidebar, `Sidebar`, `List`) via
+  `uikit::smooth_scroll::apply_smooth_scrolling`. See
+  [ScrollView.md](ScrollView.md).

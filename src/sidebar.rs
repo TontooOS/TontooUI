@@ -931,6 +931,7 @@ impl ViewContent for Sidebar {
         scroll.set_hscrollbar_policy(gtk::PolicyType::Never);
         scroll.set_vscrollbar_policy(gtk::PolicyType::Automatic);
         scroll.set_vexpand(true);
+        uikit::smooth_scroll::apply_smooth_scrolling(&scroll);
         // Keep the whole list area transparent so the sidebar
         // `background_gradient` stays visible behind the items: the
         // app-level CSS paints every scrolledwindow/viewport with the

@@ -57,6 +57,7 @@ impl ViewContent for ScrollView {
         scrolled.set_vscrollbar_policy(if self.vertical { gtk::PolicyType::Automatic } else { gtk::PolicyType::Never });
         scrolled.set_hexpand(true);
         scrolled.set_vexpand(true);
+        uikit::smooth_scroll::apply_smooth_scrolling(&scrolled);
         if frame.width > 0.0 { scrolled.set_width_request(frame.width as i32); }
         if frame.height > 0.0 { scrolled.set_height_request(frame.height as i32); }
 

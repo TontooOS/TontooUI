@@ -35,6 +35,7 @@ pub enum ScrollEdgeEffect { Soft, Hard }
 ## Behavior
 
 - Uses `GtkScrolledWindow` with `Automatic`/`Never` policies per `horizontal`/`vertical`.
+- Smooth scrolling via `uikit::smooth_scroll::apply_smooth_scrolling`: discrete wheel ticks animate with an ease-out-cubic settle (200 ms) instead of jumping one step instantly; touchpad deltas apply 1:1. Events at the scroll limits bubble so nested scroll views chain correctly.
 - Background follows the app background (`#1d1d1d` Dark / `#ececec` Light) via `scrolledwindow` and `viewport` CSS. The hard edge line is a `GtkSeparator` appended above the content.
 - The element sits directly on the app background — no card wrapper — and follows the system scheme.
 - Content is any `Widget` (pure TontooUI API: `VStack` with `Text`/`Divider` etc., SF Pro for text).

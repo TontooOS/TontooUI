@@ -496,6 +496,7 @@ impl ViewContent for TabView {
         scroll.set_hscrollbar_policy(gtk::PolicyType::Never);
         scroll.set_vscrollbar_policy(gtk::PolicyType::Automatic);
         scroll.set_vexpand(true);
+        uikit::smooth_scroll::apply_smooth_scrolling(&scroll);
         scroll.add_css_class("tb-scroll");
         uikit::widget::apply_css(
             &scroll,
