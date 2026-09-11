@@ -20,16 +20,20 @@ pub struct MenuItem {
     pub label: String,
     pub description: Option<String>,
     pub icon: Option<String>,
+    /// SF Symbol shown at the trailing (right) edge, after the label.
+    pub trailing_icon: Option<String>,
     pub role: MenuRole,
     pub on_activate: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl MenuItem {
     pub fn new(label: impl Into<String>) -> Self {
-        Self { label: label.into(), description: None, icon: None, role: MenuRole::Default, on_activate: None }
+        Self { label: label.into(), description: None, icon: None, trailing_icon: None, role: MenuRole::Default, on_activate: None }
     }
     pub fn description(mut self, d: impl Into<String>) -> Self { self.description = Some(d.into()); self }
     pub fn icon(mut self, name: impl Into<String>) -> Self { self.icon = Some(name.into()); self }
+    /// SF Symbol at the trailing edge (e.g. a disclosure chevron).
+    pub fn trailing_icon(mut self, name: impl Into<String>) -> Self { self.trailing_icon = Some(name.into()); self }
     pub fn destructive(mut self) -> Self { self.role = MenuRole::Destructive; self }
     pub fn on_activate(mut self, f: impl Fn() + Send + Sync + 'static) -> Self { self.on_activate = Some(Arc::new(f)); self }
 }
@@ -40,6 +44,8 @@ pub enum MenuEntry {
     Divider,
     Section { title: Option<String>, items: Vec<MenuEntry> },
     Submenu { title: String, items: Vec<MenuEntry> },
+    /// Non-interactive tag row: title plus colored dots (Finder Tags).
+    TagDots { title: String, colors: Vec<(u8, u8, u8)> },
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -183,7 +189,7 @@ fn build_entry_widget(entry: &MenuEntry, is_dark: bool, popover_weak: &glib::Wea
                 }
             }
             #[cfg(not(feature = "coreicon"))]
-            { let _ = &item.icon; }
+            { let _ = &item.icon; let _ = &item.trailing_icon; }
 
             let lbl = gtk::Label::new(Some(item.label.as_str()));
             lbl.set_halign(gtk::Align::Start);
@@ -191,6 +197,15 @@ fn build_entry_widget(entry: &MenuEntry, is_dark: bool, popover_weak: &glib::Wea
             let col = if item.role == MenuRole::Destructive { "#ff3b30" } else if is_dark { "#ececec" } else { "#1d1d1f" };
             uikit::widget::apply_css(&lbl, &format!("label {{ color: {}; font-family: 'SF Pro Display'; font-size: 13px; }}", col));
             row.append(&lbl);
+            #[cfg(feature = "coreicon")]
+            {
+                if let Some(ref trailing) = item.trailing_icon {
+                    if let Some(img) = icon_image(trailing, is_dark) {
+                        img.set_halign(gtk::Align::End);
+                        row.append(&img);
+                    }
+                }
+            }
             // placeholder for checkmark/icon on right? keep empty
             outer.append(&row);
             if let Some(ref desc) = item.description {
@@ -214,6 +229,35 @@ fn build_entry_widget(entry: &MenuEntry, is_dark: bool, popover_weak: &glib::Wea
                 });
             }
             btn.upcast()
+        }
+        MenuEntry::TagDots { title, colors } => {
+            // Non-interactive tag row: title plus colored dots, no hover
+            // action and no popdown on click (clicks pass through).
+            let v = gtk::Box::new(gtk::Orientation::Vertical, 4);
+            v.set_hexpand(true);
+            v.set_margin_top(4);
+            v.set_margin_bottom(4);
+            v.set_margin_start(8);
+            v.set_margin_end(8);
+            let lbl = gtk::Label::new(Some(title.as_str()));
+            lbl.set_halign(gtk::Align::Start);
+            let tcol = if is_dark { "#ececec" } else { "#1d1d1f" };
+            uikit::widget::apply_css(&lbl, &format!("label {{ color: {}; font-family: 'SF Pro Display'; font-size: 13px; }}", tcol));
+            v.append(&lbl);
+            let dots = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            dots.set_halign(gtk::Align::Start);
+            for (r, g, b) in colors {
+                let dot = gtk::Box::new(gtk::Orientation::Vertical, 0);
+                dot.set_size_request(16, 16);
+                uikit::widget::apply_css(
+                    &dot,
+                    &format!(".tagdot {{ background-color: rgb({},{},{}); border-radius: 9999px; }}", r, g, b),
+                );
+                dot.add_css_class("tagdot");
+                dots.append(&dot);
+            }
+            v.append(&dots);
+            v.upcast()
         }
     }
 }
@@ -439,5 +483,26 @@ mod tests {
     fn context_builder() {
         let c = ContextMenu::new(Text::new("Hi")).item("A").divider();
         assert_eq!(c.entries.len(), 2);
+    }
+    #[test]
+    fn trailing_icon_builder() {
+        let item = MenuItem::new("Open With").trailing_icon("arrowtriangle.forward.fill");
+        assert_eq!(item.trailing_icon.as_deref(), Some("arrowtriangle.forward.fill"));
+        assert!(MenuItem::new("Open").trailing_icon.is_none());
+    }
+    #[test]
+    fn tag_dots_entry() {
+        let entries = vec![MenuEntry::TagDots {
+            title: "Tags...".to_string(),
+            colors: vec![(255, 59, 48)],
+        }];
+        assert_eq!(entries.len(), 1);
+        match &entries[0] {
+            MenuEntry::TagDots { title, colors } => {
+                assert_eq!(title, "Tags...");
+                assert_eq!(colors.len(), 1);
+            }
+            _ => panic!("expected TagDots"),
+        }
     }
 }

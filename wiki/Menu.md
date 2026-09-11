@@ -21,8 +21,8 @@ Wraps a child and shows the menu on right-click (secondary gesture).
 
 ```rust
 pub enum MenuRole { Default, Destructive }
-pub struct MenuItem { label: String, description: Option<String>, icon: Option<String>, role: MenuRole }
-pub enum MenuEntry { Item(MenuItem), Divider, Section { title: Option<String>, items: Vec<MenuEntry> }, Submenu { title: String, items: Vec<MenuEntry> } }
+pub struct MenuItem { label: String, description: Option<String>, icon: Option<String>, trailing_icon: Option<String>, role: MenuRole }
+pub enum MenuEntry { Item(MenuItem), Divider, Section { title: Option<String>, items: Vec<MenuEntry> }, Submenu { title: String, items: Vec<MenuEntry> }, TagDots { title: String, colors: Vec<(u8, u8, u8)> } }
 ```
 
 ## Builder Methods — Menu
@@ -46,6 +46,7 @@ pub enum MenuEntry { Item(MenuItem), Divider, Section { title: Option<String>, i
 | `new` | `new(label: impl Into<String>) -> Self` | Create item |
 | `description` | `description(self, d: impl Into<String>) -> Self` | Secondary text |
 | `icon` | `icon(self, name: impl Into<String>) -> Self` | SF Symbol (CoreIcon `assets/icons/name.png`) |
+| `trailing_icon` | `trailing_icon(self, name: impl Into<String>) -> Self` | SF Symbol at the trailing (right) edge, after the label |
 | `destructive` | `destructive(self) -> Self` | Red role `#ff3b30` |
 | `on_activate` | `on_activate(self, f: Fn() + Send + Sync + 'static) -> Self` | Click handler, auto-closes popover |
 
@@ -65,6 +66,7 @@ pub enum MenuEntry { Item(MenuItem), Divider, Section { title: Option<String>, i
 - Popover is a separate `GdkSurface` popup window (own window in background) — made transparent via display-level CSS provider, `has_arrow(false)`, `autohide(true)`.
 - `ContextMenu` uses `GestureClick button 3` (right-click) with `set_pointing_to` at cursor; preview variant prepends pill + separator.
 - Icons are recolored via CoreIcon alpha-mask tint (zinc-400/500) to theme gray.
+- `TagDots` renders a non-interactive tag row (title plus colored CSS dots, e.g. Finder Tags) with no hover action.
 - No manual Light/Dark toggle — follows `resolve_scheme` / `ColorScheme::detect_system`.
 
 ## Usage / Example
