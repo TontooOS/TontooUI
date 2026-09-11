@@ -83,7 +83,8 @@ A flat glyph button inside the bar. Behavior notes:
 
 - `new(icon)` loads an SF Symbol PNG from the CoreIcon assets (feature
   `coreicon`), recolored to the scheme glyph color (near-white dark /
-  near-black light) and cached in the temp dir.
+  near-black light) and cached in the temp dir. Dotted symbol names
+  resolve to `<symbol>.png` verbatim (e.g. `chevron.backward.png`).
 - `shared_background(false)` renders the bare glyph without the glass
   capsule, mirroring `sharedBackgroundVisibility(.hidden)`.
 - `hidden(true)` skips rendering entirely, mirroring

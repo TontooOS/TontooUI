@@ -103,7 +103,7 @@ fn sf_icon_path(symbol: &str, color: coreicon::Color) -> Option<String> {
     if !coreicon_assets.exists() {
         return None;
     }
-    let src = coreicon_assets.join(symbol).with_extension("png");
+    let src = coreicon_assets.join(format!("{symbol}.png"));
     if !src.exists() {
         return None;
     }

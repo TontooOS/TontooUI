@@ -194,7 +194,7 @@ pub(crate) fn sf_icon_path(symbol: &str, color: (u8, u8, u8)) -> Option<String> 
     if !coreicon_assets.exists() {
         return None;
     }
-    let src = coreicon_assets.join(symbol).with_extension("png");
+    let src = coreicon_assets.join(format!("{symbol}.png"));
     if !src.exists() {
         return None;
     }
@@ -374,5 +374,25 @@ mod tests {
             effective_shape(ButtonBorderShape::Capsule, true),
             ButtonBorderShape::Capsule
         );
+    }
+
+    #[cfg(feature = "coreicon")]
+    #[test]
+    fn sf_icon_path_keeps_dots_in_symbol_name() {
+        // Dotted SF Symbols must resolve to "<symbol>.png": joining the
+        // symbol and replacing the extension (Path::with_extension)
+        // turns "chevron.backward" into "chevron.png", which does not
+        // exist and renders an empty button.
+        let assets = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .join("CoreIcon/assets/icons");
+        if !assets.exists() {
+            return;
+        }
+        assert!(assets.join("chevron.backward.png").is_file());
+        assert!(sf_icon_path("chevron.backward", (29, 29, 30)).is_some());
+        assert!(sf_icon_path("square.grid.2x2", (29, 29, 30)).is_some());
+        assert!(sf_icon_path("does.not.exist", (29, 29, 30)).is_none());
     }
 }

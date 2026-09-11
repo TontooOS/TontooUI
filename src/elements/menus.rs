@@ -70,7 +70,7 @@ fn icon_image(name: &str, is_dark: bool) -> Option<gtk::Image> {
     let color = if is_dark { coreicon::Color::new(0.85,0.85,0.87,1.0) } else { coreicon::Color::new(0.18,0.18,0.19,1.0) };
     let assets = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent()?.join("CoreIcon/assets/icons");
     if !assets.exists() { return None; }
-    let src = assets.join(name).with_extension("png");
+    let src = assets.join(format!("{name}.png"));
     if !src.exists() { return None; }
     let key = format!("menu_{}_{:02x}{:02x}{:02x}.png", name.replace('.', "_"), (color.r*255.0) as u8,(color.g*255.0) as u8,(color.b*255.0) as u8);
     let out = std::env::temp_dir().join(key);
