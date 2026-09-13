@@ -21,6 +21,8 @@ Creates a new text input with the given placeholder text.
 | `frame` | `frame(self, width: f32, height: f32) -> Self` | Set size |
 | `on_change` | `on_change(self, handler: impl Fn(String) + Send + Sync + 'static) -> Self` | Callback on text change |
 | `on_submit` | `on_submit(self, handler: impl Fn(String) + Send + Sync + 'static) -> Self` | Callback on Enter press |
+| `on_blur` | `on_blur(self, handler: impl Fn() + Send + Sync + 'static) -> Self` | Callback on focus loss (click-away, Tab); fires after the selection is cleared |
+| `deselect_on_click_away` | `deselect_on_click_away(self, enabled: bool) -> Self` | Click outside drops focus and clears selection (default `true`) |
 | `at` | `at(self, x: f32, y: f32) -> Self` | Absolute positioning |
 
 ## Accessor Methods
@@ -49,7 +51,8 @@ let input = TextInput::new("Search...")
     .accent_color(Color::from_hex("#FF6B2B").unwrap())
     .frame(300.0, 44.0)
     .on_change(|text| println!("Changed: {}", text))
-    .on_submit(|text| println!("Submitted: {}", text));
+    .on_submit(|text| println!("Submitted: {}", text))
+    .on_blur(|| println!("Focus lost"));
 ```
 
 ## Features
@@ -58,7 +61,13 @@ let input = TextInput::new("Search...")
 - TontooOS styling: dark `#2a2a2c` fill, `#3a3a3d` border, SF Pro font, accent color focus ring
 - Focus dismissal: clicking anywhere outside the input drops keyboard focus
   and clears the text selection, so the blue focus ring and highlighted text
-  never linger after clicking another widget or empty space
+  never linger after clicking another widget or empty space. A capture-phase
+  `GestureClick` (any mouse button) on the toplevel window hit-tests with
+  `pick`: presses inside the entry are ignored, everything else drops window
+  focus. Focus loss clears the selection first, then fires `on_blur` exactly
+  once (Tab and click-away share the path). The controller is removed on
+  unrealize, so rebuilt entries never pile gestures up; widgets built before
+  append retry once idle.
 
 ## Cross References
 

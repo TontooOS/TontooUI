@@ -182,6 +182,9 @@ TontooUI is designed so long-running apps do not accumulate work over time:
 
 ## Changelog
 
+- 2026-09-13: `TextInput` click-away deselect via capture-phase window gesture
+  with hit-testing (empty space deselects too), `on_blur` callback and
+  `deselect_on_click_away` opt-out. See [TextInput.md](TextInput.md).
 - 2026-09-11: Smooth scrolling in all scroll containers (`ScrollView`,
   `TabView` sidebar, `Sidebar`, `List`) via
   `uikit::smooth_scroll::apply_smooth_scrolling`. See

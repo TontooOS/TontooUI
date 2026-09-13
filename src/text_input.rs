@@ -32,6 +32,8 @@ pub struct TextInput {
     accent_color: Color,
     on_change: Option<Arc<dyn Fn(String) + Send + Sync>>,
     on_submit: Option<Arc<dyn Fn(String) + Send + Sync>>,
+    on_blur: Option<Arc<dyn Fn() + Send + Sync>>,
+    deselect_on_click_away: bool,
     position_mode: PositionMode,
     position: Position,
     width: f32,
@@ -51,6 +53,8 @@ impl TextInput {
             accent_color: Color::new(0.047, 0.522, 0.937, 1.0), // TontooOS blue
             on_change: None,
             on_submit: None,
+            on_blur: None,
+            deselect_on_click_away: true,
             position_mode: PositionMode::Auto,
             position: Position::new(),
             width: 300.0,
@@ -113,6 +117,21 @@ impl TextInput {
     /// Callback when the user presses Enter.
     pub fn on_submit(mut self, handler: impl Fn(String) + Send + Sync + 'static) -> Self {
         self.on_submit = Some(Arc::new(handler));
+        self
+    }
+
+    /// Callback when the field loses keyboard focus (click-away, Tab, ...).
+    /// Fires after the text selection was cleared. Use it to commit
+    /// (e.g. Finder inline rename) or collapse (e.g. search field).
+    pub fn on_blur(mut self, handler: impl Fn() + Send + Sync + 'static) -> Self {
+        self.on_blur = Some(Arc::new(handler));
+        self
+    }
+
+    /// Whether a click anywhere outside the field drops focus and clears
+    /// the selection (default `true`). Set to `false` to keep focus.
+    pub fn deselect_on_click_away(mut self, enabled: bool) -> Self {
+        self.deselect_on_click_away = enabled;
         self
     }
 
@@ -240,30 +259,36 @@ impl TextInput {
             });
         }
 
-        // Clear the text selection and drop keyboard focus when the user
-        // clicks anywhere else. GTK only moves focus to widgets that can take
-        // it, so a click on an ordinary box or label would otherwise leave the
-        // entry focused with its blue ring and selected text intact.
-        entry.connect_realize(|w| {
-            let Some(root) = w.root() else { return };
-            let Ok(window) = root.downcast::<gtk::Window>() else { return };
-            let press = gtk::GestureClick::new();
-            let weak = w.downgrade();
-            let win = window.clone();
-            press.connect_pressed(move |_g, _n, _x, _y| {
-                // Runs in the capture phase (before the clicked widget's own
-                // handlers), so clicking the entry itself still focuses it;
-                // clicking anywhere else clears the focus ring and the text
-                // selection.
-                if let Some(entry) = weak.upgrade() {
-                    if entry.has_focus() {
-                        entry.select_region(0, 0);
-                    }
+        // Focus loss always clears the selection first, then notifies.
+        // `on_blur` fires exactly once here; the click-away gesture below
+        // only drops focus, which routes through this handler.
+        {
+            let weak = entry.downgrade();
+            let blur = self.on_blur.clone();
+            let focus = gtk::EventControllerFocus::new();
+            focus.connect_leave(move |_| {
+                if let Some(field) = weak.upgrade() {
+                    field.select_region(0, 0);
                 }
-                gtk::prelude::GtkWindowExt::set_focus(&win, None::<&gtk::Widget>);
+                if let Some(cb) = blur.as_ref() {
+                    cb();
+                }
             });
-            window.add_controller(press);
-        });
+            entry.add_controller(focus);
+        }
+
+        // Clear the text selection and drop keyboard focus when the user
+        // clicks anywhere else — including empty space. GTK only moves focus
+        // to widgets that can take it, so a click on an ordinary box, a label
+        // or window padding would otherwise leave the entry focused with its
+        // focus ring and selected text intact. A capture-phase gesture on the
+        // toplevel window sees every press before the target widget; a
+        // hit-test keeps presses inside the entry untouched.
+        if self.deselect_on_click_away {
+            entry.connect_realize(|w| {
+                install_click_away(w);
+            });
+        }
 
         entry
     }
@@ -274,6 +299,84 @@ impl TextInput {
         let h = self.height;
         View::new(self).with_frame(0.0, 0.0, w, h)
     }
+}
+
+/// True when the press at window-relative `(x, y)` landed inside `entry`.
+/// Walks from the picked widget up to the entry; anything else (including
+/// empty space with no picked widget) counts as outside.
+fn press_inside_entry(gesture: &gtk::GestureClick, entry: &gtk::Entry, x: f64, y: f64) -> bool {
+    let target = gesture
+        .widget()
+        .and_then(|root| root.pick(x, y, gtk::PickFlags::DEFAULT));
+    let mut node = target;
+    while let Some(widget) = node {
+        if widget == entry.clone().upcast::<gtk::Widget>() {
+            return true;
+        }
+        node = widget.parent();
+    }
+    false
+}
+
+/// Install the click-away gesture for one realized entry. Runs in the
+/// capture phase on the toplevel window so empty areas (boxes, labels,
+/// padding) deselect just like focusable widgets do. Presses inside the
+/// entry are ignored; everything else drops window focus (the focus-leave
+/// handler clears the selection and fires `on_blur`).
+fn install_click_away(entry: &gtk::Entry) {
+    let try_install = |field: &gtk::Entry| -> bool {
+        let Some(root) = field.root() else {
+            return false;
+        };
+        let Ok(window) = root.downcast::<gtk::Window>() else {
+            return false;
+        };
+        let weak_entry = field.downgrade();
+        let weak_win = window.downgrade();
+        let press = gtk::GestureClick::new();
+        // Button 0 = any mouse button (left/right/middle all deselect).
+        press.set_button(0);
+        press.set_propagation_phase(gtk::PropagationPhase::Capture);
+        let weak_win_c = weak_win.clone();
+        press.connect_pressed(move |gesture, _, x, y| {
+            let Some(field) = weak_entry.upgrade() else {
+                return;
+            };
+            let Some(win) = weak_win.upgrade() else {
+                return;
+            };
+            if press_inside_entry(gesture, &field, x, y) {
+                return;
+            }
+            if field.has_focus() {
+                field.select_region(0, 0);
+            }
+            gtk::prelude::GtkWindowExt::set_focus(&win, None::<&gtk::Widget>);
+        });
+        let press_handle = press.clone();
+        window.add_controller(press);
+        // The controller lives on the window while the entry may be rebuilt
+        // (e.g. Finder grid refresh); the weak entry keeps it a no-op after
+        // teardown, and unrealize removes it so repeated realizes never pile
+        // up.
+        let win_c = weak_win_c;
+        field.connect_unrealize(move |_| {
+            if let Some(win) = win_c.upgrade() {
+                win.remove_controller(&press_handle);
+            }
+        });
+        true
+    };
+    if try_install(entry) {
+        return;
+    }
+    // Not yet attached to a window (built before append): retry once idle.
+    let weak = entry.downgrade();
+    glib::idle_add_local_once(move || {
+        if let Some(field) = weak.upgrade() {
+            try_install(&field);
+        }
+    });
 }
 
 impl ViewContent for TextInput {
@@ -375,5 +478,16 @@ mod tests {
         let input = TextInput::new("Search")
             .accent_color(Color::from_hex("#FF6B2B").unwrap());
         assert_eq!(input.accent_color, Color::from_rgb(255, 107, 43));
+    }
+
+    #[test]
+    fn text_input_click_away_defaults_on() {
+        let input = TextInput::new("Search");
+        assert!(input.deselect_on_click_away);
+        assert!(input.on_blur.is_none());
+        let kept = TextInput::new("Search").deselect_on_click_away(false);
+        assert!(!kept.deselect_on_click_away);
+        let with_blur = TextInput::new("Search").on_blur(|| {});
+        assert!(with_blur.on_blur.is_some());
     }
 }
