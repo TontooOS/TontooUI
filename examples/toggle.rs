@@ -89,8 +89,9 @@ impl App for ToggleDemo {
             toggle.set_focused(focused);
         });
 
+        // Unified bar: same fill as the background, only a divider line.
         self.bar.set_palette(
-            palette.titlebar_bg,
+            palette.bg,
             palette.titlebar_text,
             palette.divider,
         );
