@@ -2,8 +2,8 @@ use std::any::Any;
 use std::time::Instant;
 
 use vello::Scene;
-use vello::kurbo::{Affine, Circle, RoundedRect, Stroke};
-use vello::peniko::{Brush, Color, Fill};
+use vello::kurbo::{Affine, Circle, Point, RoundedRect, Stroke};
+use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
 use super::super::layout::View;
 use crate::animation::{Easing, Repeat, Tween, TweenAnim};
@@ -13,8 +13,10 @@ use crate::theme::{GlassAmount, desaturate};
 
 /// Track height in logical px.
 pub const SLIDER_TRACK_H: f32 = 6.0;
-/// Knob diameter in logical px (sized to sit well next to text).
-pub const SLIDER_KNOB_D: f32 = 28.0;
+/// Knob width in logical px (pill shape, wider than tall).
+pub const SLIDER_KNOB_W: f32 = 24.0;
+/// Knob height in logical px.
+pub const SLIDER_KNOB_H: f32 = 19.0;
 /// Label size for header text.
 pub const SLIDER_HEADER_SIZE: f32 = 15.0;
 /// Label size for min/max text.
@@ -255,8 +257,9 @@ impl Slider {
 
     fn knob_hit(&self, x: f32, y: f32) -> bool {
         let kx = self.knob_x(self.shown);
-        let r = SLIDER_KNOB_D / 2.0 + 6.0;
-        (x - kx).abs() <= r && (y - self.tcy).abs() <= r + 10.0
+        let hw = SLIDER_KNOB_W / 2.0 + 6.0;
+        let hh = SLIDER_KNOB_H / 2.0 + 6.0;
+        (x - kx).abs() <= hw && (y - self.tcy).abs() <= hh
     }
 
     fn track_hit(&self, x: f32, y: f32) -> bool {
@@ -421,17 +424,99 @@ impl Slider {
         }
 
         // Knob shadow first (under the knob).
-        let kr = SLIDER_KNOB_D / 2.0;
+        let kw = SLIDER_KNOB_W / 2.0;
+        let kh = SLIDER_KNOB_H / 2.0;
+        let kr = SLIDER_KNOB_H / 2.0;
         scene.draw_blurred_rounded_rect(
             Affine::IDENTITY,
-            vello::kurbo::Rect::new(px(kx - kr), px(tcy - kr), px(kx + kr), px(tcy + kr)),
-            Color::from_rgba8(0, 0, 0, 60),
+            vello::kurbo::Rect::new(px(kx - kw), px(tcy - kh), px(kx + kw), px(tcy + kh)),
+            Color::from_rgba8(0, 0, 0, 40),
             px(kr),
-            4.0 * scale,
+            6.0 * scale,
         );
-        // Knob: white pill, liquid glass while pressed.
-        let knob = Circle::new((px(kx), px(tcy)), px(kr));
-        if self.dragging {
+        let knob = RoundedRect::new(
+            px(kx - kw),
+            px(tcy - kh),
+            px(kx + kw),
+            px(tcy + kh),
+            px(kr),
+        );
+        if self.glass && !self.dragging {
+            let tint = if self.dark {
+                Color::from_rgba8(255, 255, 255, 26)
+            } else {
+                Color::from_rgba8(0, 0, 0, 20)
+            };
+            scene.fill(
+                Fill::NonZero,
+                Affine::IDENTITY,
+                &Brush::Solid(tint),
+                None,
+                &knob,
+            );
+            let bevel = RoundedRect::new(
+                px(kx - kw) + 1.0 * scale,
+                px(tcy - kh) + 1.0 * scale,
+                px(kx + kw) - 1.0 * scale,
+                px(tcy + kh) - 1.0 * scale,
+                (px(kr) - 1.0 * scale).max(0.0),
+            );
+            let knob_y0 = px(tcy - kh);
+            let knob_y1 = px(tcy + kh);
+            let bevel_brush = Gradient::new_linear(
+                Point::new(px(kx), knob_y0),
+                Point::new(px(kx), knob_y1),
+            )
+            .with_stops([
+                ColorStop {
+                    offset: 0.0,
+                    color: Color::from_rgba8(255, 255, 255, 115).into(),
+                },
+                ColorStop {
+                    offset: 0.35,
+                    color: Color::TRANSPARENT.into(),
+                },
+                ColorStop {
+                    offset: 1.0,
+                    color: Color::from_rgba8(0, 0, 0, 46).into(),
+                },
+            ]);
+            scene.stroke(
+                &Stroke::new(2.0 * scale),
+                Affine::IDENTITY,
+                &Brush::Gradient(bevel_brush),
+                None,
+                &bevel,
+            );
+            let chroma_r = RoundedRect::new(
+                px(kx - kw) - 0.75 * scale,
+                px(tcy - kh) - 0.75 * scale,
+                px(kx + kw) + 0.75 * scale,
+                px(tcy + kh) + 0.75 * scale,
+                px(kr) + 0.75 * scale,
+            );
+            scene.stroke(
+                &Stroke::new(1.0 * scale),
+                Affine::IDENTITY,
+                &Brush::Solid(Color::from_rgba8(255, 90, 120, 30)),
+                None,
+                &chroma_r,
+            );
+            let chroma_c = RoundedRect::new(
+                px(kx - kw) + 0.75 * scale,
+                px(tcy - kh) + 0.75 * scale,
+                px(kx + kw) - 0.75 * scale,
+                px(tcy + kh) - 0.75 * scale,
+                (px(kr) - 0.75 * scale).max(0.0),
+            );
+            scene.stroke(
+                &Stroke::new(1.0 * scale),
+                Affine::IDENTITY,
+                &Brush::Solid(Color::from_rgba8(90, 200, 255, 30)),
+                None,
+                &chroma_c,
+            );
+        } else if self.dragging {
             scene.fill(
                 Fill::NonZero,
                 Affine::IDENTITY,
@@ -497,7 +582,7 @@ impl View for Slider {
         } else {
             0.0
         };
-        (160.0, header + SLIDER_KNOB_D + 16.0)
+        (160.0, header + SLIDER_KNOB_H + 16.0)
     }
 
     fn place(&mut self, fonts: &mut FontSystem, x: f32, y: f32, w: f32, h: f32) {
