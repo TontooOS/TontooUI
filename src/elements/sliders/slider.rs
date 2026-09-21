@@ -45,7 +45,9 @@ pub struct Slider {
     value_text: Option<Box<dyn Fn(f64) -> String>>,
     show_ticks: bool,
     fill: Color,
+    fill_manual: bool,
     track: Color,
+    track_manual: bool,
     text_color: Color,
     glass: bool,
     glass_amount: GlassAmount,
@@ -82,7 +84,9 @@ impl Slider {
             value_text: None,
             show_ticks: false,
             fill: SLIDER_FILL,
+            fill_manual: false,
             track: SLIDER_TRACK_DARK,
+            track_manual: false,
             text_color: Color::WHITE,
             glass: false,
             glass_amount: GlassAmount::Glass,
@@ -138,13 +142,17 @@ impl Slider {
         self
     }
 
+    /// Manual fill: wins over the system accent until cleared. The fill
+    /// follows the system default/color unless the dev sets it by hand.
     pub fn fill(mut self, color: Color) -> Self {
         self.fill = color;
+        self.fill_manual = true;
         self
     }
 
     pub fn track_color(mut self, color: Color) -> Self {
         self.track = color;
+        self.track_manual = true;
         self
     }
 
@@ -160,16 +168,23 @@ impl Slider {
         self
     }
 
-    /// Live theme: accent fill, mode grays, glass stage.
+    /// Live theme: accent fill, mode grays, glass stage. A manually set
+    /// fill/track color wins over the system one.
     pub fn set_theme(&mut self, accent: Color, dark: bool, glass: GlassAmount) {
-        self.fill = accent;
+        if !self.fill_manual {
+            self.fill = accent;
+        }
         self.dark = dark;
         self.glass_amount = glass;
         if dark {
-            self.track = SLIDER_TRACK_DARK;
+            if !self.track_manual {
+                self.track = SLIDER_TRACK_DARK;
+            }
             self.text_color = Color::WHITE;
         } else {
-            self.track = SLIDER_TRACK_LIGHT;
+            if !self.track_manual {
+                self.track = SLIDER_TRACK_LIGHT;
+            }
             self.text_color = Color::BLACK;
         }
     }
