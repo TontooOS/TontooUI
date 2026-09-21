@@ -23,7 +23,7 @@ pub const BACKGROUND: Color = Color::from_rgb8(0x1d, 0x1d, 0x1d);
 /// Physical pixels = value x window scale factor (20 pt is ~40 px at 2x).
 pub const WINDOW_CORNER_RADIUS: f32 = 20.0;
 
-/// Non-printable keys forwarded to the view.
+/// Non-printable keys forwarded to the app.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Key {
     Backspace,
@@ -50,9 +50,10 @@ pub struct Viewport {
     pub height: f32,
 }
 
-/// Content hosted in a `Window`. Coordinates are logical pixels relative to
-/// the window; place content inside `viewport`.
-pub trait View {
+/// App hosted in a `Window`. The app owns a tree of element `View`s
+/// (see `elements::View`) and forwards events into it. Coordinates are
+/// logical pixels relative to the window; place content inside `viewport`.
+pub trait App {
     fn draw(
         &mut self,
         scene: &mut Scene,
@@ -76,15 +77,15 @@ pub trait View {
     }
 }
 
-/// Open a window and run `view` until the window closes.
+/// Open a window and run `app` until the window closes.
 pub fn run(
     title: &str,
     width: u32,
     height: u32,
-    view: impl View + 'static,
+    app: impl App + 'static,
 ) -> Result<(), Box<dyn Error>> {
     let event_loop = EventLoop::new()?;
-    let mut shell = Shell::new(title.to_owned(), width, height, view);
+    let mut shell = Shell::new(title.to_owned(), width, height, app);
     event_loop.run_app(&mut shell)?;
     Ok(())
 }
@@ -100,22 +101,22 @@ struct Active {
     start: Instant,
 }
 
-struct Shell<V: View> {
+struct Shell<V: App> {
     title: String,
     width: u32,
     height: u32,
-    view: V,
+    app: V,
     context: Option<RenderContext>,
     active: Option<Active>,
 }
 
-impl<V: View> Shell<V> {
-    fn new(title: String, width: u32, height: u32, view: V) -> Self {
+impl<V: App> Shell<V> {
+    fn new(title: String, width: u32, height: u32, app: V) -> Self {
         Self {
             title,
             width,
             height,
-            view,
+            app,
             context: None,
             active: None,
         }
@@ -125,7 +126,7 @@ impl<V: View> Shell<V> {
         let Some(active) = self.active.as_mut() else {
             return;
         };
-        if let Some(command) = self.view.poll_window_command() {
+        if let Some(command) = self.app.poll_window_command() {
             match command {
                 WindowCommand::Close => event_loop.exit(),
                 WindowCommand::Minimize => active.window.set_minimized(true),
@@ -159,7 +160,7 @@ impl<V: View> Shell<V> {
             size.height as f32 / scale,
         );
         let elapsed = active.start.elapsed().as_secs_f64();
-        self.view.draw(
+        self.app.draw(
             &mut active.scene,
             &mut active.fonts,
             Viewport {
@@ -223,7 +224,7 @@ impl<V: View> Shell<V> {
     }
 }
 
-impl<V: View> ApplicationHandler for Shell<V> {
+impl<V: App> ApplicationHandler for Shell<V> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         if self.active.is_some() {
             return;
@@ -312,10 +313,10 @@ impl<V: View> ApplicationHandler for Shell<V> {
             WindowEvent::CursorMoved { position, .. } => {
                 active.cursor_pos = (position.x, position.y);
                 let scale = active.scale;
-                self.view.mouse_move(position.x / scale, position.y / scale);
+                self.app.mouse_move(position.x / scale, position.y / scale);
             }
             WindowEvent::Focused(focused) => {
-                self.view.set_focused(focused);
+                self.app.set_focused(focused);
                 active.window.request_redraw();
             }
             WindowEvent::MouseInput { state, button, .. } => {
@@ -323,14 +324,14 @@ impl<V: View> ApplicationHandler for Shell<V> {
                     let scale = active.scale;
                     let x = (active.cursor_pos.0 / scale) as f32;
                     let y = (active.cursor_pos.1 / scale) as f32;
-                    if let Some((rx, ry, rw, rh)) = self.view.drag_region() {
+                    if let Some((rx, ry, rw, rh)) = self.app.drag_region() {
                         if x >= rx && x <= rx + rw && y >= ry && y <= ry + rh {
                             // Titlebar drag: moving keeps focus, no click.
                             let _ = active.window.drag_window();
                             return;
                         }
                     }
-                    self.view.mouse_down(x as f64, y as f64);
+                    self.app.mouse_down(x as f64, y as f64);
                     active.window.request_redraw();
                 }
             }
@@ -340,16 +341,16 @@ impl<V: View> ApplicationHandler for Shell<V> {
                 }
                 let mut redraw = true;
                 match event.physical_key {
-                    PhysicalKey::Code(KeyCode::Backspace) => self.view.key(Key::Backspace),
-                    PhysicalKey::Code(KeyCode::ArrowLeft) => self.view.key(Key::Left),
-                    PhysicalKey::Code(KeyCode::ArrowRight) => self.view.key(Key::Right),
+                    PhysicalKey::Code(KeyCode::Backspace) => self.app.key(Key::Backspace),
+                    PhysicalKey::Code(KeyCode::ArrowLeft) => self.app.key(Key::Left),
+                    PhysicalKey::Code(KeyCode::ArrowRight) => self.app.key(Key::Right),
                     PhysicalKey::Code(KeyCode::Enter) | PhysicalKey::Code(KeyCode::NumpadEnter) => {
-                        self.view.key(Key::Enter)
+                        self.app.key(Key::Enter)
                     }
-                    PhysicalKey::Code(KeyCode::Escape) => self.view.key(Key::Escape),
+                    PhysicalKey::Code(KeyCode::Escape) => self.app.key(Key::Escape),
                     _ => {
                         if let Some(text) = event.text.as_ref() {
-                            self.view.text(text.as_str());
+                            self.app.text(text.as_str());
                         } else {
                             redraw = false;
                         }

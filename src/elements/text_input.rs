@@ -5,7 +5,7 @@ use vello::Scene;
 use vello::kurbo::{Affine, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, Fill};
 
-use super::layout::Element;
+use super::layout::View;
 use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
 
 const PADDING: f32 = 12.0;
@@ -273,7 +273,7 @@ impl Default for TextInput {
     }
 }
 
-impl Element for TextInput {
+impl View for TextInput {
     fn measure(&mut self, _fonts: &mut FontSystem) -> (f32, f32) {
         (self.width, self.height)
     }

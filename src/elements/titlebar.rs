@@ -5,7 +5,7 @@ use vello::Scene;
 use vello::kurbo::{Affine, BezPath, Circle, Line, Point, RoundedRect, RoundedRectRadii, Stroke};
 use vello::peniko::{Brush, Color, Fill};
 
-use super::layout::Element;
+use super::layout::View;
 use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
 use crate::renderer::window::WINDOW_CORNER_RADIUS;
 
@@ -313,7 +313,7 @@ fn glyph_bar() -> RoundedRect {
     RoundedRect::new(-len / 2.0, -thick / 2.0, len / 2.0, thick / 2.0, thick / 2.0)
 }
 
-impl Element for Titlebar {
+impl View for Titlebar {
     fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
         self.ensure_layout(fonts);
         let layout = self.layout.as_ref().expect("layout built");

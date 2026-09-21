@@ -35,23 +35,22 @@ chrome, including rounded corners, traffic lights and title bars.
 > shadow. TontooUI draws no shadows itself.
 
 ```rust
-pub fn run(title: &str, width: u32, height: u32, view: impl View + 'static) -> Result<(), Box<dyn Error>>
+pub fn run(title: &str, width: u32, height: u32, app: impl App + 'static) -> Result<(), Box<dyn Error>>
 ```
 
 Opens a window with `title` and logical size `width` x `height` and runs
-`view` until the window closes.
+`app` until the window closes.
 
 - Returns `Err` when the event loop cannot start (e.g. no display server).
 - When no compatible GPU exists, an error is printed and the loop exits.
 - The loop uses continuous redraw (`ControlFlow::Poll`) so animations and
   cursor blink work without extra timers.
 
-## View
+## App
 
 ```rust
-pub trait View {
+pub trait App {
     fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, viewport: Viewport, time_secs: f64);
-    fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_move(&mut self, _x: f64, _y: f64) {}
     fn set_focused(&mut self, _focused: bool) {}
@@ -75,10 +74,11 @@ pub struct Viewport {
 }
 ```
 
-Content hosted in a window. All coordinates are logical pixels; place
-content inside `viewport` (window size minus the 24 px frame margin).
-`time_secs` is seconds since the window opened (use it for blink and
-animation phases).
+An `App` owns a tree of element `View`s (see [Layout.md](Layout.md)) and
+forwards events into it. All coordinates are logical pixels; place content
+inside `viewport` (window size minus the 24 px frame margin). `time_secs`
+is seconds since the window opened (use it for blink and animation
+phases).
 
 ```rust
 pub enum Key {
@@ -202,7 +202,7 @@ window size. The shell converts it to the `Viewport` passed to views.
 ```rust
 use tontooui::elements::Text;
 use tontooui::renderer::FontSystem;
-use tontooui::renderer::window::{View, Viewport, run};
+use tontooui::renderer::window::{App, Viewport, run};
 use vello::Scene;
 use vello::peniko::Color;
 
@@ -210,7 +210,7 @@ struct Hello {
     label: Text,
 }
 
-impl View for Hello {
+impl App for Hello {
     fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, viewport: Viewport, _t: f64) {
         self.label.set_position(viewport.x + 8.0, viewport.y + 12.0);
         self.label.draw(scene, fonts);

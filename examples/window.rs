@@ -1,5 +1,5 @@
-use tontooui::elements::{Element, Text, TextInput, Titlebar, TrafficAction, VStack};
-use tontooui::renderer::window::{Key, View, Viewport, WindowCommand, run};
+use tontooui::elements::{Text, TextInput, Titlebar, TrafficAction, View, VStack};
+use tontooui::renderer::window::{App, Key, Viewport, WindowCommand, run};
 use tontooui::renderer::FontSystem;
 use vello::Scene;
 use vello::peniko::Color;
@@ -45,7 +45,7 @@ impl Demo {
     }
 }
 
-impl View for Demo {
+impl App for Demo {
     fn draw(
         &mut self,
         scene: &mut Scene,

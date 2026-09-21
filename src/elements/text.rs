@@ -4,7 +4,7 @@ use parley::Layout;
 use vello::Scene;
 use vello::peniko::Color;
 
-use super::layout::Element;
+use super::layout::View;
 use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
 
 /// Static text label. Layout is cached and rebuilt when content, size,
@@ -110,7 +110,7 @@ impl Text {
     }
 }
 
-impl Element for Text {
+impl View for Text {
     fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
         self.measured_size(fonts)
     }

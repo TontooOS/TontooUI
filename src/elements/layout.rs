@@ -1,6 +1,8 @@
 use std::any::Any;
 
 use vello::Scene;
+use vello::kurbo::{Affine, RoundedRect};
+use vello::peniko::{Brush, Color, Fill};
 
 use crate::renderer::text::FontSystem;
 
@@ -13,10 +15,11 @@ pub enum Align {
     Trailing,
 }
 
-/// Layout protocol. Inherent `draw` methods on concrete elements take
+/// Layout protocol. Every visible thing is a `View`: elements, stacks,
+/// spacers and modifiers. Inherent `draw` methods on concrete elements take
 /// precedence over the trait method, so existing direct callers keep working
-/// while stacks use the trait through `Box<dyn Element>`.
-pub trait Element {
+/// while containers use the trait through `Box<dyn View>`.
+pub trait View {
     /// Intrinsic logical size.
     fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32);
     /// Assign a logical rect. Stacks measure first (fonts needed for text),
@@ -37,21 +40,21 @@ pub trait Element {
 pub struct VStack {
     spacing: f32,
     align: Align,
-    children: Vec<Box<dyn Element>>,
+    children: Vec<Box<dyn View>>,
 }
 
 /// Horizontal stack. Mirrors `VStack` along the x axis.
 pub struct HStack {
     spacing: f32,
     align: Align,
-    children: Vec<Box<dyn Element>>,
+    children: Vec<Box<dyn View>>,
 }
 
 /// Overlay stack. All children share the same rect at intrinsic size,
 /// positioned per `align` on both axes.
 pub struct ZStack {
     align: Align,
-    children: Vec<Box<dyn Element>>,
+    children: Vec<Box<dyn View>>,
 }
 
 /// Flexible empty space. Takes a share of the remaining stack space
@@ -82,13 +85,13 @@ macro_rules! stack_boilerplate {
                 self
             }
 
-            pub fn child(mut self, child: impl Element + 'static) -> Self {
+            pub fn child(mut self, child: impl View + 'static) -> Self {
                 self.children.push(Box::new(child));
                 self
             }
 
             /// Access a child by index for state updates (typing, toggles).
-            pub fn child_mut<T: Element + 'static>(
+            pub fn child_mut<T: View + 'static>(
                 &mut self,
                 index: usize,
             ) -> Option<&mut T> {
@@ -123,12 +126,12 @@ impl ZStack {
         self
     }
 
-    pub fn child(mut self, child: impl Element + 'static) -> Self {
+    pub fn child(mut self, child: impl View + 'static) -> Self {
         self.children.push(Box::new(child));
         self
     }
 
-    pub fn child_mut<T: Element + 'static>(&mut self, index: usize) -> Option<&mut T> {
+    pub fn child_mut<T: View + 'static>(&mut self, index: usize) -> Option<&mut T> {
         self.children
             .get_mut(index)?
             .as_any_mut()
@@ -167,7 +170,7 @@ impl Default for Spacer {
     }
 }
 
-impl Element for Spacer {
+impl View for Spacer {
     fn measure(&mut self, _fonts: &mut FontSystem) -> (f32, f32) {
         (self.min, self.min)
     }
@@ -193,7 +196,7 @@ fn cross_offset(align: Align, total: f32, used: f32) -> f32 {
     }
 }
 
-impl Element for VStack {
+impl View for VStack {
     fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
         let mut w: f32 = 0.0;
         let mut h: f32 = 0.0;
@@ -254,7 +257,7 @@ impl Element for VStack {
     }
 }
 
-impl Element for HStack {
+impl View for HStack {
     fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
         let mut w: f32 = 0.0;
         let mut h: f32 = 0.0;
@@ -315,7 +318,154 @@ impl Element for HStack {
     }
 }
 
-impl Element for ZStack {
+/// Uniform padding wrapper. Adds `px` logical pixels on every side.
+pub struct Padding {
+    px: f32,
+    child: Box<dyn View>,
+}
+
+/// Rounded background behind a child, sized to the child rect.
+pub struct Background {
+    color: Color,
+    radius: f32,
+    child: Box<dyn View>,
+    rect: (f32, f32, f32, f32),
+}
+
+/// Fixed-size box. The child keeps intrinsic size, top-leading aligned.
+pub struct Frame {
+    width: f32,
+    height: f32,
+    child: Box<dyn View>,
+}
+
+impl Padding {
+    pub fn all(child: impl View + 'static, px: f32) -> Self {
+        Self {
+            px: px.max(0.0),
+            child: Box::new(child),
+        }
+    }
+
+    pub fn child_mut<T: View + 'static>(&mut self) -> Option<&mut T> {
+        self.child.as_any_mut().downcast_mut::<T>()
+    }
+}
+
+impl Background {
+    pub fn new(child: impl View + 'static, color: Color) -> Self {
+        Self {
+            color,
+            radius: 0.0,
+            child: Box::new(child),
+            rect: (0.0, 0.0, 0.0, 0.0),
+        }
+    }
+
+    pub fn radius(mut self, px: f32) -> Self {
+        self.radius = px.max(0.0);
+        self
+    }
+
+    pub fn child_mut<T: View + 'static>(&mut self) -> Option<&mut T> {
+        self.child.as_any_mut().downcast_mut::<T>()
+    }
+}
+
+impl Frame {
+    pub fn new(child: impl View + 'static, width: f32, height: f32) -> Self {
+        Self {
+            width: width.max(0.0),
+            height: height.max(0.0),
+            child: Box::new(child),
+        }
+    }
+
+    pub fn child_mut<T: View + 'static>(&mut self) -> Option<&mut T> {
+        self.child.as_any_mut().downcast_mut::<T>()
+    }
+}
+
+impl View for Padding {
+    fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
+        let (w, h) = self.child.measure(fonts);
+        (w + self.px * 2.0, h + self.px * 2.0)
+    }
+
+    fn place(&mut self, fonts: &mut FontSystem, x: f32, y: f32, w: f32, h: f32) {
+        self.child.place(
+            fonts,
+            x + self.px,
+            y + self.px,
+            (w - self.px * 2.0).max(0.0),
+            (h - self.px * 2.0).max(0.0),
+        );
+    }
+
+    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+        self.child.draw(scene, fonts);
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+impl View for Background {
+    fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
+        self.child.measure(fonts)
+    }
+
+    fn place(&mut self, fonts: &mut FontSystem, x: f32, y: f32, w: f32, h: f32) {
+        self.rect = (x, y, w, h);
+        self.child.place(fonts, x, y, w, h);
+    }
+
+    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+        let scale = fonts.scale as f64;
+        let (x, y, w, h) = self.rect;
+        let bg = RoundedRect::new(
+            x as f64 * scale,
+            y as f64 * scale,
+            (x + w) as f64 * scale,
+            (y + h) as f64 * scale,
+            self.radius as f64 * scale,
+        );
+        scene.fill(
+            Fill::NonZero,
+            Affine::IDENTITY,
+            &Brush::Solid(self.color),
+            None,
+            &bg,
+        );
+        self.child.draw(scene, fonts);
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+impl View for Frame {
+    fn measure(&mut self, _fonts: &mut FontSystem) -> (f32, f32) {
+        (self.width, self.height)
+    }
+
+    fn place(&mut self, fonts: &mut FontSystem, x: f32, y: f32, _w: f32, _h: f32) {
+        let (cw, ch) = self.child.measure(fonts);
+        self.child.place(fonts, x, y, cw, ch);
+    }
+
+    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+        self.child.draw(scene, fonts);
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+impl View for ZStack {
     fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
         let mut w: f32 = 0.0;
         let mut h: f32 = 0.0;
