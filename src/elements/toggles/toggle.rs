@@ -29,6 +29,8 @@ pub const TOGGLE_KNOB_PAD: f32 = 2.0;
 pub const TOGGLE_KNOB_W_RATIO: f32 = 1.35;
 /// Knob slide animation time in seconds.
 pub const TOGGLE_ANIM_SECONDS: f32 = 0.20;
+/// Drag-release snap time in seconds.
+pub const TOGGLE_SNAP_SECONDS: f32 = 0.15;
 /// Checkbox box size in logical px.
 pub const TOGGLE_BOX: f32 = 21.12;
 /// Checkbox corner radius in logical px.
@@ -98,6 +100,9 @@ pub struct Toggle {
     label_y: f32,
     armed: bool,
     hovered: bool,
+    dragging: bool,
+    down_x: f32,
+    dragged: bool,
     disabled: bool,
     focused: bool,
     anim: Option<TweenAnim<f32>>,
@@ -133,6 +138,9 @@ impl Toggle {
             label_y: 0.0,
             armed: false,
             hovered: false,
+            dragging: false,
+            down_x: 0.0,
+            dragged: false,
             disabled: false,
             focused: true,
             anim: None,
@@ -243,13 +251,97 @@ impl Toggle {
         x >= self.x && x <= self.x + self.width && y >= self.y && y <= self.y + self.height
     }
 
+    fn switch_hit(&self, x: f32, y: f32) -> bool {
+        x >= self.sx
+            && x <= self.sx + TOGGLE_SWITCH_W
+            && y >= self.sy
+            && y <= self.sy + TOGGLE_SWITCH_H
+    }
+
+    fn knob_w() -> f32 {
+        (TOGGLE_SWITCH_H - TOGGLE_KNOB_PAD * 2.0) * TOGGLE_KNOB_W_RATIO
+    }
+
+    fn travel() -> f32 {
+        TOGGLE_SWITCH_W - TOGGLE_KNOB_PAD * 2.0 - Self::knob_w()
+    }
+
+    /// Knob position for a pointer x over the track, 0.0 (off) to 1.0
+    /// (on). The knob center maps to the pointer so a grabbed knob does
+    /// not jump.
+    fn shown_at(&self, x: f32) -> f32 {
+        let travel = Self::travel();
+        if travel <= 0.0 {
+            return if self.on { 1.0 } else { 0.0 };
+        }
+        ((x - (self.sx + TOGGLE_KNOB_PAD + Self::knob_w() / 2.0)) / travel).clamp(0.0, 1.0)
+    }
+
     pub fn mouse_down(&mut self, x: f64, y: f64) {
-        if !self.disabled && self.hit(x as f32, y as f32) {
+        if self.disabled {
+            return;
+        }
+        let (x, y) = (x as f32, y as f32);
+        // Pressing the switch track starts a drag: the knob follows the
+        // pointer until release. Everything else arms a plain click.
+        if self.style == ToggleStyle::Switch && self.switch_hit(x, y) {
+            self.dragging = true;
+            self.down_x = x;
+            self.dragged = false;
+            self.armed = true;
+            self.anim = None;
+            self.shown = self.shown_at(x);
+        } else if self.hit(x, y) {
             self.armed = true;
         }
     }
 
+    pub fn mouse_move(&mut self, x: f64, y: f64) {
+        let (x, y) = (x as f32, y as f32);
+        self.hovered = self.hit(x, y);
+        if self.dragging {
+            if (x - self.down_x).abs() > 4.0 {
+                self.dragged = true;
+            }
+            self.shown = self.shown_at(x);
+        }
+    }
+
     pub fn mouse_up(&mut self, x: f64, y: f64) {
+        self.finish_up(x, y);
+    }
+
+    fn finish_up(&mut self, x: f64, y: f64) {
+        if self.dragging {
+            self.dragging = false;
+            self.armed = false;
+            if self.disabled {
+                return;
+            }
+            if !self.dragged {
+                // Tap on the track flips like a click.
+                self.shown = if self.on { 1.0 } else { 0.0 };
+                if self.switch_hit(x as f32, y as f32) {
+                    self.toggle();
+                }
+                return;
+            }
+            // Dragged: snap to the nearer stop, firing when the state
+            // changed.
+            let target = self.shown > 0.5;
+            if target != self.on {
+                self.on = target;
+                self.notify();
+            }
+            let end = if target { 1.0 } else { 0.0 };
+            self.anim = Some(TweenAnim::new(
+                Tween::new(self.shown, end, TOGGLE_SNAP_SECONDS)
+                    .easing(Easing::CubicOut)
+                    .repeat(Repeat::Never),
+            ));
+            self.anim_time = 0.0;
+            return;
+        }
         self.finish_click(x, y);
     }
 
@@ -353,8 +445,8 @@ impl Toggle {
         // Capsule knob (macOS measure): nearly full track height and
         // wider than tall, sliding from the left stop to the right stop.
         let knob_h = TOGGLE_SWITCH_H - TOGGLE_KNOB_PAD * 2.0;
-        let knob_w = knob_h * TOGGLE_KNOB_W_RATIO;
-        let travel = TOGGLE_SWITCH_W - TOGGLE_KNOB_PAD * 2.0 - knob_w;
+        let knob_w = Self::knob_w();
+        let travel = Self::travel();
         let kx = self.sx + TOGGLE_KNOB_PAD + self.shown.clamp(0.0, 1.0) * travel;
         let ky = self.sy + TOGGLE_KNOB_PAD;
         scene.draw_blurred_rounded_rect(
@@ -626,7 +718,7 @@ impl View for Toggle {
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {
-        self.finish_click(x, y);
+        self.finish_up(x, y);
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -659,6 +751,52 @@ mod tests {
         // Positive travel with symmetric stops.
         let travel = TOGGLE_SWITCH_W - TOGGLE_KNOB_PAD * 2.0 - knob_w;
         assert!(travel > 0.0);
+    }
+
+    #[test]
+    fn track_tap_flips_without_drag() {
+        let mut toggle = Toggle::new("Wi-Fi");
+        let mut fonts = FontSystem::new();
+        let (w, h) = toggle.measure(&mut fonts);
+        toggle.place(&mut fonts, 0.0, 0.0, w, h);
+        // Press and release on the right end of the track without moving.
+        let x = (w - 3.0) as f64;
+        toggle.mouse_down(x, 14.0);
+        toggle.mouse_up(x, 14.0);
+        assert!(toggle.is_on());
+    }
+
+    #[test]
+    fn drag_slides_knob_and_snaps_on_release() {
+        let mut toggle = Toggle::new("Wi-Fi");
+        let mut fonts = FontSystem::new();
+        let (w, _) = toggle.measure(&mut fonts);
+        toggle.place(&mut fonts, 0.0, 0.0, w, TOGGLE_SWITCH_H);
+        let left = (w - TOGGLE_SWITCH_W + 3.0) as f64;
+        let right = (w - 3.0) as f64;
+        toggle.mouse_down(left, 14.0);
+        toggle.mouse_move(right, 14.0);
+        // Knob followed the pointer past halfway.
+        assert!(toggle.shown > 0.5);
+        toggle.mouse_up(right, 14.0);
+        assert!(toggle.is_on());
+        // Snap animation runs to the on stop.
+        assert!(toggle.anim.is_some());
+    }
+
+    #[test]
+    fn drag_below_half_snaps_back_off() {
+        let mut toggle = Toggle::new("Wi-Fi").on(true);
+        let mut fonts = FontSystem::new();
+        let (w, _) = toggle.measure(&mut fonts);
+        toggle.place(&mut fonts, 0.0, 0.0, w, TOGGLE_SWITCH_H);
+        let left = (w - TOGGLE_SWITCH_W + 3.0) as f64;
+        let right = (w - 3.0) as f64;
+        toggle.mouse_down(right, 14.0);
+        toggle.mouse_move(left, 14.0);
+        assert!(toggle.shown < 0.5);
+        toggle.mouse_up(left, 14.0);
+        assert!(!toggle.is_on());
     }
 
     #[test]

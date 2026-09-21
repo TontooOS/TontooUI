@@ -16,6 +16,7 @@ sliders) unless the dev sets it manually with `fill`.
 | `TOGGLE_KNOB_PAD` | 2 px knob padding inside the track |
 | `TOGGLE_KNOB_W_RATIO` | 1.35 knob width over height (wide macOS capsule) |
 | `TOGGLE_ANIM_SECONDS` | 0.20 s knob slide |
+| `TOGGLE_SNAP_SECONDS` | 0.15 s drag-release snap |
 | `TOGGLE_BOX` / `TOGGLE_BOX_RADIUS` | 21.12 px box, 5.76 px radius |
 | `TOGGLE_ICON_BOX` / `TOGGLE_ICON_RADIUS` | 26.88 px badge, 6.72 px radius |
 | `TOGGLE_ICON_GLYPH` | 15.36 px glyph inside the badge |
@@ -61,6 +62,7 @@ pub fn set_label(&mut self, label: impl Into<String>)
 pub fn set_focused(&mut self, focused: bool)
 pub fn set_hover(&mut self, x: f32, y: f32)
 pub fn mouse_down(&mut self, x: f64, y: f64)
+pub fn mouse_move(&mut self, x: f64, y: f64)
 pub fn mouse_up(&mut self, x: f64, y: f64)
 ```
 
@@ -83,10 +85,17 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
 `mouse_down` inside the row arms the toggle; `mouse_up` inside flips
 the state with animation (`View::mouse_up` does the same for boxed
 children). Pressing inside and releasing outside keeps the state.
-`set_hover` tracks the hover position for the button press/hover
-overlay. Forward `mouse_down`, `set_hover` and `mouse_up` from the app
-(see `examples/toggle.rs`). The animation is driven by real frame
-deltas, so it is Hz-independent.
+
+Switch style additionally supports dragging: pressing the track grabs
+the knob and it follows the pointer (`mouse_move`) live. Releasing past
+halfway snaps to the nearer stop with a 0.15 s `CubicOut` tween and
+fires `on_toggle` when the state changed; releasing before halfway
+snaps back. A press without moving (under 4 px) counts as a tap and
+flips the state. Checkbox and button styles stay click-only.
+
+Forward `mouse_down`, `mouse_move` and `mouse_up` from the app (see
+`examples/toggle.rs`). Animations are driven by real frame deltas, so
+they are Hz-independent.
 
 ## Usage / Example
 

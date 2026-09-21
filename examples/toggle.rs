@@ -136,7 +136,7 @@ impl App for ToggleDemo {
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
-        self.each_toggle(|toggle| toggle.set_hover(x as f32, y as f32));
+        self.each_toggle(|toggle| toggle.mouse_move(x, y));
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {
