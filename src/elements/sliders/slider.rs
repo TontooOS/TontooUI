@@ -17,6 +17,10 @@ pub const SLIDER_TRACK_H: f32 = 6.0;
 pub const SLIDER_KNOB_W: f32 = 24.0;
 /// Knob height in logical px.
 pub const SLIDER_KNOB_H: f32 = 19.0;
+/// Extra width when pressed (glass expand).
+pub const SLIDER_KNOB_EXPAND_W: f32 = 4.0;
+/// Extra height when pressed (glass expand).
+pub const SLIDER_KNOB_EXPAND_H: f32 = 3.0;
 /// Label size for header text.
 pub const SLIDER_HEADER_SIZE: f32 = 15.0;
 /// Label size for min/max text.
@@ -56,6 +60,7 @@ pub struct Slider {
     dark: bool,
     focused: bool,
     dragging: bool,
+    knob_expand: f32,
     anim: Option<TweenAnim<f64>>,
     anim_time: f32,
     last_draw: Option<Instant>,
@@ -95,6 +100,7 @@ impl Slider {
             dark: true,
             focused: true,
             dragging: false,
+            knob_expand: 0.0,
             anim: None,
             anim_time: 0.0,
             last_draw: None,
@@ -301,6 +307,12 @@ impl Slider {
             None => 0.0,
         };
         self.last_draw = Some(now);
+        let expand_target = if self.dragging { 1.0f32 } else { 0.0 };
+        let expand_speed = 14.0;
+        self.knob_expand += (expand_target - self.knob_expand).min(expand_speed * dt).max(-expand_speed * dt);
+        if (self.knob_expand - expand_target).abs() < 0.005 {
+            self.knob_expand = expand_target;
+        }
         if self.anim.is_some() && !self.dragging {
             self.anim_time += dt;
             let done = self.anim.as_mut().expect("anim set").update(self.anim_time);
@@ -424,9 +436,9 @@ impl Slider {
         }
 
         // Knob shadow first (under the knob).
-        let kw = SLIDER_KNOB_W / 2.0;
-        let kh = SLIDER_KNOB_H / 2.0;
-        let kr = SLIDER_KNOB_H / 2.0;
+        let kw = SLIDER_KNOB_W / 2.0 + self.knob_expand * SLIDER_KNOB_EXPAND_W / 2.0;
+        let kh = SLIDER_KNOB_H / 2.0 + self.knob_expand * SLIDER_KNOB_EXPAND_H / 2.0;
+        let kr = kh;
         scene.draw_blurred_rounded_rect(
             Affine::IDENTITY,
             vello::kurbo::Rect::new(px(kx - kw), px(tcy - kh), px(kx + kw), px(tcy + kh)),
@@ -441,7 +453,7 @@ impl Slider {
             px(tcy + kh),
             px(kr),
         );
-        if self.glass && !self.dragging {
+        if self.dragging {
             let tint = if self.dark {
                 Color::from_rgba8(255, 255, 255, 26)
             } else {
@@ -473,12 +485,16 @@ impl Slider {
                     color: Color::from_rgba8(255, 255, 255, 115).into(),
                 },
                 ColorStop {
-                    offset: 0.35,
+                    offset: 0.4,
                     color: Color::TRANSPARENT.into(),
                 },
                 ColorStop {
+                    offset: 0.85,
+                    color: Color::from_rgba8(255, 255, 255, 40).into(),
+                },
+                ColorStop {
                     offset: 1.0,
-                    color: Color::from_rgba8(0, 0, 0, 46).into(),
+                    color: Color::from_rgba8(255, 255, 255, 80).into(),
                 },
             ]);
             scene.stroke(
@@ -515,21 +531,6 @@ impl Slider {
                 &Brush::Solid(Color::from_rgba8(90, 200, 255, 30)),
                 None,
                 &chroma_c,
-            );
-        } else if self.dragging {
-            scene.fill(
-                Fill::NonZero,
-                Affine::IDENTITY,
-                &Brush::Solid(Color::from_rgba8(255, 255, 255, 64)),
-                None,
-                &knob,
-            );
-            scene.stroke(
-                &Stroke::new(1.5 * scale),
-                Affine::IDENTITY,
-                &Brush::Solid(Color::from_rgba8(255, 255, 255, 200)),
-                None,
-                &knob,
             );
         } else {
             scene.fill(
