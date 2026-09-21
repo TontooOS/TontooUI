@@ -1,6 +1,6 @@
 use parley::{
-    Alignment, AlignmentOptions, FontContext, GenericFamily, Layout, LayoutContext,
-    LineHeight, PositionedLayoutItem, StyleProperty,
+    Alignment, AlignmentOptions, FontContext, FontWeight, GenericFamily, Layout,
+    LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
 };
 use vello::Scene;
 use vello::peniko::{Brush, Color, Fill};
@@ -39,13 +39,26 @@ impl FontSystem {
         }
     }
 
-    /// Lay out `content` at `size` logical px. `max_width` is in logical px;
-    /// `None` disables wrapping.
+    /// Lay out `content` at `size` logical px with regular weight. `max_width`
+    /// is in logical px; `None` disables wrapping.
     pub fn layout_text(
         &mut self,
         content: &str,
         size: f32,
         color: Color,
+        max_width: Option<f32>,
+    ) -> Layout<SolidBrush> {
+        self.layout_text_weighted(content, size, color, 400.0, max_width)
+    }
+
+    /// Lay out `content` with an explicit font weight (400 regular, 600
+    /// semibold, ...).
+    pub fn layout_text_weighted(
+        &mut self,
+        content: &str,
+        size: f32,
+        color: Color,
+        weight: f32,
         max_width: Option<f32>,
     ) -> Layout<SolidBrush> {
         let px = size * self.scale;
@@ -56,6 +69,7 @@ impl FontSystem {
         builder.push_default(GenericFamily::SystemUi);
         builder.push_default(LineHeight::FontSizeRelative(1.25));
         builder.push_default(StyleProperty::FontSize(px));
+        builder.push_default(StyleProperty::FontWeight(FontWeight::new(weight)));
         let mut layout = builder.build(content);
         layout.break_all_lines(max_width.map(|w| w * self.scale));
         layout.align(Alignment::Start, AlignmentOptions::default());

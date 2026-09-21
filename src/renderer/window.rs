@@ -55,6 +55,11 @@ pub trait View {
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn text(&mut self, _text: &str) {}
     fn key(&mut self, _key: Key) {}
+    /// Draggable region for window moving: (x, y, width, height) in logical
+    /// px. A press inside starts a window drag instead of a click.
+    fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
+        None
+    }
 }
 
 /// Open a window and run `view` until the window closes.
@@ -284,10 +289,16 @@ impl<V: View> ApplicationHandler for Shell<V> {
             WindowEvent::MouseInput { state, button, .. } => {
                 if state == ElementState::Pressed && button == MouseButton::Left {
                     let scale = active.scale;
-                    self.view.mouse_down(
-                        active.cursor_pos.0 / scale,
-                        active.cursor_pos.1 / scale,
-                    );
+                    let x = (active.cursor_pos.0 / scale) as f32;
+                    let y = (active.cursor_pos.1 / scale) as f32;
+                    if let Some((rx, ry, rw, rh)) = self.view.drag_region() {
+                        if x >= rx && x <= rx + rw && y >= ry && y <= ry + rh {
+                            // Titlebar drag: moving keeps focus, no click.
+                            let _ = active.window.drag_window();
+                            return;
+                        }
+                    }
+                    self.view.mouse_down(x as f64, y as f64);
                     active.window.request_redraw();
                 }
             }

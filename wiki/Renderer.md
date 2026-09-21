@@ -54,6 +54,9 @@ pub trait View {
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn text(&mut self, _text: &str) {}
     fn key(&mut self, _key: Key) {}
+    fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
+        None
+    }
 }
 ```
 
@@ -204,3 +207,4 @@ fn main() {
 
 - [Text.md](Text.md) – static text element drawn through `FontSystem`
 - [TextInput.md](TextInput.md) – editable text element with keyboard input
+- [Titlebar.md](Titlebar.md) – custom decoration bar with drag region
