@@ -1,6 +1,6 @@
 # Tontoo TontooUI
 
-A Swift like UI Lib based on UIKit for making Modern Apps
+A SwiftUI Rema, A SwiftUI Clone! 
 
 ## Made for TontooOS
 
