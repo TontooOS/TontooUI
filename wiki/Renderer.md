@@ -28,6 +28,11 @@ the macOS 27 Golden Gate direction (one fixed radius, tighter than Tahoe).
 Windows are undecorated (`with_decorations(false)`); apps draw their own
 chrome, including rounded corners, traffic lights and title bars.
 
+> **Note:** Window shadows are compositor-side on Wayland. winit exposes a
+> shadow switch only on Windows (`with_undecorated_shadow`); on Linux there
+> is no client-side API, so TontooCompositor decides whether a window gets a
+> shadow. TontooUI draws no shadows itself.
+
 ```rust
 pub fn run(title: &str, width: u32, height: u32, view: impl View + 'static) -> Result<(), Box<dyn Error>>
 ```
