@@ -87,6 +87,26 @@ target once finished.
 Unix only (daemon socket). Elsewhere the watcher serves defaults and
 never polls.
 
+```rust
+pub fn set_focused(&mut self, focused: bool, now_secs: f64)
+pub fn focused(&self) -> bool
+```
+
+Inactive window state like macOS: unfocused windows desaturate the whole
+palette by luminance (gray glass instead of glass color, colorless text,
+monochrome accent) through the same 0.25 s fade instead of snapping.
+Forward the shell focus event here; refocusing restores the exact live
+palette. Traffic lights dim separately in the bar (see
+[Titlebar.md](Titlebar.md)).
+
+```rust
+pub fn desaturate(color: Color) -> Color
+```
+
+Grays a single color by luminance, keeping alpha. Future glass materials
+and elements read the (possibly desaturated) palette, so they turn gray
+and non-glass automatically when the window is inactive.
+
 ## Wiring
 
 The shell reads `App::background` every frame for the window body; apps

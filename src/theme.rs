@@ -158,6 +158,29 @@ impl Theme {
     }
 }
 
+/// Desaturate to gray by luminance, keeping alpha. Used for the inactive
+/// window state: glass turns non-glass gray, text loses its color, accents
+/// go monochrome, like macOS.
+pub fn desaturate(color: Color) -> Color {
+    let c = color.to_rgba8();
+    let lum = (0.2126 * c.r as f32 + 0.7152 * c.g as f32 + 0.0722 * c.b as f32)
+        .round()
+        .clamp(0.0, 255.0) as u8;
+    Color::from_rgba8(lum, lum, lum, c.a)
+}
+
+fn desaturate_palette(palette: &Palette) -> Palette {
+    Palette {
+        bg: desaturate(palette.bg),
+        text: desaturate(palette.text),
+        text_dim: desaturate(palette.text_dim),
+        titlebar_bg: desaturate(palette.titlebar_bg),
+        titlebar_text: desaturate(palette.titlebar_text),
+        divider: desaturate(palette.divider),
+        accent: desaturate(palette.accent),
+    }
+}
+
 fn lerp_palette(from: &Palette, to: &Palette, t: f32) -> Palette {
     // Qualified: `Color` also has an inherent 3-argument `lerp`.
     Palette {
@@ -183,6 +206,7 @@ pub struct ThemeWatcher {
     from: Palette,
     fade_start: f64,
     fading: bool,
+    focused: bool,
     last_poll: f64,
     #[cfg(unix)]
     provider: coresettings::SettingsProvider,
@@ -198,6 +222,7 @@ impl ThemeWatcher {
             theme,
             fade_start: 0.0,
             fading: false,
+            focused: true,
             last_poll: f64::NEG_INFINITY,
             #[cfg(unix)]
             provider: coresettings::SettingsProvider::from_env(),
@@ -208,6 +233,22 @@ impl ThemeWatcher {
 
     pub fn theme(&self) -> Theme {
         self.theme
+    }
+
+    /// Window focus for the inactive state. Unfocused windows desaturate
+    /// the whole palette (gray glass, colorless text, monochrome accent)
+    /// through the same fade instead of snapping.
+    pub fn set_focused(&mut self, focused: bool, now_secs: f64) {
+        if focused != self.focused {
+            self.from = self.palette(now_secs);
+            self.focused = focused;
+            self.fade_start = now_secs;
+            self.fading = true;
+        }
+    }
+
+    pub fn focused(&self) -> bool {
+        self.focused
     }
 
     /// Poll the daemon (throttled). Returns true when the theme changed and
@@ -244,18 +285,33 @@ impl ThemeWatcher {
         false
     }
 
-    /// Current palette, mid-fade blended with eased progress.
+    /// Current palette, mid-fade blended with eased progress. Unfocused
+    /// windows get the desaturated (gray, non-glass) variant.
     pub fn palette(&mut self, now_secs: f64) -> Palette {
+        // Exact target: perceptual blends land a ulp off the endpoint.
+        let live = self.theme.palette();
         if !self.fading {
-            return self.theme.palette();
+            return if self.focused {
+                live
+            } else {
+                desaturate_palette(&live)
+            };
         }
         let p = ((now_secs - self.fade_start) / THEME_FADE_SECONDS).clamp(0.0, 1.0) as f32;
         if p >= 1.0 {
             self.fading = false;
-            // Exact target: perceptual blends land a ulp off the endpoint.
-            return self.theme.palette();
+            return if self.focused {
+                live
+            } else {
+                desaturate_palette(&live)
+            };
         }
-        lerp_palette(&self.from, &self.theme.palette(), Easing::CubicOut.apply(p))
+        let blended = lerp_palette(&self.from, &live, Easing::CubicOut.apply(p));
+        if self.focused {
+            blended
+        } else {
+            desaturate_palette(&blended)
+        }
     }
 }
 
@@ -279,6 +335,51 @@ mod tests {
     #[test]
     fn multicolor_resolves_blue() {
         assert_eq!(Accent::Multicolor.color(), Accent::Blue.color());
+    }
+
+    #[test]
+    fn desaturate_keeps_luminance_gray() {
+        let gray = desaturate(Color::from_rgb8(0x00, 0x7a, 0xff));
+        let c = gray.to_rgba8();
+        assert_eq!(c.r, c.g);
+        assert_eq!(c.g, c.b);
+        assert_eq!(c.a, 255);
+        // Blue is dark: gray value well below white.
+        assert!(c.r < 128);
+        assert_eq!(desaturate(Color::WHITE).to_rgba8().r, 255);
+        assert_eq!(desaturate(Color::BLACK).to_rgba8().r, 0);
+    }
+
+    #[test]
+    fn unfocused_palette_is_gray() {
+        let mut watcher = ThemeWatcher::new();
+        watcher.set_focused(false, 0.0);
+        let gray = watcher.palette(10.0);
+        assert!(!watcher.fading);
+        let live = Theme::default().palette();
+        assert_ne!(gray.accent, live.accent);
+        for color in [
+            gray.bg,
+            gray.text,
+            gray.titlebar_bg,
+            gray.titlebar_text,
+            gray.divider,
+            gray.accent,
+        ] {
+            let c = color.to_rgba8();
+            assert_eq!(c.r, c.g, "not gray: {c:?}");
+            assert_eq!(c.g, c.b, "not gray: {c:?}");
+        }
+    }
+
+    #[test]
+    fn refocus_restores_color() {
+        let mut watcher = ThemeWatcher::new();
+        watcher.set_focused(false, 0.0);
+        let _ = watcher.palette(10.0);
+        watcher.set_focused(true, 10.0);
+        let back = watcher.palette(20.0);
+        assert_eq!(back, Theme::default().palette());
     }
 
     #[test]
