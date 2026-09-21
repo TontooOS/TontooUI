@@ -63,6 +63,17 @@ impl TextInput {
         self
     }
 
+    /// Move/resize. Rebuilds the layout only when the size changed.
+    pub fn set_bounds(&mut self, x: f32, y: f32, width: f32, height: f32) {
+        if width != self.width || height != self.height {
+            self.dirty = true;
+        }
+        self.x = x;
+        self.y = y;
+        self.width = width;
+        self.height = height;
+    }
+
     pub fn text(&self) -> &str {
         &self.text
     }

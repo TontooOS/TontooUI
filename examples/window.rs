@@ -1,5 +1,5 @@
 use tontooui::elements::{Text, TextInput};
-use tontooui::renderer::window::{Key, View, run};
+use tontooui::renderer::window::{Key, View, Viewport, run};
 use tontooui::renderer::FontSystem;
 use vello::Scene;
 use vello::peniko::Color;
@@ -16,19 +16,14 @@ impl Demo {
         Self {
             title: Text::new("TontooUI Renderer Test")
                 .size(28.0)
-                .color(Color::WHITE)
-                .at(32.0, 36.0),
+                .color(Color::WHITE),
             subtitle: Text::new("Click the field and type. Esc clears focus.")
                 .size(14.0)
-                .color(Color::from_rgb8(0x9a, 0x9a, 0x9e))
-                .at(32.0, 76.0),
-            input: TextInput::new()
-                .bounds(32.0, 120.0, 420.0, 44.0)
-                .placeholder("Type here..."),
+                .color(Color::from_rgb8(0x9a, 0x9a, 0x9e)),
+            input: TextInput::new().placeholder("Type here..."),
             echo: Text::new("Echo: ")
                 .size(15.0)
-                .color(Color::from_rgb8(0xff, 0x9f, 0x0a))
-                .at(32.0, 184.0),
+                .color(Color::from_rgb8(0xff, 0x9f, 0x0a)),
         }
     }
 }
@@ -38,17 +33,22 @@ impl View for Demo {
         &mut self,
         scene: &mut Scene,
         fonts: &mut FontSystem,
-        _width: f32,
-        _height: f32,
+        viewport: Viewport,
         time_secs: f64,
     ) {
+        let x = viewport.x + 8.0;
+        self.title.set_position(x, viewport.y + 12.0);
         self.title.draw(scene, fonts);
+        self.subtitle.set_position(x, viewport.y + 52.0);
         self.subtitle.draw(scene, fonts);
+        self.input
+            .set_bounds(x, viewport.y + 96.0, 420.0, 44.0);
         // 530 ms cursor blink.
         let blink_on = (time_secs * 1000.0 / 530.0) as u64 % 2 == 0;
         self.input.draw(scene, fonts, blink_on);
         let shown = format!("Echo: {}", self.input.text());
         self.echo.set_content(shown);
+        self.echo.set_position(x, viewport.y + 160.0);
         self.echo.draw(scene, fonts);
     }
 

@@ -33,14 +33,23 @@ pub enum Key {
     Escape,
 }
 
-/// Content hosted in a `Window`. Coordinates are logical pixels.
+/// Logical content area inside the window frame.
+#[derive(Clone, Copy, Debug)]
+pub struct Viewport {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+/// Content hosted in a `Window`. Coordinates are logical pixels relative to
+/// the window; place content inside `viewport`.
 pub trait View {
     fn draw(
         &mut self,
         scene: &mut Scene,
         fonts: &mut FontSystem,
-        width: f32,
-        height: f32,
+        viewport: Viewport,
         time_secs: f64,
     );
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
@@ -107,30 +116,30 @@ impl<V: View> Shell<V> {
         let scale = active.scale as f32;
         active.fonts.scale = scale;
 
-        // Rounded window background. The surface is cleared transparent and
-        // every window gets the standard corner radius automatically.
-        let (pw, ph) = (size.width as f64, size.height as f64);
-        let bg = vello::kurbo::RoundedRect::new(
-            0.0,
-            0.0,
-            pw,
-            ph,
-            WINDOW_CORNER_RADIUS as f64 * active.scale,
-        );
-        active.scene.fill(
-            vello::peniko::Fill::NonZero,
-            vello::kurbo::Affine::IDENTITY,
-            &vello::peniko::Brush::Solid(BACKGROUND),
-            None,
-            &bg,
+        // Window frame: shadows, rounded body, edge and outline. The surface
+        // itself is cleared transparent so the corners stay see-through.
+        super::frame::draw(
+            &mut active.scene,
+            size.width,
+            size.height,
+            scale,
+            BACKGROUND,
         );
 
+        let (vx, vy, vw, vh) = super::frame::content_rect(
+            size.width as f32 / scale,
+            size.height as f32 / scale,
+        );
         let elapsed = active.start.elapsed().as_secs_f64();
         self.view.draw(
             &mut active.scene,
             &mut active.fonts,
-            size.width as f32 / scale,
-            size.height as f32 / scale,
+            Viewport {
+                x: vx,
+                y: vy,
+                width: vw,
+                height: vh,
+            },
             elapsed,
         );
 

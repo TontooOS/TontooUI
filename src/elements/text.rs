@@ -55,6 +55,12 @@ impl Text {
         self
     }
 
+    /// Move without rebuilding the layout.
+    pub fn set_position(&mut self, x: f32, y: f32) {
+        self.x = x;
+        self.y = y;
+    }
+
     pub fn set_content(&mut self, content: impl Into<String>) {
         let content = content.into();
         if content != self.content {

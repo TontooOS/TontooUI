@@ -10,6 +10,7 @@ result to the winit surface. There is no UIKit layer and no GTK dependency.
 |---|---|---|
 | `window` | `src/renderer/window.rs` | winit event loop, surface management, `View` trait, `run` |
 | `text` | `src/renderer/text.rs` | Parley font system and scene text drawing |
+| `frame` | `src/renderer/frame.rs` | Window frame: shadows, rounded body, edge, outline |
 
 ## Window
 
@@ -49,16 +50,26 @@ Opens a window with `title` and logical size `width` x `height` and runs
 
 ```rust
 pub trait View {
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, width: f32, height: f32, time_secs: f64);
+    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, viewport: Viewport, time_secs: f64);
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn text(&mut self, _text: &str) {}
     fn key(&mut self, _key: Key) {}
 }
 ```
 
-Content hosted in a window. All coordinates are logical pixels; `width` and
-`height` are the current logical window size and `time_secs` is seconds since
-the window opened (use it for blink and animation phases).
+```rust
+pub struct Viewport {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+```
+
+Content hosted in a window. All coordinates are logical pixels; place
+content inside `viewport` (window size minus the 24 px frame margin).
+`time_secs` is seconds since the window opened (use it for blink and
+animation phases).
 
 ```rust
 pub enum Key {
@@ -78,8 +89,8 @@ Non-printable keys forwarded to the view. Printable input arrives via
 Each `RedrawRequested` event runs these steps:
 
 1. `scene.reset()` clears the previous frame.
-2. The shell records a full-window `RoundedRect` with `BACKGROUND` and
-   `WINDOW_CORNER_RADIUS`. The window is transparent, so the corners stay
+2. `frame::draw()` records the window frame (see below). The window is
+   transparent and the surface is cleared transparent, so the corners stay
    see-through. Content drawn by views can still paint over the cutout;
    per-window clipping is not implemented yet.
 3. `view.draw()` records GPU commands into the scene.
@@ -134,12 +145,40 @@ Draws a finished layout at logical position (`x`, `y`). Iterates glyph runs
 and records them with `Scene::draw_glyphs`. Only glyph runs are drawn;
 inline boxes are skipped.
 
+## Frame
+
+```rust
+pub const MARGIN: f32;
+pub const EDGE: Color;
+pub const INNER_TOP: Color;
+pub const OUTER: Color;
+```
+
+Recreates the old UIKit window style, drawn by the shell before every
+`view.draw()` so all windows look the same:
+
+| Layer | Value |
+|---|---|
+| Margin | `24.0` logical px to the screen edge (`MARGIN`) |
+| Body | `RoundedRect` with `BACKGROUND` and `WINDOW_CORNER_RADIUS` |
+| Shadows | `0 3px 6px` black 15%, `0 7px 24px` black 12%, `0 12px 32px` black 8% (gaussian blur via `draw_blurred_rounded_rect`) |
+| Inner | 1 px inner ring with a top-to-transparent white gradient (`INNER_TOP`) |
+| Edge | 1 px stroke in `EDGE` (white 14%) |
+| Outline | Outer 1 px ring in `OUTER` (black 55%) |
+
+```rust
+pub fn content_rect(width: f32, height: f32) -> (f32, f32, f32, f32)
+```
+
+Logical `(x, y, width, height)` inside the frame for the given logical
+window size. The shell converts it to the `Viewport` passed to views.
+
 ## Usage / Example
 
 ```rust
 use tontooui::elements::Text;
 use tontooui::renderer::FontSystem;
-use tontooui::renderer::window::{View, run};
+use tontooui::renderer::window::{View, Viewport, run};
 use vello::Scene;
 use vello::peniko::Color;
 
@@ -148,14 +187,15 @@ struct Hello {
 }
 
 impl View for Hello {
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, _w: f32, _h: f32, _t: f64) {
+    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, viewport: Viewport, _t: f64) {
+        self.label.set_position(viewport.x + 8.0, viewport.y + 12.0);
         self.label.draw(scene, fonts);
     }
 }
 
 fn main() {
     run("Hello", 800, 600, Hello {
-        label: Text::new("Hello, TontooUI!").size(28.0).color(Color::WHITE).at(32.0, 36.0),
+        label: Text::new("Hello, TontooUI!").size(28.0).color(Color::WHITE),
     }).unwrap();
 }
 ```
