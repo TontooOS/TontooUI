@@ -18,7 +18,7 @@ use super::super::buttons::{
 
 /// Switch track width in logical px (stretched long and slim,
 /// macOS style).
-pub const TOGGLE_SWITCH_W: f32 = 74.67;
+pub const TOGGLE_SWITCH_W: f32 = 64.0;
 /// Switch track height in logical px (three quarters of the iOS
 /// measure).
 pub const TOGGLE_SWITCH_H: f32 = 22.32;
@@ -59,7 +59,7 @@ pub const TOGGLE_OFF_DARK: Color = Color::from_rgb8(0x3a, 0x3a, 0x3c);
 /// Toggle presentation (SwiftUI `toggleStyle`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ToggleStyle {
-    /// iOS switch stretched long and slim: 74.67x22.32 track, wide
+    /// iOS switch stretched long and slim: 64x22.32 track, wide
     /// capsule knob, generous stretch of track beside the knob.
     #[default]
     Switch,
@@ -773,7 +773,7 @@ mod tests {
         let mut fonts = FontSystem::new();
         let (w, h) = toggle.measure(&mut fonts);
         assert_eq!((w, h), (TOGGLE_SWITCH_W, TOGGLE_SWITCH_H));
-        assert_eq!((TOGGLE_SWITCH_W, TOGGLE_SWITCH_H), (74.67, 22.32));
+        assert_eq!((TOGGLE_SWITCH_W, TOGGLE_SWITCH_H), (64.0, 22.32));
     }
 
     #[test]
