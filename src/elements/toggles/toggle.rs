@@ -366,6 +366,11 @@ impl Toggle {
             None => 0.0,
         };
         self.last_draw = Some(now);
+        if self.dragging {
+            // While held the pointer owns `shown`; never snap it back to
+            // the on/off endpoint or the knob would freeze mid-drag.
+            return;
+        }
         if let Some(anim) = self.anim.as_mut() {
             self.anim_time += dt;
             let done = anim.update(self.anim_time);
@@ -780,6 +785,26 @@ mod tests {
         // Positive travel with symmetric stops.
         let travel = TOGGLE_SWITCH_W - TOGGLE_KNOB_PAD * 2.0 - knob_w;
         assert!(travel > 0.0);
+    }
+
+    #[test]
+    fn dragging_survives_frame_advance() {
+        // Regression: draw() must not reset the held knob to the on/off
+        // endpoint, or dragging left would do nothing and snap back on.
+        let mut toggle = Toggle::new("Wi-Fi").on(true);
+        let mut fonts = FontSystem::new();
+        let (w, _) = toggle.measure(&mut fonts);
+        toggle.place(&mut fonts, 0.0, 0.0, w, TOGGLE_SWITCH_H);
+        let left = (w - TOGGLE_SWITCH_W + 3.0) as f64;
+        let right = (w - 3.0) as f64;
+        toggle.mouse_down(right, 14.0);
+        toggle.mouse_move(left, 14.0);
+        let held = toggle.shown;
+        assert!(held < 0.5);
+        toggle.advance(Instant::now());
+        assert_eq!(toggle.shown, held);
+        toggle.mouse_up(left, 14.0);
+        assert!(!toggle.is_on());
     }
 
     #[test]
