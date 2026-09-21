@@ -1,8 +1,11 @@
+use std::any::Any;
+
 use parley::Layout;
 use vello::Scene;
 use vello::kurbo::{Affine, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, Fill};
 
+use super::layout::Element;
 use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
 
 const PADDING: f32 = 12.0;
@@ -173,6 +176,10 @@ impl TextInput {
     }
 
     pub fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, blink_on: bool) {
+        self.render(scene, fonts, blink_on);
+    }
+
+    fn render(&mut self, scene: &mut Scene, fonts: &mut FontSystem, blink_on: bool) {
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
 
@@ -263,5 +270,25 @@ impl TextInput {
 impl Default for TextInput {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Element for TextInput {
+    fn measure(&mut self, _fonts: &mut FontSystem) -> (f32, f32) {
+        (self.width, self.height)
+    }
+
+    fn place(&mut self, _fonts: &mut FontSystem, x: f32, y: f32, w: f32, h: f32) {
+        self.set_bounds(x, y, w, h);
+    }
+
+    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+        // Stacks have no clock; draw without cursor blink. Direct callers
+        // use the inherent `draw` with explicit blink state.
+        self.render(scene, fonts, false);
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }

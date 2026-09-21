@@ -1,7 +1,10 @@
+use std::any::Any;
+
 use parley::Layout;
 use vello::Scene;
 use vello::peniko::Color;
 
+use super::layout::Element;
 use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
 
 /// Static text label. Layout is cached and rebuilt when content, size,
@@ -83,6 +86,14 @@ impl Text {
 
     /// Logical size of the laid out text.
     pub fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
+        self.measured_size(fonts)
+    }
+
+    pub fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+        self.render(scene, fonts);
+    }
+
+    fn measured_size(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
         self.ensure_layout(fonts);
         let layout = self.layout.as_ref().expect("layout built");
         let scale = fonts.scale;
@@ -92,9 +103,27 @@ impl Text {
         )
     }
 
-    pub fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+    fn render(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
         self.ensure_layout(fonts);
         let layout = self.layout.as_ref().expect("layout built");
         draw_layout(scene, layout, self.x, self.y, fonts.scale);
+    }
+}
+
+impl Element for Text {
+    fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
+        self.measured_size(fonts)
+    }
+
+    fn place(&mut self, _fonts: &mut FontSystem, x: f32, y: f32, _w: f32, _h: f32) {
+        self.set_position(x, y);
+    }
+
+    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+        self.render(scene, fonts);
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
     }
 }

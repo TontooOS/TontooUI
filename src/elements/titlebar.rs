@@ -1,8 +1,11 @@
+use std::any::Any;
+
 use parley::Layout;
 use vello::Scene;
 use vello::kurbo::{Affine, BezPath, Circle, Line, Point, RoundedRect, RoundedRectRadii, Stroke};
 use vello::peniko::{Brush, Color, Fill};
 
+use super::layout::Element;
 use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
 use crate::renderer::window::WINDOW_CORNER_RADIUS;
 
@@ -184,6 +187,10 @@ impl Titlebar {
     }
 
     pub fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+        self.render(scene, fonts);
+    }
+
+    fn render(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
         let bar_h = self.height.px();
@@ -304,6 +311,29 @@ fn glyph_bar() -> RoundedRect {
     let len = TRAFFIC_SIZE as f64 * 0.68;
     let thick = 2.2;
     RoundedRect::new(-len / 2.0, -thick / 2.0, len / 2.0, thick / 2.0, thick / 2.0)
+}
+
+impl Element for Titlebar {
+    fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
+        self.ensure_layout(fonts);
+        let layout = self.layout.as_ref().expect("layout built");
+        (
+            FontSystem::layout_size(layout).0 / fonts.scale,
+            self.height.px(),
+        )
+    }
+
+    fn place(&mut self, _fonts: &mut FontSystem, x: f32, y: f32, w: f32, _h: f32) {
+        self.set_rect(x, y, w);
+    }
+
+    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+        self.render(scene, fonts);
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
 }
 
 /// Expand logo from the TontooOS artwork (500x500 viewBox, square, so a
