@@ -205,34 +205,31 @@ window size. The shell converts it to the `Viewport` passed to views.
 ## Usage / Example
 
 ```rust
-use tontooui::elements::Text;
+use tontooui::elements::Titlebar;
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::window::{App, Viewport, run};
 use vello::Scene;
-use vello::peniko::Color;
 
 struct Hello {
-    label: Text,
+    bar: Titlebar,
 }
 
 impl App for Hello {
     fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, viewport: Viewport, _t: f64) {
-        self.label.set_position(viewport.x + 8.0, viewport.y + 12.0);
-        self.label.draw(scene, fonts);
+        self.bar.set_rect(viewport.x, viewport.y, viewport.width);
+        self.bar.draw(scene, fonts);
     }
 }
 
 fn main() {
     run("Hello", 800, 600, Hello {
-        label: Text::new("Hello, TontooUI!").size(28.0).color(Color::WHITE),
+        bar: Titlebar::new("Hello"),
     }).unwrap();
 }
 ```
 
 ## Cross References
 
-- [Text.md](Text.md) – static text element drawn through `FontSystem`
-- [TextInput.md](TextInput.md) – editable text element with keyboard input
 - [Titlebar.md](Titlebar.md) – custom decoration bar with drag region
 - [Layout.md](Layout.md) – VStack, HStack, ZStack, Spacer and the View trait
 - [Theme.md](Theme.md) – live dark/light plus accent with fade animation

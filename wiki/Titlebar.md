@@ -188,6 +188,4 @@ bar.draw(scene, fonts);
 ## Cross References
 
 - [Renderer.md](Renderer.md) – `View` trait, `drag_region`, frame, `FontSystem`
-- [Text.md](Text.md) – static text element
-- [TextInput.md](TextInput.md) – editable text field
 - [Theme.md](Theme.md) – live palette with fade animation

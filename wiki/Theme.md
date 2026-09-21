@@ -100,21 +100,19 @@ self.bg = palette.bg;
 self.bar.set_palette(palette.titlebar_bg, palette.titlebar_text, palette.divider);
 ```
 
-`Titlebar::set_palette` rebuilds title glyphs on text color change;
-`Text::set_color` rebuilds its layout on change. Both keep mid-fade
-colors crisp without extra work from callers.
+`Titlebar::set_palette` rebuilds title glyphs on text color change, so
+mid-fade colors stay crisp without extra work from callers. Rebuilt text
+elements rejoin through their own `set_color`.
 
 ## Usage / Example
 
-See `examples/window.rs`: watcher polling, background override, titlebar
-palette, accent-colored echo text. Switch the daemon theme
-(`customize_set {"theme": "light"}`) while it runs and watch the 0.25 s
-crossfade.
+Poll the watcher per frame, override `App::background`, forward the
+palette to themed views. Switch the daemon theme (`customize_set
+{"theme": "light"}`) while the app runs and watch the 0.25 s crossfade.
 
 ## Cross References
 
 - [Renderer.md](Renderer.md) – `App::background`, frame pipeline, `View`/`App`
 - [Layout.md](Layout.md) – views holding themed content
 - [Titlebar.md](Titlebar.md) – `set_palette`
-- [Text.md](Text.md) – `set_color`
 - [Animation.md](Animation.md) – easing and tween drivers used by the fade

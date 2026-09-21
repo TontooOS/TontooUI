@@ -20,14 +20,13 @@ pub trait View {
 Everything visible is a `View`. Intrinsic size, rect assignment and drawing
 in logical px. `flex` is the share of remaining stack space (zero means
 fixed). `as_any_mut` powers typed child access for state updates. All
-built-in views (`Text`, `TextInput`, `Titlebar`, stacks, `Spacer`,
-modifiers) implement it. An `App` (see [Renderer.md](Renderer.md)) owns the
-root view tree and forwards events into it.
+built-in views (`Titlebar`, stacks, `Spacer`, modifiers, and the rebuilt
+elements landing next) implement it. An `App` (see
+[Renderer.md](Renderer.md)) owns the root view tree and forwards events
+into it.
 
-`Text`, `TextInput` and `Titlebar` keep their inherent `draw` methods, so
-direct callers work unchanged; stacks use the trait through
-`Box<dyn Element>`. `TextInput` drawn through a stack never blinks (stacks
-have no clock); direct callers pass the blink state explicitly.
+Concrete views keep their inherent `draw` methods, so direct callers work
+unchanged; stacks use the trait through `Box<dyn View>`.
 
 ```rust
 pub enum Align {
@@ -88,11 +87,11 @@ pub fn child_mut<T: View + 'static>(&mut self, index: usize) -> Option<&mut T>
 ```
 
 Available on all three stacks. Typed access by position for state updates
-(typing into a `TextInput`, changing a `Text`):
+(retitling a bar, changing content):
 
 ```rust
-if let Some(input) = stack.child_mut::<TextInput>(2) {
-    input.insert(text);
+if let Some(bar) = stack.child_mut::<Titlebar>(0) {
+    bar.set_title("New title");
 }
 ```
 
@@ -139,21 +138,16 @@ so nesting stays transparent:
 ```rust
 root.child_mut::<Background>(0)?
     .child_mut::<VStack>()?
-    .child_mut::<TextInput>(1)?
-    .insert(text);
+    .child_mut::<Titlebar>(0)?
+    .set_title("New title");
 ```
 
 ## Usage / Example
 
-Run `cargo run --example multi_view`: an `HStack` with two `Background`
-panels side by side (left: title, subtitle, `Spacer`, echo; right: input),
-each padded, with nested `child_mut` state routing.
-
 ```rust
 let mut stack = VStack::new()
     .spacing(8.0)
-    .child(Text::new("Title").size(28.0).color(Color::WHITE))
-    .child(TextInput::new().placeholder("Type here..."))
+    .child(Titlebar::new("Panel"))
     .child(Spacer::new());
 
 stack.place(fonts, x, y, width, height);
@@ -163,6 +157,4 @@ stack.draw(scene, fonts);
 ## Cross References
 
 - [Renderer.md](Renderer.md) – `FontSystem`, frame, `View` trait
-- [Text.md](Text.md) – static text element
-- [TextInput.md](TextInput.md) – editable text field
 - [Titlebar.md](Titlebar.md) – decoration bar
