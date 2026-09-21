@@ -16,24 +16,24 @@ use super::super::buttons::{
     BUTTON_PAD_X, BUTTON_PAD_Y, BUTTON_RADIUS,
 };
 
-/// Switch track width in logical px (half iOS measure).
-pub const TOGGLE_SWITCH_W: f32 = 25.5;
-/// Switch track height in logical px (half iOS measure).
-pub const TOGGLE_SWITCH_H: f32 = 15.5;
+/// Switch track width in logical px (three-quarter iOS measure).
+pub const TOGGLE_SWITCH_W: f32 = 38.25;
+/// Switch track height in logical px (three-quarter iOS measure).
+pub const TOGGLE_SWITCH_H: f32 = 23.25;
 /// Switch knob diameter in logical px.
-pub const TOGGLE_KNOB_D: f32 = 13.5;
+pub const TOGGLE_KNOB_D: f32 = 20.25;
 /// Knob slide animation time in seconds.
 pub const TOGGLE_ANIM_SECONDS: f32 = 0.20;
 /// Checkbox box size in logical px.
-pub const TOGGLE_BOX: f32 = 11.0;
+pub const TOGGLE_BOX: f32 = 16.5;
 /// Checkbox corner radius in logical px.
-pub const TOGGLE_BOX_RADIUS: f32 = 3.0;
+pub const TOGGLE_BOX_RADIUS: f32 = 4.5;
 /// Leading settings-row icon badge size in logical px.
-pub const TOGGLE_ICON_BOX: f32 = 14.0;
+pub const TOGGLE_ICON_BOX: f32 = 21.0;
 /// Leading icon badge corner radius in logical px.
-pub const TOGGLE_ICON_RADIUS: f32 = 3.5;
+pub const TOGGLE_ICON_RADIUS: f32 = 5.25;
 /// Glyph box inside the leading icon badge in logical px.
-pub const TOGGLE_ICON_GLYPH: f32 = 8.0;
+pub const TOGGLE_ICON_GLYPH: f32 = 12.0;
 /// Row label size in logical px.
 pub const TOGGLE_LABEL_SIZE: f32 = 17.0;
 /// Gap between badge, box/control and label in logical px.
@@ -48,8 +48,8 @@ pub const TOGGLE_OFF_DARK: Color = Color::from_rgb8(0x3a, 0x3a, 0x3c);
 /// Toggle presentation (SwiftUI `toggleStyle`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ToggleStyle {
-    /// iOS switch at half measure: 25.5x15.5 track, knob slides over
-    /// with animation.
+    /// iOS switch at three-quarter measure: 38.25x23.25 track, knob
+    /// slides over with animation.
     #[default]
     Switch,
     /// Rounded button: gray fill when off, accent fill with white text
@@ -355,7 +355,7 @@ impl Toggle {
             Rect::new(px(kx), px(ky), px(kx + TOGGLE_KNOB_D), px(ky + TOGGLE_KNOB_D)),
             Color::from_rgba8(0, 0, 0, 40),
             px(TOGGLE_KNOB_D / 2.0),
-            3.0 * scale,
+            4.5 * scale,
         );
         let knob = RoundedRect::new(
             px(kx),
@@ -393,10 +393,10 @@ impl Toggle {
         if self.shown > 0.5 {
             // White checkmark, drawn with round caps.
             let mut path = BezPath::new();
-            path.move_to((px(self.bx + 3.0), px(self.by + 5.75)));
-            path.line_to((px(self.bx + 4.9), px(self.by + 7.5)));
-            path.line_to((px(self.bx + 8.0), px(self.by + 4.0)));
-            let mut stroke = Stroke::new(1.25 * scale);
+            path.move_to((px(self.bx + 4.5), px(self.by + 8.625)));
+            path.line_to((px(self.bx + 7.35), px(self.by + 11.25)));
+            path.line_to((px(self.bx + 12.0), px(self.by + 6.0)));
+            let mut stroke = Stroke::new(1.875 * scale);
             stroke.start_cap = Cap::Round;
             stroke.end_cap = Cap::Round;
             stroke.join = Join::Round;
@@ -634,12 +634,12 @@ mod tests {
     use std::rc::Rc;
 
     #[test]
-    fn switch_measures_half_ios_size_without_label() {
+    fn switch_measures_three_quarter_ios_size_without_label() {
         let mut toggle = Toggle::new("");
         let mut fonts = FontSystem::new();
         let (w, h) = toggle.measure(&mut fonts);
         assert_eq!((w, h), (TOGGLE_SWITCH_W, TOGGLE_SWITCH_H));
-        assert_eq!((TOGGLE_SWITCH_W, TOGGLE_SWITCH_H), (25.5, 15.5));
+        assert_eq!((TOGGLE_SWITCH_W, TOGGLE_SWITCH_H), (38.25, 23.25));
     }
 
     #[test]

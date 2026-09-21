@@ -12,12 +12,12 @@ sliders) unless the dev sets it manually with `fill`.
 
 | Token | Value |
 |---|---|
-| `TOGGLE_SWITCH_W` / `TOGGLE_SWITCH_H` | 25.5 px / 15.5 px track (half iOS measure) |
-| `TOGGLE_KNOB_D` | 13.5 px white knob with soft shadow |
+| `TOGGLE_SWITCH_W` / `TOGGLE_SWITCH_H` | 38.25 px / 23.25 px track (three-quarter iOS measure) |
+| `TOGGLE_KNOB_D` | 20.25 px white knob with soft shadow |
 | `TOGGLE_ANIM_SECONDS` | 0.20 s knob slide |
-| `TOGGLE_BOX` / `TOGGLE_BOX_RADIUS` | 11 px box, 3 px radius |
-| `TOGGLE_ICON_BOX` / `TOGGLE_ICON_RADIUS` | 14 px badge, 3.5 px radius |
-| `TOGGLE_ICON_GLYPH` | 8 px glyph inside the badge |
+| `TOGGLE_BOX` / `TOGGLE_BOX_RADIUS` | 16.5 px box, 4.5 px radius |
+| `TOGGLE_ICON_BOX` / `TOGGLE_ICON_RADIUS` | 21 px badge, 5.25 px radius |
+| `TOGGLE_ICON_GLYPH` | 12 px glyph inside the badge |
 | `TOGGLE_LABEL_SIZE` | 17 px row label |
 | `TOGGLE_GAP` | 8 px badge/box/control-to-label gap |
 | `TOGGLE_OFF_DARK` / `TOGGLE_OFF_LIGHT` | `#3A3A3C` / `#E5E5E5` |
@@ -33,8 +33,8 @@ pub enum ToggleStyle {
 }
 ```
 
-`Switch` draws the label left and the 25.5x15.5 track right (with the badge
-before the label when an icon is set). `Checkbox` draws the 11 px box
+`Switch` draws the label left and the 38.25x23.25 track right (with the badge
+before the label when an icon is set). `Checkbox` draws the 16.5 px box
 left and the label right. `Button` draws a rounded button (8 px radius,
 same padding as `Button`) that fills gray when off and accent with
 white text when on; the icon renders inside the button.
