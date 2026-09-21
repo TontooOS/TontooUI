@@ -169,6 +169,7 @@ impl<V: View> ApplicationHandler for Shell<V> {
                 .create_window(
                     WindowAttributes::default()
                         .with_title(&self.title)
+                        .with_decorations(false)
                         .with_inner_size(LogicalSize::new(self.width, self.height)),
                 )
                 .expect("create window"),
