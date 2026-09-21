@@ -20,8 +20,12 @@ use super::super::buttons::{
 pub const TOGGLE_SWITCH_W: f32 = 48.96;
 /// Switch track height in logical px (96 percent of iOS measure).
 pub const TOGGLE_SWITCH_H: f32 = 29.76;
-/// Switch knob diameter in logical px.
-pub const TOGGLE_KNOB_D: f32 = 25.92;
+/// Switch knob padding inside the track in logical px (macOS measure:
+/// the knob nearly fills the track height).
+pub const TOGGLE_KNOB_PAD: f32 = 2.0;
+/// Switch knob width relative to its height (macOS measure: the knob is
+/// a capsule, wider than tall).
+pub const TOGGLE_KNOB_W_RATIO: f32 = 1.2;
 /// Knob slide animation time in seconds.
 pub const TOGGLE_ANIM_SECONDS: f32 = 0.20;
 /// Checkbox box size in logical px.
@@ -345,24 +349,26 @@ impl Toggle {
             &track,
         );
 
-        // Knob slides from the left stop to the right stop.
-        let inset = (TOGGLE_SWITCH_H - TOGGLE_KNOB_D) / 2.0;
-        let travel = TOGGLE_SWITCH_W - inset * 2.0 - TOGGLE_KNOB_D;
-        let kx = self.sx + inset + self.shown.clamp(0.0, 1.0) * travel;
-        let ky = self.sy + inset;
+        // Capsule knob (macOS measure): nearly full track height and
+        // wider than tall, sliding from the left stop to the right stop.
+        let knob_h = TOGGLE_SWITCH_H - TOGGLE_KNOB_PAD * 2.0;
+        let knob_w = knob_h * TOGGLE_KNOB_W_RATIO;
+        let travel = TOGGLE_SWITCH_W - TOGGLE_KNOB_PAD * 2.0 - knob_w;
+        let kx = self.sx + TOGGLE_KNOB_PAD + self.shown.clamp(0.0, 1.0) * travel;
+        let ky = self.sy + TOGGLE_KNOB_PAD;
         scene.draw_blurred_rounded_rect(
             Affine::IDENTITY,
-            Rect::new(px(kx), px(ky), px(kx + TOGGLE_KNOB_D), px(ky + TOGGLE_KNOB_D)),
+            Rect::new(px(kx), px(ky), px(kx + knob_w), px(ky + knob_h)),
             Color::from_rgba8(0, 0, 0, 40),
-            px(TOGGLE_KNOB_D / 2.0),
+            px(knob_h / 2.0),
             5.76 * scale,
         );
         let knob = RoundedRect::new(
             px(kx),
             px(ky),
-            px(kx + TOGGLE_KNOB_D),
-            px(ky + TOGGLE_KNOB_D),
-            px(TOGGLE_KNOB_D / 2.0),
+            px(kx + knob_w),
+            px(ky + knob_h),
+            px(knob_h / 2.0),
         );
         scene.fill(
             Fill::NonZero,
@@ -640,6 +646,18 @@ mod tests {
         let (w, h) = toggle.measure(&mut fonts);
         assert_eq!((w, h), (TOGGLE_SWITCH_W, TOGGLE_SWITCH_H));
         assert_eq!((TOGGLE_SWITCH_W, TOGGLE_SWITCH_H), (48.96, 29.76));
+    }
+
+    #[test]
+    fn knob_is_macos_capsule() {
+        let knob_h = TOGGLE_SWITCH_H - TOGGLE_KNOB_PAD * 2.0;
+        let knob_w = knob_h * TOGGLE_KNOB_W_RATIO;
+        // Capsule: wider than tall, nearly full track height.
+        assert!(knob_w > knob_h);
+        assert!(knob_h / TOGGLE_SWITCH_H > 0.85);
+        // Positive travel with symmetric stops.
+        let travel = TOGGLE_SWITCH_W - TOGGLE_KNOB_PAD * 2.0 - knob_w;
+        assert!(travel > 0.0);
     }
 
     #[test]

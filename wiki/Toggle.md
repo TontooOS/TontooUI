@@ -13,7 +13,8 @@ sliders) unless the dev sets it manually with `fill`.
 | Token | Value |
 |---|---|
 | `TOGGLE_SWITCH_W` / `TOGGLE_SWITCH_H` | 48.96 px / 29.76 px track (96 percent of iOS measure) |
-| `TOGGLE_KNOB_D` | 25.92 px white knob with soft shadow |
+| `TOGGLE_KNOB_PAD` | 2 px knob padding inside the track |
+| `TOGGLE_KNOB_W_RATIO` | 1.2 knob width over height (macOS capsule) |
 | `TOGGLE_ANIM_SECONDS` | 0.20 s knob slide |
 | `TOGGLE_BOX` / `TOGGLE_BOX_RADIUS` | 21.12 px box, 5.76 px radius |
 | `TOGGLE_ICON_BOX` / `TOGGLE_ICON_RADIUS` | 26.88 px badge, 6.72 px radius |
