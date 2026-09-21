@@ -1,4 +1,5 @@
 use tontooui::elements::{GlassContainer, Titlebar, TrafficAction, View};
+use tontooui::renderer::ImageLoader;
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
 use tontooui::theme::{ThemeMode, ThemeWatcher, desaturate};
@@ -30,6 +31,7 @@ impl App for GlassDemo {
         &mut self,
         scene: &mut Scene,
         fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
         viewport: Viewport,
         time_secs: f64,
     ) {
@@ -54,7 +56,7 @@ impl App for GlassDemo {
         let gy = viewport.y + 31.0 + (viewport.height - 31.0 - gh) / 2.0;
         self.glass.set_bounds(gx, gy, gw, gh);
         self.glass.set_tint(tint);
-        self.glass.draw(scene, fonts);
+        self.glass.draw(scene, fonts, images);
     }
 
     fn transparent_body(&self) -> bool {

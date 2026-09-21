@@ -13,6 +13,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowAttributes};
 
+use super::images::{ImageCache, ImageLoader};
 use super::text::FontSystem;
 
 /// Window background. Dark mode base color per TontooOS convention.
@@ -58,10 +59,12 @@ pub trait App {
         &mut self,
         scene: &mut Scene,
         fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
         viewport: Viewport,
         time_secs: f64,
     );
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
+    fn mouse_up(&mut self, _x: f64, _y: f64) {}
     fn mouse_move(&mut self, _x: f64, _y: f64) {}
     fn set_focused(&mut self, _focused: bool) {}
     fn text(&mut self, _text: &str) {}
@@ -105,6 +108,7 @@ struct Active {
     surface: RenderSurface<'static>,
     renderer: Renderer,
     fonts: FontSystem,
+    images: ImageCache,
     scene: Scene,
     scale: f64,
     cursor_pos: (f64, f64),
@@ -174,9 +178,19 @@ impl<V: App> Shell<V> {
             size.height as f32 / scale,
         );
         let elapsed = active.start.elapsed().as_secs_f64();
+        let surface = &mut active.surface;
+        let devices = &context.devices;
+        let device_handle = &devices[surface.dev_id];
+        let mut loader = ImageLoader::new(
+            &mut active.renderer,
+            &device_handle.device,
+            &device_handle.queue,
+            &mut active.images,
+        );
         self.app.draw(
             &mut active.scene,
             &mut active.fonts,
+            &mut loader,
             Viewport {
                 x: vx,
                 y: vy,
@@ -189,9 +203,6 @@ impl<V: App> Shell<V> {
         // Frame lines above content so bars and fields never cover them.
         super::frame::draw_frame(&mut active.scene, size.width, size.height, scale);
 
-        let surface = &mut active.surface;
-        let devices = &context.devices;
-        let device_handle = &devices[surface.dev_id];
         let params = RenderParams {
             base_color: Color::TRANSPARENT,
             width: size.width,
@@ -291,6 +302,7 @@ impl<V: App> ApplicationHandler for Shell<V> {
             surface,
             renderer,
             fonts: FontSystem::new(),
+            images: ImageCache::new(),
             scene: Scene::new(),
             scale,
             cursor_pos: (0.0, 0.0),
@@ -334,10 +346,13 @@ impl<V: App> ApplicationHandler for Shell<V> {
                 active.window.request_redraw();
             }
             WindowEvent::MouseInput { state, button, .. } => {
-                if state == ElementState::Pressed && button == MouseButton::Left {
-                    let scale = active.scale;
-                    let x = (active.cursor_pos.0 / scale) as f32;
-                    let y = (active.cursor_pos.1 / scale) as f32;
+                if button != MouseButton::Left {
+                    return;
+                }
+                let scale = active.scale;
+                let x = (active.cursor_pos.0 / scale) as f32;
+                let y = (active.cursor_pos.1 / scale) as f32;
+                if state == ElementState::Pressed {
                     if let Some((rx, ry, rw, rh)) = self.app.drag_region() {
                         if x >= rx && x <= rx + rw && y >= ry && y <= ry + rh {
                             // Titlebar drag: moving keeps focus, no click.
@@ -346,6 +361,9 @@ impl<V: App> ApplicationHandler for Shell<V> {
                         }
                     }
                     self.app.mouse_down(x as f64, y as f64);
+                    active.window.request_redraw();
+                } else {
+                    self.app.mouse_up(x as f64, y as f64);
                     active.window.request_redraw();
                 }
             }

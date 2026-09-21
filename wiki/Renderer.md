@@ -234,3 +234,4 @@ fn main() {
 - [Layout.md](Layout.md) – VStack, HStack, ZStack, Spacer and the View trait
 - [Theme.md](Theme.md) – live dark/light plus accent with fade animation
 - [Glass.md](Glass.md) – liquid glass container plus transparent body
+- [Button.md](Button.md) – standard button with CoreIcon SF Symbols

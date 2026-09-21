@@ -158,3 +158,4 @@ stack.draw(scene, fonts);
 
 - [Renderer.md](Renderer.md) – `FontSystem`, frame, `View` trait
 - [Titlebar.md](Titlebar.md) – decoration bar
+- [Button.md](Button.md) – standard button hosted in stacks

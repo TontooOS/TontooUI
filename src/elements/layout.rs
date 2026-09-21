@@ -4,6 +4,7 @@ use vello::Scene;
 use vello::kurbo::{Affine, RoundedRect};
 use vello::peniko::{Brush, Color, Fill};
 
+use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
 
 /// Cross-axis alignment inside stacks.
@@ -26,7 +27,13 @@ pub trait View {
     /// then pass intrinsic size except for flex children, which share the
     /// remaining space.
     fn place(&mut self, fonts: &mut FontSystem, x: f32, y: f32, width: f32, height: f32);
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem);
+    fn draw(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+    );
+    fn mouse_up(&mut self, _x: f64, _y: f64) {}
     /// Share of remaining space. Zero means fixed intrinsic size.
     fn flex(&self) -> f32 {
         0.0
@@ -177,7 +184,13 @@ impl View for Spacer {
 
     fn place(&mut self, _fonts: &mut FontSystem, _x: f32, _y: f32, _w: f32, _h: f32) {}
 
-    fn draw(&mut self, _scene: &mut Scene, _fonts: &mut FontSystem) {}
+    fn draw(
+        &mut self,
+        _scene: &mut Scene,
+        _fonts: &mut FontSystem,
+        _images: &mut ImageLoader<'_>,
+    ) {
+    }
 
     fn flex(&self) -> f32 {
         self.factor
@@ -246,9 +259,14 @@ impl View for VStack {
         }
     }
 
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+    fn draw(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+    ) {
         for child in self.children.iter_mut() {
-            child.draw(scene, fonts);
+            child.draw(scene, fonts, images);
         }
     }
 
@@ -307,9 +325,14 @@ impl View for HStack {
         }
     }
 
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+    fn draw(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+    ) {
         for child in self.children.iter_mut() {
-            child.draw(scene, fonts);
+            child.draw(scene, fonts, images);
         }
     }
 
@@ -402,8 +425,13 @@ impl View for Padding {
         );
     }
 
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
-        self.child.draw(scene, fonts);
+    fn draw(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+    ) {
+        self.child.draw(scene, fonts, images);
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -421,7 +449,12 @@ impl View for Background {
         self.child.place(fonts, x, y, w, h);
     }
 
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+    fn draw(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+    ) {
         let scale = fonts.scale as f64;
         let (x, y, w, h) = self.rect;
         let bg = RoundedRect::new(
@@ -438,7 +471,7 @@ impl View for Background {
             None,
             &bg,
         );
-        self.child.draw(scene, fonts);
+        self.child.draw(scene, fonts, images);
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -456,8 +489,13 @@ impl View for Frame {
         self.child.place(fonts, x, y, cw, ch);
     }
 
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
-        self.child.draw(scene, fonts);
+    fn draw(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+    ) {
+        self.child.draw(scene, fonts, images);
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -496,9 +534,14 @@ impl View for ZStack {
         }
     }
 
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+    fn draw(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+    ) {
         for child in self.children.iter_mut() {
-            child.draw(scene, fonts);
+            child.draw(scene, fonts, images);
         }
     }
 

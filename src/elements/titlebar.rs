@@ -6,6 +6,7 @@ use vello::kurbo::{Affine, BezPath, Circle, Line, Point, RoundedRect, RoundedRec
 use vello::peniko::{Brush, Color, Fill};
 
 use super::layout::View;
+use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
 use crate::renderer::window::WINDOW_CORNER_RADIUS;
 
@@ -344,7 +345,12 @@ impl View for Titlebar {
         self.set_rect(x, y, w);
     }
 
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+    fn draw(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        _images: &mut ImageLoader<'_>,
+    ) {
         self.render(scene, fonts);
     }
 

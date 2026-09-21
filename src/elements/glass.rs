@@ -1,10 +1,10 @@
 use std::any::Any;
 
 use vello::Scene;
+use super::layout::View;
 use vello::kurbo::{Affine, Point, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
-
-use super::layout::View;
+use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
 
 /// Frost tint for dark mode glass (white glow over the backdrop).
@@ -88,7 +88,12 @@ impl GlassContainer {
         self.child.as_mut()?.as_any_mut().downcast_mut::<T>()
     }
 
-    fn render(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
+    fn render(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+    ) {
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
         let radius = self.radius as f64 * scale;
@@ -184,7 +189,7 @@ impl GlassContainer {
 
         // Optional content on top (placed by `place`).
         if let Some(child) = self.child.as_mut() {
-            child.draw(scene, fonts);
+            child.draw(scene, fonts, images);
         }
     }
 }
@@ -207,8 +212,13 @@ impl View for GlassContainer {
         }
     }
 
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
-        self.render(scene, fonts);
+    fn draw(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+    ) {
+        self.render(scene, fonts, images);
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
