@@ -1,6 +1,6 @@
 use parley::Layout;
 use vello::Scene;
-use vello::kurbo::{Affine, Circle, Line, Point, RoundedRect, RoundedRectRadii, Stroke};
+use vello::kurbo::{Affine, BezPath, Circle, Line, Point, RoundedRect, RoundedRectRadii, Stroke};
 use vello::peniko::{Brush, Color, Fill};
 
 use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
@@ -18,7 +18,7 @@ pub const TITLEBAR_DIVIDER_DARK: Color = Color::from_rgba8(255, 255, 255, 36);
 pub const TITLEBAR_DIVIDER_LIGHT: Color = Color::from_rgba8(0, 0, 0, 31);
 
 /// Traffic light button size, spacing and left margin in logical px.
-pub const TRAFFIC_SIZE: f32 = 12.0;
+pub const TRAFFIC_SIZE: f32 = 17.0;
 pub const TRAFFIC_GAP: f32 = 10.0;
 pub const TRAFFIC_LEFT: f32 = 18.0;
 
@@ -248,8 +248,8 @@ impl Titlebar {
         }
     }
 
-    /// Hover glyph at physical center (`cx`, `cy`): x, minus or plus.
-    /// Glyph size is 68% of the button diameter.
+    /// Hover glyph at physical center (`cx`, `cy`): x, minus or the expand
+    /// logo. Glyphs fit 68% of the button diameter without stretching.
     fn draw_glyph(&self, scene: &mut Scene, index: usize, cx: f64, cy: f64, scale: f64) {
         let half = TRAFFIC_SIZE as f64 * 0.68 / 2.0 * scale;
         let style = Stroke::new(1.3 * scale);
@@ -272,9 +272,47 @@ impl Titlebar {
                 line(cx - half, cy, cx + half, cy);
             }
             _ => {
-                line(cx - half, cy, cx + half, cy);
-                line(cx, cy - half, cx, cy + half);
+                // Expand logo (500x500 viewBox), uniformly scaled to fit the
+                // 68% box so the aspect ratio never stretches.
+                let box_px = TRAFFIC_SIZE as f64 * 0.68 * scale;
+                let k = box_px / 500.0;
+                let transform =
+                    Affine::translate((cx - box_px / 2.0, cy - box_px / 2.0)) * Affine::scale(k);
+                scene.fill(
+                    Fill::NonZero,
+                    transform,
+                    &brush,
+                    None,
+                    &expand_logo(),
+                );
             }
         }
     }
+}
+
+/// Expand logo from the TontooOS artwork (500x500 viewBox, square, so a
+/// uniform scale never stretches it).
+fn expand_logo() -> BezPath {
+    let mut top = BezPath::new();
+    top.move_to((120.0, 270.0));
+    top.line_to((120.0, 170.0));
+    top.curve_to((120.0, 130.0), (150.0, 100.0), (190.0, 100.0));
+    top.line_to((290.0, 100.0));
+    top.curve_to((330.0, 100.0), (340.0, 115.0), (320.0, 135.0));
+    top.line_to((155.0, 300.0));
+    top.curve_to((135.0, 320.0), (120.0, 310.0), (120.0, 270.0));
+    top.close_path();
+
+    let mut bottom = BezPath::new();
+    bottom.move_to((380.0, 230.0));
+    bottom.line_to((380.0, 330.0));
+    bottom.curve_to((380.0, 370.0), (350.0, 400.0), (310.0, 400.0));
+    bottom.line_to((210.0, 400.0));
+    bottom.curve_to((170.0, 400.0), (160.0, 385.0), (180.0, 365.0));
+    bottom.line_to((345.0, 200.0));
+    bottom.curve_to((365.0, 180.0), (380.0, 190.0), (380.0, 230.0));
+    bottom.close_path();
+
+    top.extend(bottom);
+    top
 }

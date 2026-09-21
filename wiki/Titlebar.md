@@ -105,17 +105,20 @@ move; failures are ignored silently.
 pub fn drag_rect(&self) -> (f32, f32, f32, f32)
 ```
 
-`bounds` minus the left 74 px traffic light cluster (18 px margin + 3 x
-12 px buttons + 2 x 10 px gaps).
+`bounds` minus the left traffic light cluster (18 px margin + 3 x 17 px
+buttons + 2 x 10 px gaps = 89 px).
+
+The maximize glyph is the TontooOS expand logo (two shapes, 500x500
+viewBox), uniformly scaled into the 68% box so it never stretches.
 
 ## Traffic Lights
 
-12 px circles, no border, no shadow. Hovering the group shows dark glyphs
-at 68% size (x, minus, plus). An unfocused window shows all gray.
+17 px circles, no border, no shadow. Hovering the group shows dark glyphs
+at 68% size (x, minus, expand logo). An unfocused window shows all gray.
 
 | Token | Value |
 |---|---|
-| `TRAFFIC_SIZE` / `TRAFFIC_GAP` / `TRAFFIC_LEFT` | 12 px / 10 px / 18 px |
+| `TRAFFIC_SIZE` / `TRAFFIC_GAP` / `TRAFFIC_LEFT` | 17 px / 10 px / 18 px |
 | `TRAFFIC_CLOSE` | `#FF5F56` |
 | `TRAFFIC_MINIMIZE` | `#FFBD2E` |
 | `TRAFFIC_MAXIMIZE` | `#27C93F` |
