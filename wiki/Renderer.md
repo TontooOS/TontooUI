@@ -73,9 +73,13 @@ Non-printable keys forwarded to the view. Printable input arrives via
 Each `RedrawRequested` event runs these steps:
 
 1. `scene.reset()` clears the previous frame.
-2. `view.draw()` records GPU commands into the scene.
-3. `renderer.render_to_texture()` renders the scene into the surface target
-   texture with `AaConfig::Msaa8` and `BACKGROUND` as base color.
+2. The shell records a full-window `RoundedRect` with `BACKGROUND` and
+   `WINDOW_CORNER_RADIUS`. The window is transparent, so the corners stay
+   see-through. Content drawn by views can still paint over the cutout;
+   per-window clipping is not implemented yet.
+3. `view.draw()` records GPU commands into the scene.
+4. `renderer.render_to_texture()` renders the scene into the surface target
+   texture with `AaConfig::Msaa8` and a transparent base color.
 4. `TextureBlitter` copies the target texture to the acquired surface texture.
 5. The surface texture is presented.
 

@@ -106,6 +106,25 @@ impl<V: View> Shell<V> {
         active.scene.reset();
         let scale = active.scale as f32;
         active.fonts.scale = scale;
+
+        // Rounded window background. The surface is cleared transparent and
+        // every window gets the standard corner radius automatically.
+        let (pw, ph) = (size.width as f64, size.height as f64);
+        let bg = vello::kurbo::RoundedRect::new(
+            0.0,
+            0.0,
+            pw,
+            ph,
+            WINDOW_CORNER_RADIUS as f64 * active.scale,
+        );
+        active.scene.fill(
+            vello::peniko::Fill::NonZero,
+            vello::kurbo::Affine::IDENTITY,
+            &vello::peniko::Brush::Solid(BACKGROUND),
+            None,
+            &bg,
+        );
+
         let elapsed = active.start.elapsed().as_secs_f64();
         self.view.draw(
             &mut active.scene,
@@ -119,7 +138,7 @@ impl<V: View> Shell<V> {
         let devices = &context.devices;
         let device_handle = &devices[surface.dev_id];
         let params = RenderParams {
-            base_color: BACKGROUND,
+            base_color: Color::TRANSPARENT,
             width: size.width,
             height: size.height,
             antialiasing_method: AaConfig::Msaa8,
@@ -175,6 +194,7 @@ impl<V: View> ApplicationHandler for Shell<V> {
                     WindowAttributes::default()
                         .with_title(&self.title)
                         .with_decorations(false)
+                        .with_transparent(true)
                         .with_inner_size(LogicalSize::new(self.width, self.height)),
                 )
                 .expect("create window"),
