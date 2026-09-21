@@ -16,16 +16,17 @@ use super::super::buttons::{
     BUTTON_PAD_X, BUTTON_PAD_Y, BUTTON_RADIUS,
 };
 
-/// Switch track width in logical px (96 percent of iOS measure).
-pub const TOGGLE_SWITCH_W: f32 = 48.96;
+/// Switch track width in logical px (widened past iOS measure so a
+/// generous stretch of track shows beside the knob, macOS style).
+pub const TOGGLE_SWITCH_W: f32 = 56.0;
 /// Switch track height in logical px (96 percent of iOS measure).
 pub const TOGGLE_SWITCH_H: f32 = 29.76;
 /// Switch knob padding inside the track in logical px (macOS measure:
 /// the knob nearly fills the track height).
 pub const TOGGLE_KNOB_PAD: f32 = 2.0;
 /// Switch knob width relative to its height (macOS measure: the knob is
-/// a capsule, wider than tall).
-pub const TOGGLE_KNOB_W_RATIO: f32 = 1.2;
+/// a wide capsule, wider than tall).
+pub const TOGGLE_KNOB_W_RATIO: f32 = 1.35;
 /// Knob slide animation time in seconds.
 pub const TOGGLE_ANIM_SECONDS: f32 = 0.20;
 /// Checkbox box size in logical px.
@@ -52,8 +53,8 @@ pub const TOGGLE_OFF_DARK: Color = Color::from_rgb8(0x3a, 0x3a, 0x3c);
 /// Toggle presentation (SwiftUI `toggleStyle`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ToggleStyle {
-    /// iOS switch at 96 percent measure: 48.96x29.76 track, knob slides
-    /// over with animation.
+    /// iOS switch with macOS proportions: 56x29.76 track, wide capsule
+    /// knob, generous stretch of track beside the knob.
     #[default]
     Switch,
     /// Rounded button: gray fill when off, accent fill with white text
@@ -645,7 +646,7 @@ mod tests {
         let mut fonts = FontSystem::new();
         let (w, h) = toggle.measure(&mut fonts);
         assert_eq!((w, h), (TOGGLE_SWITCH_W, TOGGLE_SWITCH_H));
-        assert_eq!((TOGGLE_SWITCH_W, TOGGLE_SWITCH_H), (48.96, 29.76));
+        assert_eq!((TOGGLE_SWITCH_W, TOGGLE_SWITCH_H), (56.0, 29.76));
     }
 
     #[test]

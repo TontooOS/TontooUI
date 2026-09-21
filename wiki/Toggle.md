@@ -12,9 +12,9 @@ sliders) unless the dev sets it manually with `fill`.
 
 | Token | Value |
 |---|---|
-| `TOGGLE_SWITCH_W` / `TOGGLE_SWITCH_H` | 48.96 px / 29.76 px track (96 percent of iOS measure) |
+| `TOGGLE_SWITCH_W` / `TOGGLE_SWITCH_H` | 56 px / 29.76 px track (widened macOS style) |
 | `TOGGLE_KNOB_PAD` | 2 px knob padding inside the track |
-| `TOGGLE_KNOB_W_RATIO` | 1.2 knob width over height (macOS capsule) |
+| `TOGGLE_KNOB_W_RATIO` | 1.35 knob width over height (wide macOS capsule) |
 | `TOGGLE_ANIM_SECONDS` | 0.20 s knob slide |
 | `TOGGLE_BOX` / `TOGGLE_BOX_RADIUS` | 21.12 px box, 5.76 px radius |
 | `TOGGLE_ICON_BOX` / `TOGGLE_ICON_RADIUS` | 26.88 px badge, 6.72 px radius |
@@ -34,7 +34,7 @@ pub enum ToggleStyle {
 }
 ```
 
-`Switch` draws the label left and the 48.96x29.76 track right (with the badge
+`Switch` draws the label left and the 56x29.76 track right (with the badge
 before the label when an icon is set). `Checkbox` draws the 21.12 px box
 left and the label right. `Button` draws a rounded button (8 px radius,
 same padding as `Button`) that fills gray when off and accent with
