@@ -204,13 +204,11 @@ impl Titlebar {
             &bg,
         );
 
-        // 1 px bottom divider, stopping before the rounded corners.
+        // 1 px bottom divider across the full width. The bar is square at
+        // the bottom (radius 0), so nothing pokes outside the shape.
         let divider = Line::new(
-            Point::new(px(self.x) + radius, px(self.y + bar_h) - 0.5 * scale),
-            Point::new(
-                px(self.x + self.width) - radius,
-                px(self.y + bar_h) - 0.5 * scale,
-            ),
+            Point::new(px(self.x), px(self.y + bar_h) - 0.5 * scale),
+            Point::new(px(self.x + self.width), px(self.y + bar_h) - 0.5 * scale),
         );
         scene.stroke(
             &Stroke::new(scale),
