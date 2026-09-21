@@ -16,11 +16,12 @@ use super::super::buttons::{
     BUTTON_PAD_X, BUTTON_PAD_Y, BUTTON_RADIUS,
 };
 
-/// Switch track width in logical px (widened past iOS measure so a
-/// generous stretch of track shows beside the knob, macOS style).
-pub const TOGGLE_SWITCH_W: f32 = 56.0;
-/// Switch track height in logical px (96 percent of iOS measure).
-pub const TOGGLE_SWITCH_H: f32 = 29.76;
+/// Switch track width in logical px (stretched long and slim,
+/// macOS style).
+pub const TOGGLE_SWITCH_W: f32 = 74.67;
+/// Switch track height in logical px (three quarters of the iOS
+/// measure).
+pub const TOGGLE_SWITCH_H: f32 = 22.32;
 /// Switch knob padding inside the track in logical px (macOS measure:
 /// the knob nearly fills the track height).
 pub const TOGGLE_KNOB_PAD: f32 = 2.0;
@@ -58,8 +59,8 @@ pub const TOGGLE_OFF_DARK: Color = Color::from_rgb8(0x3a, 0x3a, 0x3c);
 /// Toggle presentation (SwiftUI `toggleStyle`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ToggleStyle {
-    /// iOS switch with macOS proportions: 56x29.76 track, wide capsule
-    /// knob, generous stretch of track beside the knob.
+    /// iOS switch stretched long and slim: 74.67x22.32 track, wide
+    /// capsule knob, generous stretch of track beside the knob.
     #[default]
     Switch,
     /// Rounded button: gray fill when off, accent fill with white text
@@ -772,7 +773,7 @@ mod tests {
         let mut fonts = FontSystem::new();
         let (w, h) = toggle.measure(&mut fonts);
         assert_eq!((w, h), (TOGGLE_SWITCH_W, TOGGLE_SWITCH_H));
-        assert_eq!((TOGGLE_SWITCH_W, TOGGLE_SWITCH_H), (56.0, 29.76));
+        assert_eq!((TOGGLE_SWITCH_W, TOGGLE_SWITCH_H), (74.67, 22.32));
     }
 
     #[test]
@@ -781,7 +782,7 @@ mod tests {
         let knob_w = knob_h * TOGGLE_KNOB_W_RATIO;
         // Capsule: wider than tall, nearly full track height.
         assert!(knob_w > knob_h);
-        assert!(knob_h / TOGGLE_SWITCH_H > 0.85);
+        assert!(knob_h / TOGGLE_SWITCH_H > 0.8);
         // Positive travel with symmetric stops.
         let travel = TOGGLE_SWITCH_W - TOGGLE_KNOB_PAD * 2.0 - knob_w;
         assert!(travel > 0.0);
