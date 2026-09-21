@@ -62,6 +62,9 @@ pub trait App {
     fn poll_window_command(&mut self) -> Option<WindowCommand> {
         None
     }
+    fn background(&self) -> Color {
+        BACKGROUND
+    }
 }
 ```
 
@@ -102,6 +105,8 @@ Window operations requested by content (e.g. traffic lights). Return one
 from `poll_window_command`; the shell consumes it once per frame and calls
 `exit`, `set_minimized(true)` or toggles `set_maximized`. Cursor moves
 arrive via `mouse_move` (logical px) and focus changes via `set_focused`.
+`background` is read every frame for the window body (see
+[Theme.md](Theme.md)); the default is the dark base color.
 
 Non-printable keys forwarded to the view. Printable input arrives via
 `text()` as already-decoded strings (including key repeat).
@@ -229,4 +234,5 @@ fn main() {
 - [Text.md](Text.md) – static text element drawn through `FontSystem`
 - [TextInput.md](TextInput.md) – editable text element with keyboard input
 - [Titlebar.md](Titlebar.md) – custom decoration bar with drag region
-- [Layout.md](Layout.md) – VStack, HStack, ZStack, Spacer and the Element trait
+- [Layout.md](Layout.md) – VStack, HStack, ZStack, Spacer and the View trait
+- [Theme.md](Theme.md) – live dark/light plus accent with fade animation

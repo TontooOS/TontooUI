@@ -72,6 +72,13 @@ Places the bar, usually spanning the content viewport. Rebuilds the layout
 only when the width changed.
 
 ```rust
+pub fn set_palette(&mut self, bg: Color, text: Color, divider: Color)
+```
+
+Live theme colors. Rebuilds title glyphs only when the text color
+changed (see [Theme.md](Theme.md)).
+
+```rust
 pub fn bounds(&self) -> (f32, f32, f32, f32)
 ```
 
@@ -183,3 +190,4 @@ bar.draw(scene, fonts);
 - [Renderer.md](Renderer.md) – `View` trait, `drag_region`, frame, `FontSystem`
 - [Text.md](Text.md) – static text element
 - [TextInput.md](TextInput.md) – editable text field
+- [Theme.md](Theme.md) – live palette with fade animation

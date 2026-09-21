@@ -71,7 +71,15 @@ let mut title = Text::new("TontooUI Renderer Test")
 title.draw(&mut scene, &mut fonts);
 ```
 
+```rust
+pub fn set_color(&mut self, color: Color)
+```
+
+Recolors without moving. Rebuilds the layout only on change, used for
+live theme and accent updates (see [Theme.md](Theme.md)).
+
 ## Cross References
 
 - [Renderer.md](Renderer.md) – `FontSystem`, frame pipeline, `View` trait
 - [TextInput.md](TextInput.md) – editable single-line text field
+- [Theme.md](Theme.md) – live palette with fade animation

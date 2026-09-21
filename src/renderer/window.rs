@@ -75,6 +75,11 @@ pub trait App {
     fn poll_window_command(&mut self) -> Option<WindowCommand> {
         None
     }
+    /// Window body background. Read every frame so theme changes apply
+    /// live; defaults to the dark base color.
+    fn background(&self) -> Color {
+        BACKGROUND
+    }
 }
 
 /// Open a window and run `app` until the window closes.
@@ -152,7 +157,7 @@ impl<V: App> Shell<V> {
             size.width,
             size.height,
             scale,
-            BACKGROUND,
+            self.app.background(),
         );
 
         let (vx, vy, vw, vh) = super::frame::content_rect(

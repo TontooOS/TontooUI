@@ -15,5 +15,9 @@ vello = "0.10"
 parley = "0.11"
 futures = "0.3"
 
+# Settings daemon client (unix socket, TontooOS target only).
+[target.'cfg(unix)'.dependencies]
+coresettings = { path = "../CoreSettings" }
+
 [lib]
 crate-type = ["cdylib", "rlib"]

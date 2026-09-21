@@ -64,6 +64,15 @@ impl Text {
         self.y = y;
     }
 
+    /// Recolor without moving. Marks the layout dirty on change (used for
+    /// live theme and accent updates).
+    pub fn set_color(&mut self, color: Color) {
+        if color != self.color {
+            self.color = color;
+            self.dirty = true;
+        }
+    }
+
     pub fn set_content(&mut self, content: impl Into<String>) {
         let content = content.into();
         if content != self.content {

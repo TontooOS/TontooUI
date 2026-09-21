@@ -74,6 +74,9 @@ pub struct Titlebar {
     width: f32,
     hover: bool,
     focused: bool,
+    bg: Color,
+    text_color: Color,
+    divider_color: Color,
     layout: Option<Layout<SolidBrush>>,
     dirty: bool,
 }
@@ -88,9 +91,23 @@ impl Titlebar {
             width: 0.0,
             hover: false,
             focused: true,
+            bg: TITLEBAR_BG_DARK,
+            text_color: TITLEBAR_TEXT_DARK,
+            divider_color: TITLEBAR_DIVIDER_DARK,
             layout: None,
             dirty: true,
         }
+    }
+
+    /// Live theme colors. Marks the layout dirty when the text color
+    /// changed so glyphs rebuild in the new color.
+    pub fn set_palette(&mut self, bg: Color, text: Color, divider: Color) {
+        if text != self.text_color {
+            self.dirty = true;
+        }
+        self.bg = bg;
+        self.text_color = text;
+        self.divider_color = divider;
     }
 
     pub fn height(mut self, height: TitlebarHeight) -> Self {
@@ -178,7 +195,7 @@ impl Titlebar {
             self.layout = Some(fonts.layout_text_weighted(
                 &self.title,
                 13.0,
-                TITLEBAR_TEXT_DARK,
+                self.text_color,
                 600.0,
                 None,
             ));
@@ -206,7 +223,7 @@ impl Titlebar {
         scene.fill(
             Fill::NonZero,
             Affine::IDENTITY,
-            &Brush::Solid(TITLEBAR_BG_DARK),
+            &Brush::Solid(self.bg),
             None,
             &bg,
         );
@@ -220,7 +237,7 @@ impl Titlebar {
         scene.stroke(
             &Stroke::new(scale),
             Affine::IDENTITY,
-            &Brush::Solid(TITLEBAR_DIVIDER_DARK),
+            &Brush::Solid(self.divider_color),
             None,
             &divider,
         );

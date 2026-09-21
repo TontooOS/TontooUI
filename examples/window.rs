@@ -1,6 +1,7 @@
 use tontooui::elements::{Text, TextInput, Titlebar, TrafficAction, View, VStack};
 use tontooui::renderer::window::{App, Key, Viewport, WindowCommand, run};
 use tontooui::renderer::FontSystem;
+use tontooui::theme::ThemeWatcher;
 use vello::Scene;
 use vello::peniko::Color;
 
@@ -8,6 +9,8 @@ struct Demo {
     bar: Titlebar,
     stack: VStack,
     command: Option<WindowCommand>,
+    watcher: ThemeWatcher,
+    bg: Color,
 }
 
 impl Demo {
@@ -34,6 +37,8 @@ impl Demo {
             bar: Titlebar::new("TontooUI"),
             stack,
             command: None,
+            watcher: ThemeWatcher::new(),
+            bg: tontooui::renderer::window::BACKGROUND,
         }
     }
 
@@ -53,12 +58,22 @@ impl App for Demo {
         viewport: Viewport,
         time_secs: f64,
     ) {
+        // Live theme: poll the daemon, crossfade the palette on change.
+        self.watcher.poll(time_secs);
+        let palette = self.watcher.palette(time_secs);
+        self.bg = palette.bg;
+        self.bar.set_palette(
+            palette.titlebar_bg,
+            palette.titlebar_text,
+            palette.divider,
+        );
         self.bar.set_rect(viewport.x, viewport.y, viewport.width);
         self.bar.draw(scene, fonts);
 
         let current = self.input_text();
         if let Some(echo) = self.stack.child_mut::<Text>(3) {
             echo.set_content(format!("Echo: {current}"));
+            echo.set_color(palette.accent);
         }
         // Input keeps its intrinsic 300 px width; stretch it to the stack.
         if let Some(input) = self.stack.child_mut::<TextInput>(2) {
@@ -76,6 +91,10 @@ impl App for Demo {
         // element; stacks draw steady. Unused here but kept for reference.
         let _ = time_secs;
         self.stack.draw(scene, fonts);
+    }
+
+    fn background(&self) -> Color {
+        self.bg
     }
 
     fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
