@@ -113,8 +113,9 @@ viewBox), uniformly scaled into the 68% box so it never stretches.
 
 ## Traffic Lights
 
-17 px circles, no border, no shadow. Hovering the group shows dark glyphs
-at 68% size (x, minus, expand logo). An unfocused window shows all gray.
+17 px circles, no border, no shadow. Hovering the group shows glyphs at
+68% size: filled rounded bars for x (dark red) and minus (dark amber), the
+expand logo (near-black) for maximize. An unfocused window shows all gray.
 
 | Token | Value |
 |---|---|
@@ -123,7 +124,9 @@ at 68% size (x, minus, expand logo). An unfocused window shows all gray.
 | `TRAFFIC_MINIMIZE` | `#FFBD2E` |
 | `TRAFFIC_MAXIMIZE` | `#27C93F` |
 | `TRAFFIC_INACTIVE` | `#888888` |
-| `TRAFFIC_GLYPH` | black 60% |
+| `TRAFFIC_GLYPH` | black 60% (maximize logo) |
+| `TRAFFIC_GLYPH_CLOSE` | `#8A1F1A` (x bars) |
+| `TRAFFIC_GLYPH_MINIMIZE` | `#8A6800` (minus bar) |
 
 ```rust
 pub enum TrafficAction {

@@ -30,6 +30,9 @@ pub const TRAFFIC_MAXIMIZE: Color = Color::from_rgb8(0x27, 0xc9, 0x3f);
 pub const TRAFFIC_INACTIVE: Color = Color::from_rgb8(0x88, 0x88, 0x88);
 /// Glyph color drawn on hover, 68% of the button size.
 pub const TRAFFIC_GLYPH: Color = Color::from_rgba8(0, 0, 0, 150);
+/// Darker tone of the button color for the close/minimize glyphs.
+pub const TRAFFIC_GLYPH_CLOSE: Color = Color::from_rgb8(0x8a, 0x1f, 0x1a);
+pub const TRAFFIC_GLYPH_MINIMIZE: Color = Color::from_rgb8(0x8a, 0x68, 0x00);
 
 /// Traffic light action triggered by click.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -249,27 +252,34 @@ impl Titlebar {
     }
 
     /// Hover glyph at physical center (`cx`, `cy`): x, minus or the expand
-    /// logo. Glyphs fit 68% of the button diameter without stretching.
+    /// logo. Glyphs fit 68% of the button diameter without stretching. The
+    /// x and minus are filled rounded bars in a darker tone of the button.
     fn draw_glyph(&self, scene: &mut Scene, index: usize, cx: f64, cy: f64, scale: f64) {
-        let half = TRAFFIC_SIZE as f64 * 0.68 / 2.0 * scale;
-        let style = Stroke::new(1.3 * scale);
-        let brush = Brush::Solid(TRAFFIC_GLYPH);
-        let mut line = |x0: f64, y0: f64, x1: f64, y1: f64| {
-            scene.stroke(
-                &style,
-                Affine::IDENTITY,
-                &brush,
-                None,
-                &Line::new(Point::new(x0, y0), Point::new(x1, y1)),
-            );
-        };
         match index {
             0 => {
-                line(cx - half, cy - half, cx + half, cy + half);
-                line(cx - half, cy + half, cx + half, cy - half);
+                for angle in [45.0_f64.to_radians(), -45.0_f64.to_radians()] {
+                    let transform = Affine::translate((cx, cy))
+                        * Affine::rotate(angle)
+                        * Affine::scale(scale);
+                    scene.fill(
+                        Fill::NonZero,
+                        transform,
+                        &Brush::Solid(TRAFFIC_GLYPH_CLOSE),
+                        None,
+                        &glyph_bar(),
+                    );
+                }
             }
             1 => {
-                line(cx - half, cy, cx + half, cy);
+                let transform =
+                    Affine::translate((cx, cy)) * Affine::scale(scale);
+                scene.fill(
+                    Fill::NonZero,
+                    transform,
+                    &Brush::Solid(TRAFFIC_GLYPH_MINIMIZE),
+                    None,
+                    &glyph_bar(),
+                );
             }
             _ => {
                 // Expand logo (500x500 viewBox), uniformly scaled to fit the
@@ -281,13 +291,21 @@ impl Titlebar {
                 scene.fill(
                     Fill::NonZero,
                     transform,
-                    &brush,
+                    &Brush::Solid(TRAFFIC_GLYPH),
                     None,
                     &expand_logo(),
                 );
             }
         }
     }
+}
+
+/// Rounded bar centered at the origin in logical px: 68% of the button
+/// diameter long, 2.2 px thick. Rotated copies form the x glyph.
+fn glyph_bar() -> RoundedRect {
+    let len = TRAFFIC_SIZE as f64 * 0.68;
+    let thick = 2.2;
+    RoundedRect::new(-len / 2.0, -thick / 2.0, len / 2.0, thick / 2.0, thick / 2.0)
 }
 
 /// Expand logo from the TontooOS artwork (500x500 viewBox, square, so a
