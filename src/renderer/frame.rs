@@ -24,17 +24,23 @@ pub fn content_rect(width: f32, height: f32) -> (f32, f32, f32, f32) {
     (MARGIN, MARGIN, width - MARGIN * 2.0, height - MARGIN * 2.0)
 }
 
-/// Draw the window frame: layered drop shadows, body, inner top highlight,
-/// 1px edge and outer 1px outline. `width`/`height` are physical pixels.
-pub fn draw(scene: &mut Scene, width: u32, height: u32, scale: f32, body: Color) {
+fn body_rect(width: u32, height: u32, scale: f32) -> (Rect, f64) {
     let s = scale as f64;
     let radius = WINDOW_CORNER_RADIUS as f64 * s;
-    let body_rect = Rect::new(
+    let rect = Rect::new(
         MARGIN as f64 * s,
         MARGIN as f64 * s,
         width as f64 - MARGIN as f64 * s,
         height as f64 - MARGIN as f64 * s,
     );
+    (rect, radius)
+}
+
+/// Draw behind content: layered drop shadows plus the rounded body.
+/// `width`/`height` are physical pixels.
+pub fn draw_behind(scene: &mut Scene, width: u32, height: u32, scale: f32, body: Color) {
+    let s = scale as f64;
+    let (body_rect, radius) = body_rect(width, height, scale);
 
     for (dy, blur, alpha) in SHADOWS {
         let rect = Rect::new(
@@ -66,6 +72,13 @@ pub fn draw(scene: &mut Scene, width: u32, height: u32, scale: f32, body: Color)
         None,
         &shape,
     );
+}
+
+/// Draw above content: inner top highlight, 1px edge and outer 1px outline.
+/// Runs after the view so bars and fields can never cover the frame.
+pub fn draw_frame(scene: &mut Scene, width: u32, height: u32, scale: f32) {
+    let s = scale as f64;
+    let (body_rect, radius) = body_rect(width, height, scale);
 
     // Inner top highlight: full inner ring with a top-to-transparent gradient.
     // Inset 2 px so it never overlaps the 1 px edge stroke; overlap would
@@ -101,6 +114,13 @@ pub fn draw(scene: &mut Scene, width: u32, height: u32, scale: f32, body: Color)
     );
 
     // 1px edge centered on the body outline.
+    let shape = RoundedRect::new(
+        body_rect.x0,
+        body_rect.y0,
+        body_rect.x1,
+        body_rect.y1,
+        radius,
+    );
     scene.stroke(
         &Stroke::new(1.0 * s),
         Affine::IDENTITY,

@@ -121,9 +121,9 @@ impl<V: View> Shell<V> {
         let scale = active.scale as f32;
         active.fonts.scale = scale;
 
-        // Window frame: shadows, rounded body, edge and outline. The surface
+        // Window frame behind content: shadows plus rounded body. The surface
         // itself is cleared transparent so the corners stay see-through.
-        super::frame::draw(
+        super::frame::draw_behind(
             &mut active.scene,
             size.width,
             size.height,
@@ -147,6 +147,9 @@ impl<V: View> Shell<V> {
             },
             elapsed,
         );
+
+        // Frame lines above content so bars and fields never cover them.
+        super::frame::draw_frame(&mut active.scene, size.width, size.height, scale);
 
         let surface = &mut active.surface;
         let devices = &context.devices;
