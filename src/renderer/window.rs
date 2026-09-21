@@ -80,6 +80,11 @@ pub trait App {
     fn background(&self) -> Color {
         BACKGROUND
     }
+    /// Transparent body: skips the window background fill so only frame
+    /// lines, bars and glass show over the desktop.
+    fn transparent_body(&self) -> bool {
+        false
+    }
 }
 
 /// Open a window and run `app` until the window closes.
@@ -157,7 +162,11 @@ impl<V: App> Shell<V> {
             size.width,
             size.height,
             scale,
-            self.app.background(),
+            if self.app.transparent_body() {
+                None
+            } else {
+                Some(self.app.background())
+            },
         );
 
         let (vx, vy, vw, vh) = super::frame::content_rect(

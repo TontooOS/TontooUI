@@ -37,8 +37,18 @@ fn body_rect(width: u32, height: u32, scale: f32) -> (Rect, f64) {
 }
 
 /// Draw behind content: layered drop shadows plus the rounded body.
-/// `width`/`height` are physical pixels.
-pub fn draw_behind(scene: &mut Scene, width: u32, height: u32, scale: f32, body: Color) {
+/// `width`/`height` are physical pixels. `None` skips shadows and body for
+/// fully transparent windows (glass demos); the frame lines still draw.
+pub fn draw_behind(
+    scene: &mut Scene,
+    width: u32,
+    height: u32,
+    scale: f32,
+    body: Option<Color>,
+) {
+    let Some(body) = body else {
+        return;
+    };
     let s = scale as f64;
     let (body_rect, radius) = body_rect(width, height, scale);
 
