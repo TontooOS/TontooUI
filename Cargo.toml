@@ -3,25 +3,12 @@ name = "tontooui"
 version = "26.1.0"
 edition = "2021"
 license = "TCL"
-description = "SwiftUI-inspired declarative UI layer for TontooOS, built on top of UIKit"
+description = "SwiftUI-inspired declarative UI layer for TontooOS"
 readme = "README.md"
-keywords = ["tontoo", "ui", "swiftui", "declarative", "gtk4"]
+keywords = ["tontoo", "ui", "swiftui", "declarative"]
 categories = ["gui"]
 
 [dependencies]
-uikit = { path = "../UIKit" }
-coreicon = { path = "../CoreIcon", optional = true }
-gtk = { package = "gtk4", version = "0.9", features = ["v4_12"] }
-glib = "0.20"
-cairo-rs = "0.20"
-image = "0.25"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-
-[features]
-default = ["coreicon"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-
-[dev-dependencies]
