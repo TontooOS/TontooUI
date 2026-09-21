@@ -104,11 +104,40 @@ fn hex_color(hex: &'static str) -> Color {
     }
 }
 
-/// Effective theme: mode plus accent.
+/// Liquid glass amount: the "LiquidGlass Slider" with much glass,
+/// balanced glass and less glass.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GlassAmount {
+    Much,
+    #[default]
+    Glass,
+    Less,
+}
+
+impl GlassAmount {
+    pub fn from_str(raw: &str) -> Self {
+        match raw {
+            "much" => Self::Much,
+            "less" => Self::Less,
+            _ => Self::Glass,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Much => "much",
+            Self::Glass => "glass",
+            Self::Less => "less",
+        }
+    }
+}
+
+/// Effective theme: mode plus accent plus glass amount.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Theme {
     pub mode: ThemeMode,
     pub accent: Accent,
+    pub glass: GlassAmount,
 }
 
 impl Default for Theme {
@@ -116,6 +145,7 @@ impl Default for Theme {
         Self {
             mode: ThemeMode::Dark,
             accent: Accent::Multicolor,
+            glass: GlassAmount::Glass,
         }
     }
 }
@@ -273,6 +303,7 @@ impl ThemeWatcher {
                     coresettings::ThemeMode::Dark => "dark",
                 }),
                 accent: Accent::from_str(customize.accent.as_str()),
+                glass: GlassAmount::from_str(customize.glass.as_str()),
             };
             if theme != self.theme {
                 self.from = self.palette(now_secs);
@@ -389,6 +420,7 @@ mod tests {
         watcher.theme = Theme {
             mode: ThemeMode::Light,
             accent: Accent::Red,
+            glass: GlassAmount::Glass,
         };
         watcher.from = Theme::default().palette();
         watcher.fade_start = 0.0;

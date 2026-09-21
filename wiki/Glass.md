@@ -13,11 +13,27 @@ pub fn tint(mut self, tint: Color) -> Self
 pub fn content(self, child: impl View + 'static) -> Self
 pub fn set_bounds(&mut self, x: f32, y: f32, width: f32, height: f32)
 pub fn set_tint(&mut self, tint: Color)
+pub fn set_theme(&mut self, mode: ThemeMode, amount: GlassAmount)
+pub fn set_focused(&mut self, focused: bool)
 pub fn child_mut<T: View + 'static>(&mut self) -> Option<&mut T>
 ```
 
-Defaults: 320 x 180, 24 px radius, dark frost tint. `set_tint` switches
-themes live (dark frost vs. light frost, gray when inactive).
+Defaults: 320 x 180, 24 px radius, dark frost tint. `set_tint` overrides
+manually; `set_theme` follows the system glass stage.
+
+## Stages
+
+The `glass` daemon setting (LiquidGlass slider) drives the look:
+
+| Stage | Dark | Light |
+|---|---|---|
+| `Less` | Mostly opaque dark (black 59%), brighter rim, grainy black outer edge | Mostly opaque light (white 59%), brighter rim, grainy edge |
+| `Glass` | Balanced frost (white 10%) | Balanced frost (black 8%) |
+| `Much` | Unchanged balanced frost (white 10%) | Lighter frost (white 5%) |
+
+Less glass adds a scattered black dash ring outside the crisp rim. True
+backdrop blur stays a compositor contract (it owns the desktop pixels);
+the stages control frost opacity, rim light and grain downstream of it.
 
 | Token | Value |
 |---|---|

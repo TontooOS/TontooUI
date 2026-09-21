@@ -4,8 +4,10 @@ use vello::Scene;
 use super::layout::View;
 use vello::kurbo::{Affine, Point, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
+
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
+use crate::theme::{GlassAmount, ThemeMode, desaturate};
 
 /// Frost tint for dark mode glass (white glow over the backdrop).
 pub const GLASS_TINT_DARK: Color = Color::from_rgba8(255, 255, 255, 26);
@@ -34,6 +36,9 @@ pub struct GlassContainer {
     height: f32,
     radius: f32,
     tint: Color,
+    specular: Color,
+    grain: bool,
+    focused: bool,
     child: Option<Box<dyn View>>,
 }
 
@@ -46,6 +51,9 @@ impl GlassContainer {
             height: 180.0,
             radius: 24.0,
             tint: GLASS_TINT_DARK,
+            specular: GLASS_SPECULAR,
+            grain: false,
+            focused: true,
             child: None,
         }
     }
@@ -84,6 +92,44 @@ impl GlassContainer {
         self.tint = tint;
     }
 
+    /// Inactive windows desaturate the frost like the rest of the palette.
+    pub fn set_focused(&mut self, focused: bool) {
+        self.focused = focused;
+    }
+
+    /// Live glass stage from the system setting. Less glass is mostly
+    /// opaque mode color with a brighter rim and a grainy black outer
+    /// edge; balanced glass sits in the middle; much glass keeps the dark
+    /// look unchanged and goes lighter in light mode.
+    pub fn set_theme(&mut self, mode: ThemeMode, amount: GlassAmount) {
+        let dark = mode == ThemeMode::Dark;
+        let (tint, specular, grain) = match (amount, dark) {
+            (GlassAmount::Less, true) => (
+                Color::from_rgba8(10, 10, 12, 150),
+                Color::from_rgba8(255, 255, 255, 160),
+                true,
+            ),
+            (GlassAmount::Less, false) => (
+                Color::from_rgba8(255, 255, 255, 150),
+                Color::from_rgba8(255, 255, 255, 200),
+                true,
+            ),
+            (GlassAmount::Much, false) => (
+                Color::from_rgba8(255, 255, 255, 14),
+                GLASS_SPECULAR,
+                false,
+            ),
+            _ => (
+                if dark { GLASS_TINT_DARK } else { GLASS_TINT_LIGHT },
+                GLASS_SPECULAR,
+                false,
+            ),
+        };
+        self.tint = tint;
+        self.specular = specular;
+        self.grain = grain;
+    }
+
     pub fn child_mut<T: View + 'static>(&mut self) -> Option<&mut T> {
         self.child.as_mut()?.as_any_mut().downcast_mut::<T>()
     }
@@ -114,11 +160,16 @@ impl GlassContainer {
             12.0 * scale,
         );
 
-        // Frosted body.
+        // Frosted body (gray when the window is inactive).
+        let tint = if self.focused {
+            self.tint
+        } else {
+            desaturate(self.tint)
+        };
         scene.fill(
             Fill::NonZero,
             Affine::IDENTITY,
-            &Brush::Solid(self.tint),
+            &Brush::Solid(tint),
             None,
             &body,
         );
@@ -138,7 +189,7 @@ impl GlassContainer {
         .with_stops([
             ColorStop {
                 offset: 0.0,
-                color: GLASS_SPECULAR.into(),
+                color: self.specular.into(),
             },
             ColorStop {
                 offset: 0.35,
@@ -186,6 +237,25 @@ impl GlassContainer {
             None,
             &cyan,
         );
+
+        // Grainy black outer edge (less glass): scattered speckles outside
+        // the crisp rim.
+        if self.grain {
+            let outer = RoundedRect::new(
+                rect.x0 - 1.5 * scale,
+                rect.y0 - 1.5 * scale,
+                rect.x1 + 1.5 * scale,
+                rect.y1 + 1.5 * scale,
+                radius + 1.5 * scale,
+            );
+            scene.stroke(
+                &Stroke::new(2.0 * scale).with_dashes(0.0, [1.5 * scale, 2.5 * scale]),
+                Affine::IDENTITY,
+                &Brush::Solid(Color::from_rgba8(0, 0, 0, 110)),
+                None,
+                &outer,
+            );
+        }
 
         // Optional content on top (placed by `place`).
         if let Some(child) = self.child.as_mut() {

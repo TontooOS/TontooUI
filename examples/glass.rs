@@ -1,9 +1,8 @@
 use tontooui::elements::{GlassContainer, Titlebar, TrafficAction, View};
 use tontooui::renderer::ImageLoader;
+use tontooui::theme::ThemeWatcher;
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
-use tontooui::theme::{ThemeMode, ThemeWatcher, desaturate};
-use tontooui::elements::glass::{GLASS_TINT_DARK, GLASS_TINT_LIGHT};
 use vello::Scene;
 
 struct GlassDemo {
@@ -37,25 +36,19 @@ impl App for GlassDemo {
     ) {
         self.watcher.poll(time_secs);
         self.watcher.set_focused(self.focused, time_secs);
-        let _palette = self.watcher.palette(time_secs);
+        let theme = self.watcher.theme();
 
         self.bar.set_rect(viewport.x, viewport.y, viewport.width);
         self.bar.draw(scene, fonts);
 
-        // Frost tint follows the mode; inactive windows go gray.
-        let mut tint = match self.watcher.theme().mode {
-            ThemeMode::Dark => GLASS_TINT_DARK,
-            ThemeMode::Light => GLASS_TINT_LIGHT,
-        };
-        if !self.focused {
-            tint = desaturate(tint);
-        }
+        // Glass stage follows the system setting live.
         let gw = 440.0;
         let gh = 220.0;
         let gx = viewport.x + (viewport.width - gw) / 2.0;
         let gy = viewport.y + 31.0 + (viewport.height - 31.0 - gh) / 2.0;
         self.glass.set_bounds(gx, gy, gw, gh);
-        self.glass.set_tint(tint);
+        self.glass.set_theme(theme.mode, theme.glass);
+        self.glass.set_focused(self.focused);
         self.glass.draw(scene, fonts, images);
     }
 

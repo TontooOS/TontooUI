@@ -37,13 +37,24 @@ pub enum Accent {
 blue (`#007AFF`). `Accent::color` converts to a Peniko color.
 
 ```rust
-pub struct Theme {
-    pub mode: ThemeMode,
-    pub accent: Accent,
+pub enum GlassAmount {
+    Much,
+    Glass,
+    Less,
 }
 ```
 
-Default is dark mode with multicolor accent.
+```rust
+pub struct Theme {
+    pub mode: ThemeMode,
+    pub accent: Accent,
+    pub glass: GlassAmount,
+}
+```
+
+Default is dark mode with multicolor accent and balanced glass.
+`GlassAmount::from_str` falls back to `Glass`. See [Glass.md](Glass.md)
+for the per-stage rendering.
 
 ## Palette
 
