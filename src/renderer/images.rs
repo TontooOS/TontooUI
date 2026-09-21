@@ -51,18 +51,25 @@ impl<'a> ImageLoader<'a> {
         }
     }
 
-    /// Get `(image, width, height)` for an SF Symbol name. Returns `None`
+    /// Get `(image, width, height)` for an SF Symbol name, downscaled with
+    /// a high-quality filter to `target_px` (max dimension in physical px,
+    /// pass ~2x the display size for crisp supersampling). Returns `None`
     /// when the asset is missing or undecodable; callers skip the icon.
-    pub fn get(&mut self, name: &str, tint: Color) -> Option<(ImageData, u32, u32)> {
+    pub fn get(
+        &mut self,
+        name: &str,
+        tint: Color,
+        target_px: u32,
+    ) -> Option<(ImageData, u32, u32)> {
         let rgba = tint.to_rgba8();
         let key = format!(
-            "{name}#{:02x}{:02x}{:02x}{:02x}",
+            "{name}#{:02x}{:02x}{:02x}{:02x}@{target_px}px",
             rgba.r, rgba.g, rgba.b, rgba.a
         );
         if let Some(cached) = self.cache.map.get(&key) {
             return Some((cached.image.clone(), cached.width, cached.height));
         }
-        let (image, width, height) = self.upload(name, tint)?;
+        let (image, width, height) = self.upload(name, tint, target_px.max(1))?;
         self.cache.map.insert(
             key,
             CachedImage {
@@ -74,7 +81,12 @@ impl<'a> ImageLoader<'a> {
         Some((image, width, height))
     }
 
-    fn upload(&mut self, name: &str, tint: Color) -> Option<(ImageData, u32, u32)> {
+    fn upload(
+        &mut self,
+        name: &str,
+        tint: Color,
+        target_px: u32,
+    ) -> Option<(ImageData, u32, u32)> {
         use std::io::BufReader;
 
         let path = coreicon::resolve_icon_path(name);
@@ -92,18 +104,38 @@ impl<'a> ImageLoader<'a> {
         if width == 0 || height == 0 {
             return None;
         }
-        let rgba = tint.to_rgba8();
-        let pixels: Vec<u8> = match info.color_type {
+        let gray: Vec<u8> = match info.color_type {
             png::ColorType::Rgba => raw
                 .chunks_exact(4)
-                .flat_map(|px| [rgba.r, rgba.g, rgba.b, px[3]])
+                .flat_map(|px| [px[0], px[1], px[2], px[3]])
                 .collect(),
             png::ColorType::Rgb => raw
                 .chunks_exact(3)
-                .flat_map(|_| [rgba.r, rgba.g, rgba.b, 255])
+                .flat_map(|px| [px[0], px[1], px[2], 255])
                 .collect(),
             _ => return None,
         };
+        // Downscale once with Lanczos3: 1024 px assets minified 50x by the
+        // GPU sampler turn to mush without mipmaps, so the CPU bakes a
+        // crisp ~2x texture instead.
+        let long_side = width.max(height);
+        let (pixels, width, height) = if long_side > target_px {
+            let scale = target_px as f32 / long_side as f32;
+            let nw = ((width as f32 * scale).round() as u32).max(1);
+            let nh = ((height as f32 * scale).round() as u32).max(1);
+            let src = image::RgbaImage::from_raw(width, height, gray)?;
+            let small =
+                image::imageops::resize(&src, nw, nh, image::imageops::FilterType::Lanczos3);
+            (small.into_raw(), nw, nh)
+        } else {
+            (gray, width, height)
+        };
+        // Glyphs are black with alpha: paint the tint, keep the alpha.
+        let rgba = tint.to_rgba8();
+        let pixels: Vec<u8> = pixels
+            .chunks_exact(4)
+            .flat_map(|px| [rgba.r, rgba.g, rgba.b, px[3]])
+            .collect();
 
         let size = wgpu::Extent3d {
             width,

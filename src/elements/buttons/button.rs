@@ -308,7 +308,8 @@ impl Button {
         let cy = self.y + (self.height - th.max(self.icon_size)) / 2.0;
 
         if let Some(name) = self.icon.clone() {
-            if let Some((image, iw, ih)) = images.get(&name, text) {
+            let target = (self.icon_size * fonts.scale * 2.0).ceil().max(1.0) as u32;
+            if let Some((image, iw, ih)) = images.get(&name, text, target) {
                 let s = (self.icon_size / iw as f32).min(self.icon_size / ih as f32);
                 let ix = cx + (self.icon_size - iw as f32 * s) / 2.0;
                 let iy = cy + (th.max(self.icon_size) - ih as f32 * s) / 2.0;

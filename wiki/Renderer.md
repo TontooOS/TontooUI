@@ -174,6 +174,21 @@ Draws a finished layout at logical position (`x`, `y`). Iterates glyph runs
 and records them with `Scene::draw_glyphs`. Only glyph runs are drawn;
 inline boxes are skipped.
 
+## Images
+
+```rust
+pub fn get(&mut self, name: &str, tint: Color, target_px: u32) -> Option<(ImageData, u32, u32)>
+```
+
+Per-frame SF Symbol access for views. Resolves CoreIcon artwork by name
+(`COREICON_ASSETS_DIR` override or system resources on TontooOS),
+recolors the black glyph to `tint` and uploads once; later frames hit the
+shell-owned cache. Assets are 1024 px: they downscale on the CPU with
+Lanczos3 to `target_px` (pass ~2x the display size) because GPU
+minification without mipmaps turns them to mush. Returns the upload plus
+natural size; callers scale with the draw transform preserving aspect.
+Missing or undecodable assets return `None` so callers skip the icon.
+
 ## Frame
 
 ```rust
@@ -235,3 +250,4 @@ fn main() {
 - [Theme.md](Theme.md) – live dark/light plus accent with fade animation
 - [Glass.md](Glass.md) – liquid glass container plus transparent body
 - [Button.md](Button.md) – standard button with CoreIcon SF Symbols
+- [Slider.md](Slider.md) – slider with steps, labels, ticks and glass track
