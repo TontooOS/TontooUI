@@ -164,7 +164,7 @@ Recreates the old UIKit window style, drawn by the shell before every
 |---|---|
 | Margin | `24.0` logical px to the screen edge (`MARGIN`) |
 | Body | `RoundedRect` with `BACKGROUND` and `WINDOW_CORNER_RADIUS` |
-| Shadows | `0 3px 6px` black 15%, `0 7px 24px` black 12%, `0 12px 32px` black 8% (gaussian blur via `draw_blurred_rounded_rect`) |
+| Shadows | `0 2px 4px` black 15%, `0 4px 12px` black 12%, `0 7px 16px` black 8% (gaussian blur via `draw_blurred_rounded_rect`; shrunk from the UIKit spec so the reach fits the 24 px margin without clipping) |
 | Inner | 1 px inner ring with a top-to-transparent white gradient (`INNER_TOP`) |
 | Edge | 1 px stroke in `EDGE` (white 14%) |
 | Outline | Outer 1 px ring in `OUTER` (black 55%) |

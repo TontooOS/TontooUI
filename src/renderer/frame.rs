@@ -14,8 +14,10 @@ pub const INNER_TOP: Color = Color::from_rgba8(255, 255, 255, 71);
 /// Outer 1px outline ring.
 pub const OUTER: Color = Color::from_rgba8(0, 0, 0, 140);
 
-/// Drop shadow layers: (y offset, blur, alpha).
-const SHADOWS: [(f32, f32, u8); 3] = [(3.0, 6.0, 38), (7.0, 24.0, 31), (12.0, 32.0, 20)];
+/// Drop shadow layers: (y offset, blur, alpha). Shrunk proportionally from
+/// the UIKit spec so the largest reach (offset + blur) fits the 24 px margin
+/// instead of clipping at the window edge.
+const SHADOWS: [(f32, f32, u8); 3] = [(2.0, 4.0, 38), (4.0, 12.0, 31), (7.0, 16.0, 20)];
 
 /// Logical content rect inside the frame: (x, y, width, height).
 pub fn content_rect(width: f32, height: f32) -> (f32, f32, f32, f32) {
@@ -66,13 +68,15 @@ pub fn draw(scene: &mut Scene, width: u32, height: u32, scale: f32, body: Color)
     );
 
     // Inner top highlight: full inner ring with a top-to-transparent gradient.
-    let inset = 1.0 * s;
+    // Inset 2 px so it never overlaps the 1 px edge stroke; overlap would
+    // make the top edge brighter than the rest.
+    let inset = 2.0 * s;
     let inner = RoundedRect::new(
-        body_rect.x0 + inset / 2.0,
-        body_rect.y0 + inset / 2.0,
-        body_rect.x1 - inset / 2.0,
-        body_rect.y1 - inset / 2.0,
-        (radius - inset / 2.0).max(0.0),
+        body_rect.x0 + inset - 0.5 * s,
+        body_rect.y0 + inset - 0.5 * s,
+        body_rect.x1 - inset + 0.5 * s,
+        body_rect.y1 - inset + 0.5 * s,
+        (radius - inset + 0.5 * s).max(0.0),
     );
     let gradient = Gradient::new_linear(
         Point::new(body_rect.x0, body_rect.y0),
@@ -89,7 +93,7 @@ pub fn draw(scene: &mut Scene, width: u32, height: u32, scale: f32, body: Color)
         },
     ]);
     scene.stroke(
-        &Stroke::new(inset),
+        &Stroke::new(1.0 * s),
         Affine::IDENTITY,
         &Brush::Gradient(gradient),
         None,
