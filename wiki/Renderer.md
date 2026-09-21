@@ -52,9 +52,15 @@ Opens a window with `title` and logical size `width` x `height` and runs
 pub trait View {
     fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, viewport: Viewport, time_secs: f64);
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
+    fn mouse_down(&mut self, _x: f64, _y: f64) {}
+    fn mouse_move(&mut self, _x: f64, _y: f64) {}
+    fn set_focused(&mut self, _focused: bool) {}
     fn text(&mut self, _text: &str) {}
     fn key(&mut self, _key: Key) {}
     fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
+        None
+    }
+    fn poll_window_command(&mut self) -> Option<WindowCommand> {
         None
     }
 }
@@ -83,6 +89,19 @@ pub enum Key {
     Escape,
 }
 ```
+
+```rust
+pub enum WindowCommand {
+    Close,
+    Minimize,
+    ToggleMaximize,
+}
+```
+
+Window operations requested by content (e.g. traffic lights). Return one
+from `poll_window_command`; the shell consumes it once per frame and calls
+`exit`, `set_minimized(true)` or toggles `set_maximized`. Cursor moves
+arrive via `mouse_move` (logical px) and focus changes via `set_focused`.
 
 Non-printable keys forwarded to the view. Printable input arrives via
 `text()` as already-decoded strings (including key repeat).

@@ -1,5 +1,5 @@
-use tontooui::elements::{Text, TextInput, Titlebar};
-use tontooui::renderer::window::{Key, View, Viewport, run};
+use tontooui::elements::{Text, TextInput, Titlebar, TrafficAction};
+use tontooui::renderer::window::{Key, View, Viewport, WindowCommand, run};
 use tontooui::renderer::FontSystem;
 use vello::Scene;
 use vello::peniko::Color;
@@ -10,6 +10,7 @@ struct Demo {
     subtitle: Text,
     input: TextInput,
     echo: Text,
+    command: Option<WindowCommand>,
 }
 
 impl Demo {
@@ -26,6 +27,7 @@ impl Demo {
             echo: Text::new("Echo: ")
                 .size(15.0)
                 .color(Color::from_rgb8(0xff, 0x9f, 0x0a)),
+            command: None,
         }
     }
 }
@@ -58,11 +60,30 @@ impl View for Demo {
     }
 
     fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
-        Some(self.bar.bounds())
+        Some(self.bar.drag_rect())
+    }
+
+    fn poll_window_command(&mut self) -> Option<WindowCommand> {
+        self.command.take()
     }
 
     fn mouse_down(&mut self, x: f64, y: f64) {
-        self.input.mouse_down(x, y);
+        match self.bar.press(x as f32, y as f32) {
+            Some(TrafficAction::Close) => self.command = Some(WindowCommand::Close),
+            Some(TrafficAction::Minimize) => self.command = Some(WindowCommand::Minimize),
+            Some(TrafficAction::Maximize) => {
+                self.command = Some(WindowCommand::ToggleMaximize)
+            }
+            None => self.input.mouse_down(x, y),
+        }
+    }
+
+    fn mouse_move(&mut self, x: f64, y: f64) {
+        self.bar.set_hover(x as f32, y as f32);
+    }
+
+    fn set_focused(&mut self, focused: bool) {
+        self.bar.set_focused(focused);
     }
 
     fn text(&mut self, text: &str) {

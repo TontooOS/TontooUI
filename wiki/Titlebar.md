@@ -88,17 +88,81 @@ corners) and the vertically/horizontally centered title.
 
 ## Dragging
 
-The shell checks `View::drag_region` on left press:
+The shell checks `View::drag_region` on left press. The bar exposes the
+bounds minus the traffic light cluster so button clicks never drag:
 
 ```rust
 fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
-    Some(self.bar.bounds())
+    Some(self.bar.drag_rect())
 }
 ```
 
 A press inside starts `window.drag_window()` and keeps focus (no click is
 forwarded to the view). Dragging needs compositor support for `xdg_toplevel`
 move; failures are ignored silently.
+
+```rust
+pub fn drag_rect(&self) -> (f32, f32, f32, f32)
+```
+
+`bounds` minus the left 74 px traffic light cluster (18 px margin + 3 x
+12 px buttons + 2 x 10 px gaps).
+
+## Traffic Lights
+
+12 px circles, no border, no shadow. Hovering the group shows dark glyphs
+at 68% size (x, minus, plus). An unfocused window shows all gray.
+
+| Token | Value |
+|---|---|
+| `TRAFFIC_SIZE` / `TRAFFIC_GAP` / `TRAFFIC_LEFT` | 12 px / 10 px / 18 px |
+| `TRAFFIC_CLOSE` | `#FF5F56` |
+| `TRAFFIC_MINIMIZE` | `#FFBD2E` |
+| `TRAFFIC_MAXIMIZE` | `#27C93F` |
+| `TRAFFIC_INACTIVE` | `#888888` |
+| `TRAFFIC_GLYPH` | black 60% |
+
+```rust
+pub enum TrafficAction {
+    Close,
+    Minimize,
+    Maximize,
+}
+```
+
+```rust
+pub fn set_hover(&mut self, x: f32, y: f32)
+```
+
+Group hover from the logical cursor position (3 px tolerance around each
+button).
+
+```rust
+pub fn set_focused(&mut self, focused: bool)
+```
+
+Dims all buttons to `TRAFFIC_INACTIVE` when the window loses focus.
+Forward `View::set_focused` here.
+
+```rust
+pub fn press(&mut self, x: f32, y: f32) -> Option<TrafficAction>
+```
+
+Click handling. Map the result to a `WindowCommand` and return it from
+`View::poll_window_command`; the shell executes close, minimize and
+maximize toggle.
+
+```rust
+fn mouse_move(&mut self, x: f64, y: f64) { self.bar.set_hover(x as f32, y as f32); }
+fn mouse_down(&mut self, x: f64, y: f64) {
+    match self.bar.press(x as f32, y as f32) {
+        Some(TrafficAction::Close) => self.command = Some(WindowCommand::Close),
+        Some(TrafficAction::Minimize) => self.command = Some(WindowCommand::Minimize),
+        Some(TrafficAction::Maximize) => self.command = Some(WindowCommand::ToggleMaximize),
+        None => self.input.mouse_down(x, y),
+    }
+}
+```
 
 ## Usage / Example
 

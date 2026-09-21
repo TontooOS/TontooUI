@@ -33,6 +33,14 @@ pub enum Key {
     Escape,
 }
 
+/// Window operations requested by content (e.g. traffic lights).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WindowCommand {
+    Close,
+    Minimize,
+    ToggleMaximize,
+}
+
 /// Logical content area inside the window frame.
 #[derive(Clone, Copy, Debug)]
 pub struct Viewport {
@@ -53,11 +61,17 @@ pub trait View {
         time_secs: f64,
     );
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
+    fn mouse_move(&mut self, _x: f64, _y: f64) {}
+    fn set_focused(&mut self, _focused: bool) {}
     fn text(&mut self, _text: &str) {}
     fn key(&mut self, _key: Key) {}
     /// Draggable region for window moving: (x, y, width, height) in logical
     /// px. A press inside starts a window drag instead of a click.
     fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
+        None
+    }
+    /// Window operation requested by content. Consumed once per call.
+    fn poll_window_command(&mut self) -> Option<WindowCommand> {
         None
     }
 }
@@ -107,10 +121,19 @@ impl<V: View> Shell<V> {
         }
     }
 
-    fn render(&mut self) {
+    fn render(&mut self, event_loop: &ActiveEventLoop) {
         let Some(active) = self.active.as_mut() else {
             return;
         };
+        if let Some(command) = self.view.poll_window_command() {
+            match command {
+                WindowCommand::Close => event_loop.exit(),
+                WindowCommand::Minimize => active.window.set_minimized(true),
+                WindowCommand::ToggleMaximize => {
+                    active.window.set_maximized(!active.window.is_maximized());
+                }
+            }
+        }
         let context = self.context.as_ref().expect("context exists");
         let size = active.window.inner_size();
         if size.width == 0 || size.height == 0 {
@@ -288,6 +311,12 @@ impl<V: View> ApplicationHandler for Shell<V> {
             }
             WindowEvent::CursorMoved { position, .. } => {
                 active.cursor_pos = (position.x, position.y);
+                let scale = active.scale;
+                self.view.mouse_move(position.x / scale, position.y / scale);
+            }
+            WindowEvent::Focused(focused) => {
+                self.view.set_focused(focused);
+                active.window.request_redraw();
             }
             WindowEvent::MouseInput { state, button, .. } => {
                 if state == ElementState::Pressed && button == MouseButton::Left {
@@ -330,7 +359,7 @@ impl<V: View> ApplicationHandler for Shell<V> {
                     active.window.request_redraw();
                 }
             }
-            WindowEvent::RedrawRequested => self.render(),
+            WindowEvent::RedrawRequested => self.render(event_loop),
             _ => {}
         }
     }
