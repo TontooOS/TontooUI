@@ -15,6 +15,7 @@ sliders) unless the dev sets it manually with `fill`.
 | `TOGGLE_SWITCH_W` / `TOGGLE_SWITCH_H` | 56 px / 29.76 px track (widened macOS style) |
 | `TOGGLE_KNOB_PAD` | 2 px knob padding inside the track |
 | `TOGGLE_KNOB_W_RATIO` | 1.35 knob width over height (wide macOS capsule) |
+| `TOGGLE_KNOB_EXPAND` | 3 px knob growth per side while held (glass, overflows track) |
 | `TOGGLE_ANIM_SECONDS` | 0.20 s knob slide |
 | `TOGGLE_SNAP_SECONDS` | 0.15 s drag-release snap |
 | `TOGGLE_BOX` / `TOGGLE_BOX_RADIUS` | 21.12 px box, 5.76 px radius |
@@ -87,7 +88,9 @@ the state with animation (`View::mouse_up` does the same for boxed
 children). Pressing inside and releasing outside keeps the state.
 
 Switch style additionally supports dragging: pressing the track grabs
-the knob and it follows the pointer (`mouse_move`) live. Releasing past
+the knob and it follows the pointer (`mouse_move`) live. While held the
+white knob turns liquid glass (translucent fill with bright rim, like
+the slider knob) and grows 3 px per side past the track. Releasing past
 halfway snaps to the nearer stop with a 0.15 s `CubicOut` tween and
 fires `on_toggle` when the state changed; releasing before halfway
 snaps back. A press without moving (under 4 px) counts as a tap and

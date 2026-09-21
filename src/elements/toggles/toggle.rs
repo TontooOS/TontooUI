@@ -27,6 +27,9 @@ pub const TOGGLE_KNOB_PAD: f32 = 2.0;
 /// Switch knob width relative to its height (macOS measure: the knob is
 /// a wide capsule, wider than tall).
 pub const TOGGLE_KNOB_W_RATIO: f32 = 1.35;
+/// Switch knob growth per side while held: the white knob turns liquid
+/// glass and overflows the track, like the slider knob.
+pub const TOGGLE_KNOB_EXPAND: f32 = 3.0;
 /// Knob slide animation time in seconds.
 pub const TOGGLE_ANIM_SECONDS: f32 = 0.20;
 /// Drag-release snap time in seconds.
@@ -444,32 +447,58 @@ impl Toggle {
 
         // Capsule knob (macOS measure): nearly full track height and
         // wider than tall, sliding from the left stop to the right stop.
+        // While held the knob turns liquid glass and grows past the track.
         let knob_h = TOGGLE_SWITCH_H - TOGGLE_KNOB_PAD * 2.0;
         let knob_w = Self::knob_w();
         let travel = Self::travel();
         let kx = self.sx + TOGGLE_KNOB_PAD + self.shown.clamp(0.0, 1.0) * travel;
         let ky = self.sy + TOGGLE_KNOB_PAD;
+        let held = self.dragging && !self.disabled;
+        let expand = if held { TOGGLE_KNOB_EXPAND } else { 0.0 };
+        let kr = knob_h / 2.0 + expand;
         scene.draw_blurred_rounded_rect(
             Affine::IDENTITY,
-            Rect::new(px(kx), px(ky), px(kx + knob_w), px(ky + knob_h)),
+            Rect::new(
+                px(kx - expand),
+                px(ky - expand),
+                px(kx + knob_w + expand),
+                px(ky + knob_h + expand),
+            ),
             Color::from_rgba8(0, 0, 0, 40),
-            px(knob_h / 2.0),
-            5.76 * scale,
+            px(kr),
+            6.0 * scale,
         );
         let knob = RoundedRect::new(
-            px(kx),
-            px(ky),
-            px(kx + knob_w),
-            px(ky + knob_h),
-            px(knob_h / 2.0),
+            px(kx - expand),
+            px(ky - expand),
+            px(kx + knob_w + expand),
+            px(ky + knob_h + expand),
+            px(kr),
         );
-        scene.fill(
-            Fill::NonZero,
-            Affine::IDENTITY,
-            &Brush::Solid(self.eff(Color::WHITE)),
-            None,
-            &knob,
-        );
+        if held {
+            scene.fill(
+                Fill::NonZero,
+                Affine::IDENTITY,
+                &Brush::Solid(Color::from_rgba8(255, 255, 255, 64)),
+                None,
+                &knob,
+            );
+            scene.stroke(
+                &Stroke::new(1.5 * scale),
+                Affine::IDENTITY,
+                &Brush::Solid(Color::from_rgba8(255, 255, 255, 200)),
+                None,
+                &knob,
+            );
+        } else {
+            scene.fill(
+                Fill::NonZero,
+                Affine::IDENTITY,
+                &Brush::Solid(self.eff(Color::WHITE)),
+                None,
+                &knob,
+            );
+        }
     }
 
     fn render_checkbox(&mut self, scene: &mut Scene, fonts: &mut FontSystem) {
@@ -751,6 +780,19 @@ mod tests {
         // Positive travel with symmetric stops.
         let travel = TOGGLE_SWITCH_W - TOGGLE_KNOB_PAD * 2.0 - knob_w;
         assert!(travel > 0.0);
+    }
+
+    #[test]
+    fn track_press_holds_dragging_state() {
+        let mut toggle = Toggle::new("Wi-Fi");
+        let mut fonts = FontSystem::new();
+        let (w, _) = toggle.measure(&mut fonts);
+        toggle.place(&mut fonts, 0.0, 0.0, w, TOGGLE_SWITCH_H);
+        assert!(!toggle.dragging);
+        toggle.mouse_down((w - 10.0) as f64, 14.0);
+        assert!(toggle.dragging);
+        toggle.mouse_up((w - 10.0) as f64, 14.0);
+        assert!(!toggle.dragging);
     }
 
     #[test]
