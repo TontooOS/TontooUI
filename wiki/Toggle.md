@@ -15,7 +15,7 @@ sliders) unless the dev sets it manually with `fill`.
 | `TOGGLE_SWITCH_W` / `TOGGLE_SWITCH_H` | 64 px / 22.32 px track (stretched long and slim) |
 | `TOGGLE_KNOB_PAD` | 2 px knob padding inside the track |
 | `TOGGLE_KNOB_W_RATIO` | 1.35 knob width over height (wide macOS capsule) |
-| `TOGGLE_KNOB_EXPAND_W` / `TOGGLE_KNOB_EXPAND_H` | +6.2 / +4.6 px per side while held (1.5x glass knob, overflows track) |
+| `TOGGLE_KNOB_EXPAND_W` / `TOGGLE_KNOB_EXPAND_H` | +12.4 / +9.2 px per side while held (2x glass bubble, stands outside the track) |
 | `TOGGLE_ANIM_SECONDS` | 0.20 s knob slide |
 | `TOGGLE_SNAP_SECONDS` | 0.15 s drag-release snap |
 | `TOGGLE_BOX` / `TOGGLE_BOX_RADIUS` | 21.12 px box, 5.76 px radius |
@@ -94,8 +94,8 @@ Switch style additionally supports dragging: pressing the track grabs
 the knob and it follows the pointer (`mouse_move`) live. While held the
 white knob turns into the shared liquid glass lens (`fill_lens_glass`:
 clear magnified center, thin 4 px blurred rim, light frost fill with
-top/bottom bevel, like the slider knob) and grows to 1.5x past the track
-(+6.2 px per side wide, +4.6 px tall); with
+top/bottom bevel, like the slider knob) and grows to a 2x bubble standing
+outside the track (+12.4 px per side wide, +9.2 px tall); with
 `App::wants_backdrop` the lens also samples the sharp and blurred in-app
 backdrop (and is omitted on the capture pass so the blur sees the track
 behind it). Releasing past halfway snaps to the nearer stop with a 0.15 s

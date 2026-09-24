@@ -31,12 +31,11 @@ pub const TOGGLE_KNOB_PAD: f32 = 2.0;
 /// a wide capsule, wider than tall).
 pub const TOGGLE_KNOB_W_RATIO: f32 = 1.35;
 /// Switch knob growth per side while held, width axis: the white knob turns
-/// liquid glass and grows 50% wider, overflowing the track like the slider
-/// knob.
-pub const TOGGLE_KNOB_EXPAND_W: f32 = 6.2;
-/// Switch knob growth per side while held, height axis: 50% taller glass
-/// knob.
-pub const TOGGLE_KNOB_EXPAND_H: f32 = 4.6;
+/// liquid glass at double size, clearly overflowing the track like a bubble.
+pub const TOGGLE_KNOB_EXPAND_W: f32 = 12.4;
+/// Switch knob growth per side while held, height axis: double height glass
+/// knob, standing well outside the track.
+pub const TOGGLE_KNOB_EXPAND_H: f32 = 9.2;
 /// Knob slide animation time in seconds.
 pub const TOGGLE_ANIM_SECONDS: f32 = 0.20;
 /// Drag-release snap time in seconds.
