@@ -16,7 +16,7 @@ use super::super::buttons::{
     BUTTON_BG_DARK, BUTTON_BG_LIGHT, BUTTON_FONT_SIZE, BUTTON_GAP, BUTTON_ICON_SIZE,
     BUTTON_PAD_X, BUTTON_PAD_Y, BUTTON_RADIUS,
 };
-use super::super::glass::{GLASS_DEPTH, GLASS_ZOOM};
+use super::super::glass::{GLASS_DEPTH, GLASS_ZOOM, glass_edge_width};
 
 /// Switch track width in logical px (compact: the white knob keeps its size,
 /// the gray track behind it is shorter).
@@ -43,6 +43,9 @@ pub const TOGGLE_SNAP_SECONDS: f32 = 0.15;
 /// Swipe distance in logical px from the press point that commits the
 /// switch: fling far enough left/right and the state flips with a snap.
 pub const TOGGLE_SWIPE_PX: f32 = 12.0;
+/// Hold time in seconds before the knob turns glass: a plain click stays
+/// the white pill, only holding (or flinging) grows the glass bubble.
+pub const TOGGLE_GLASS_DELAY: f32 = 0.15;
 /// Checkbox box size in logical px.
 pub const TOGGLE_BOX: f32 = 21.12;
 /// Checkbox corner radius in logical px.
@@ -127,6 +130,12 @@ pub struct Toggle {
     /// Glass grow factor: 0.0 at rest, 1.0 fully grown while held.
     /// Animated in `advance` like the slider knob expand.
     grow: f32,
+    /// Press instant of the current hold (`None` at rest). The knob turns
+    /// glass only after `TOGGLE_GLASS_DELAY`, so clicks stay white.
+    down_at: Option<Instant>,
+    /// True once the hold passed the glass delay (or a fling committed).
+    /// Computed in `advance`, read by the renderer.
+    glass_on: bool,
     on_toggle: Option<Box<dyn FnMut(bool)>>,
 }
 
@@ -167,6 +176,8 @@ impl Toggle {
             anim_time: 0.0,
             last_draw: None,
             grow: 0.0,
+            down_at: None,
+            glass_on: false,
             on_toggle: None,
         }
     }
@@ -309,6 +320,7 @@ impl Toggle {
             self.committed = false;
             self.armed = true;
             self.anim = None;
+            self.down_at = Some(Instant::now());
         } else if self.hit(x, y) {
             self.armed = true;
         }
@@ -335,13 +347,15 @@ impl Toggle {
     }
 
     /// Swipe commit: flip the state at once (track repaints directly) and
-    /// run the short snap for the knob. The drag stays active so the glass
+    /// run the short snap for the knob. Forces the glass on so even a fast
+    /// fling shows brief bubble feedback. The drag stays active so the glass
     /// bubble lingers until release; the snap animation progresses anyway
     /// (see `advance`).
     fn commit(&mut self, target: bool) {
         self.committed = true;
         self.dragged = true;
         self.armed = false;
+        self.glass_on = true;
         if target != self.on {
             self.on = target;
             self.notify();
@@ -363,6 +377,7 @@ impl Toggle {
         if self.dragging {
             self.dragging = false;
             self.armed = false;
+            self.down_at = None;
             if self.disabled {
                 return;
             }
@@ -418,14 +433,19 @@ impl Toggle {
             None => 0.0,
         };
         self.last_draw = Some(now);
-        // Glass grow animation: ease toward held (1.0) or rest (0.0) at
-        // the same rate as the slider knob expand. Runs before the
-        // dragging early-return so release shrinks smoothly too.
-        let grow_target = if self.dragging && !self.disabled {
-            1.0f32
-        } else {
-            0.0
-        };
+        // Glass arms only after holding past the delay: quick clicks never
+        // grow glass. A fling commit forces it on for feedback (see
+        // `commit`). Growth follows the glass state, so release shrinks
+        // smoothly too.
+        let held = self.dragging && !self.disabled;
+        // Once on it latches while held; release always clears it so the
+        // bubble shrinks back.
+        self.glass_on = held
+            && (self.glass_on
+                || self
+                    .down_at
+                    .is_some_and(|t| now.saturating_duration_since(t).as_secs_f32() >= TOGGLE_GLASS_DELAY));
+        let grow_target = if self.glass_on { 1.0f32 } else { 0.0 };
         let grow_speed = 14.0;
         self.grow += (grow_target - self.grow)
             .min(grow_speed * dt)
@@ -528,8 +548,9 @@ impl Toggle {
         let ky = self.sy + TOGGLE_KNOB_PAD;
         let held = self.dragging && !self.disabled;
         // Animated glass size; the glass look lingers while the bubble
-        // shrinks after release.
-        let glass = held || self.grow > 0.001;
+        // shrinks after release. Plain clicks never arm `glass_on`, so
+        // they keep the white pill.
+        let glass = self.glass_on || self.grow > 0.001;
         let ex = self.grow * TOGGLE_KNOB_EXPAND_W;
         let ey = self.grow * TOGGLE_KNOB_EXPAND_H;
         let kr = knob_h / 2.0 + ey;
@@ -560,9 +581,8 @@ impl Toggle {
         if skip_knob {
             // Capture pass: knob body omitted for the backdrop blur.
         } else if glass {
-            // Liquid glass knob: clear magnified center, thin blurred rim
-            // only (same lens as `GlassContainer`, narrower band for the
-            // small knob).
+            // Liquid glass knob: clear minified center, hairline blurred
+            // rim (same adaptive edge as `GlassContainer`).
             fill_lens_glass(
                 scene,
                 images,
@@ -574,7 +594,7 @@ impl Toggle {
                 ),
                 px(kr),
                 GLASS_ZOOM,
-                4.0 * scale,
+                glass_edge_width(knob_h) as f64 * scale,
             );
             scene.fill(
                 Fill::NonZero,
@@ -996,6 +1016,40 @@ mod tests {
         toggle.mouse_up(left, 14.0);
         assert!(!toggle.is_on());
         assert!(!toggle.dragging);
+    }
+
+    #[test]
+    fn click_never_shows_glass() {
+        let mut toggle = Toggle::new("Wi-Fi");
+        let mut fonts = FontSystem::new();
+        let (w, _) = toggle.measure(&mut fonts);
+        toggle.place(&mut fonts, 0.0, 0.0, w, TOGGLE_SWITCH_H);
+        let x = (w - 3.0) as f64;
+        // Quick press and release: flips state, but the hold delay never
+        // passes, so no glass grows.
+        toggle.mouse_down(x, 14.0);
+        toggle.advance(Instant::now());
+        assert!(!toggle.glass_on);
+        toggle.mouse_up(x, 14.0);
+        assert!(toggle.is_on());
+        toggle.advance(Instant::now());
+        assert!(!toggle.glass_on);
+        assert_eq!(toggle.grow, 0.0);
+    }
+
+    #[test]
+    fn fling_forces_glass_for_feedback() {
+        let mut toggle = Toggle::new("Wi-Fi");
+        let mut fonts = FontSystem::new();
+        let (w, _) = toggle.measure(&mut fonts);
+        toggle.place(&mut fonts, 0.0, 0.0, w, TOGGLE_SWITCH_H);
+        let left = (w - TOGGLE_SWITCH_W + 3.0) as f64;
+        toggle.mouse_down(left, 14.0);
+        // Fast fling past the threshold: commits and forces glass on even
+        // though the hold delay has not passed.
+        toggle.mouse_move(left + TOGGLE_SWIPE_PX as f64 + 4.0, 14.0);
+        assert!(toggle.is_on());
+        assert!(toggle.glass_on);
     }
 
     #[test]

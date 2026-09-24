@@ -6,7 +6,7 @@ use vello::kurbo::{Affine, Circle, Point, Rect, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
 use super::super::layout::View;
-use super::super::glass::GLASS_ZOOM;
+use super::super::glass::{GLASS_ZOOM, glass_edge_width};
 use crate::animation::{Easing, Repeat, Tween, TweenAnim};
 use crate::renderer::backdrop::fill_lens_glass;
 use crate::renderer::images::ImageLoader;
@@ -475,16 +475,15 @@ impl Slider {
         if skip_knob {
             // Capture pass: leave the knob area empty for the blur.
         } else if self.dragging {
-            // Liquid glass knob: clear magnified center, thin blurred rim
-            // only (same lens as `GlassContainer`, narrower band for the
-            // small knob).
+            // Liquid glass knob: clear minified center, hairline blurred
+            // rim (same adaptive edge as `GlassContainer`).
             fill_lens_glass(
                 scene,
                 images,
                 &Rect::new(px(kx - kw), px(tcy - kh), px(kx + kw), px(tcy + kh)),
                 px(kr),
                 GLASS_ZOOM,
-                4.0 * scale,
+                glass_edge_width(SLIDER_KNOB_H) as f64 * scale,
             );
             let tint = if self.dark {
                 Color::from_rgba8(255, 255, 255, 26)

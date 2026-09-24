@@ -24,12 +24,23 @@ pub const GLASS_CHROMA_RED: Color = Color::from_rgba8(255, 90, 120, 30);
 pub const GLASS_CHROMA_CYAN: Color = Color::from_rgba8(90, 200, 255, 30);
 /// Width of the frosted edge band in logical px for small glass.
 /// Large glass (see `GLASS_LARGE_MIN_SIDE`) uses `GLASS_EDGE_WIDTH_LARGE`.
-pub const GLASS_EDGE_WIDTH: f32 = 1.0;
+pub const GLASS_EDGE_WIDTH: f32 = 2.0;
 /// Edge band width in logical px once the glass counts as large.
-pub const GLASS_EDGE_WIDTH_LARGE: f32 = 2.0;
+pub const GLASS_EDGE_WIDTH_LARGE: f32 = 3.0;
 /// Minimum smaller side in logical px from which a glass counts as large
-/// (gets the 2 px edge band instead of 1 px).
+/// (gets the 3 px edge band instead of 2 px).
 pub const GLASS_LARGE_MIN_SIDE: f32 = 200.0;
+
+/// Edge band width in logical px for a glass body with the given smaller
+/// side: 2 px normally, 3 px once large. Shared by the container and the
+/// small knobs so every glass rim stays hairline.
+pub fn glass_edge_width(min_side: f32) -> f32 {
+    if min_side >= GLASS_LARGE_MIN_SIDE {
+        GLASS_EDGE_WIDTH_LARGE
+    } else {
+        GLASS_EDGE_WIDTH
+    }
+}
 /// Lens zoom of the clear center: below 1.0 the backdrop behind the glass
 /// shrinks (minify), above 1.0 it grows. Default minifies slightly.
 pub const GLASS_ZOOM: f64 = 0.80;
@@ -183,11 +194,7 @@ impl GlassContainer {
         // Liquid lens: clear magnified center, blurred rim band only (see
         // `fill_lens_glass`; tiny bodies fall back to a full blur fill).
         // Small glass gets a 1 px edge, large glass a 2 px edge.
-        let edge_logical = if self.width.min(self.height) >= GLASS_LARGE_MIN_SIDE {
-            GLASS_EDGE_WIDTH_LARGE
-        } else {
-            GLASS_EDGE_WIDTH
-        };
+        let edge_logical = glass_edge_width(self.width.min(self.height));
         let band = edge_logical as f64 * scale;
         fill_lens_glass(scene, images, &rect, radius, GLASS_ZOOM, band);
 

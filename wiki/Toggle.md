@@ -18,6 +18,7 @@ sliders) unless the dev sets it manually with `fill`.
 | `TOGGLE_KNOB_EXPAND_W` / `TOGGLE_KNOB_EXPAND_H` | +9.9 / +7.3 px per side while held (1.8x glass bubble, stands outside the track) |
 | `TOGGLE_ANIM_SECONDS` | 0.20 s knob slide |
 | `TOGGLE_SNAP_SECONDS` | 0.15 s drag-release snap |
+| `TOGGLE_GLASS_DELAY` | 0.15 s hold before the knob turns glass (clicks stay white) |
 | `TOGGLE_BOX` / `TOGGLE_BOX_RADIUS` | 21.12 px box, 5.76 px radius |
 | `TOGGLE_ICON_BOX` / `TOGGLE_ICON_RADIUS` | 26.88 px badge, 6.72 px radius |
 | `TOGGLE_ICON_GLYPH` | 15.36 px glyph inside the badge |
@@ -95,14 +96,18 @@ the knob, but it never follows the pointer freely. A fling past
 `TOGGLE_SWIPE_PX` (12 px) commits that direction at once (track repaints
 directly, `on_toggle` fires) with a 0.15 s `CubicOut` snap; pulling back
 past the opposite threshold flips back within the same hold, anything less
-snaps back. While held the white knob turns into the shared liquid glass
-lens (`fill_lens_glass`: clear minified center, thin 4 px blurred rim,
-light frost fill with top/bottom bevel, like the slider knob) and grows to
-a 1.8x bubble standing outside the track (+9.9 px per side wide,
-+7.3 px tall), lingering until release; with `App::wants_backdrop` the
-lens also samples the sharp and blurred in-app backdrop (and is omitted on
-the capture pass so the blur sees the track behind it). A press without
-moving (under 4 px) counts as a tap and flips the state on release.
+snaps back. The knob turns glass only after holding past
+`TOGGLE_GLASS_DELAY` (0.15 s): a plain click or tap keeps the white pill
+and just flips the state, only holding (or a fling, which forces glass for
+feedback) grows the bubble. While held the white knob turns into the shared
+liquid glass lens (`fill_lens_glass`: clear minified center, adaptive
+2-3 px blurred rim, light frost fill with top/bottom bevel, like the
+slider knob) and grows to a 1.8x bubble standing outside the track
+(+9.9 px per side wide, +7.3 px tall), lingering until release; with
+`App::wants_backdrop` the lens also samples the sharp and blurred in-app
+backdrop (and is omitted on the capture pass so the blur sees the track
+behind it). A press without moving (under 4 px) counts as a tap and flips
+the state on release.
 Checkbox and button styles stay click-only.
 
 Forward `mouse_down`, `mouse_move` and `mouse_up` from the app (see
