@@ -2,8 +2,8 @@ use std::any::Any;
 use std::time::Instant;
 
 use vello::Scene;
-use vello::kurbo::{Affine, BezPath, Cap, Join, Rect, RoundedRect, Stroke};
-use vello::peniko::{Brush, Color, Fill};
+use vello::kurbo::{Affine, BezPath, Cap, Join, Point, Rect, RoundedRect, Stroke};
+use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
 use super::super::layout::View;
 use crate::animation::{Animatable, Easing, Repeat, Tween, TweenAnim};
@@ -16,7 +16,7 @@ use super::super::buttons::{
     BUTTON_BG_DARK, BUTTON_BG_LIGHT, BUTTON_FONT_SIZE, BUTTON_GAP, BUTTON_ICON_SIZE,
     BUTTON_PAD_X, BUTTON_PAD_Y, BUTTON_RADIUS,
 };
-use super::super::glass::GLASS_MAGNIFY;
+use super::super::glass::{GLASS_DEPTH, GLASS_MAGNIFY};
 
 /// Switch track width in logical px (stretched long and slim,
 /// macOS style).
@@ -30,9 +30,13 @@ pub const TOGGLE_KNOB_PAD: f32 = 2.0;
 /// Switch knob width relative to its height (macOS measure: the knob is
 /// a wide capsule, wider than tall).
 pub const TOGGLE_KNOB_W_RATIO: f32 = 1.35;
-/// Switch knob growth per side while held: the white knob turns liquid
-/// glass and overflows the track, like the slider knob.
-pub const TOGGLE_KNOB_EXPAND: f32 = 3.0;
+/// Switch knob growth per side while held, width axis: the white knob turns
+/// liquid glass and grows 50% wider, overflowing the track like the slider
+/// knob.
+pub const TOGGLE_KNOB_EXPAND_W: f32 = 6.2;
+/// Switch knob growth per side while held, height axis: 50% taller glass
+/// knob.
+pub const TOGGLE_KNOB_EXPAND_H: f32 = 4.6;
 /// Knob slide animation time in seconds.
 pub const TOGGLE_ANIM_SECONDS: f32 = 0.20;
 /// Drag-release snap time in seconds.
@@ -468,8 +472,9 @@ impl Toggle {
         let kx = self.sx + TOGGLE_KNOB_PAD + self.shown.clamp(0.0, 1.0) * travel;
         let ky = self.sy + TOGGLE_KNOB_PAD;
         let held = self.dragging && !self.disabled;
-        let expand = if held { TOGGLE_KNOB_EXPAND } else { 0.0 };
-        let kr = knob_h / 2.0 + expand;
+        let ex = if held { TOGGLE_KNOB_EXPAND_W } else { 0.0 };
+        let ey = if held { TOGGLE_KNOB_EXPAND_H } else { 0.0 };
+        let kr = knob_h / 2.0 + ey;
         // Capture pass while held: leave the knob empty so the blur sees
         // the track behind the glass.
         let skip_knob = held && images.is_capture_pass();
@@ -477,10 +482,10 @@ impl Toggle {
             scene.draw_blurred_rounded_rect(
                 Affine::IDENTITY,
                 Rect::new(
-                    px(kx - expand),
-                    px(ky - expand),
-                    px(kx + knob_w + expand),
-                    px(ky + knob_h + expand),
+                    px(kx - ex),
+                    px(ky - ey),
+                    px(kx + knob_w + ex),
+                    px(ky + knob_h + ey),
                 ),
                 Color::from_rgba8(0, 0, 0, 40),
                 px(kr),
@@ -488,10 +493,10 @@ impl Toggle {
             );
         }
         let knob = RoundedRect::new(
-            px(kx - expand),
-            px(ky - expand),
-            px(kx + knob_w + expand),
-            px(ky + knob_h + expand),
+            px(kx - ex),
+            px(ky - ey),
+            px(kx + knob_w + ex),
+            px(ky + knob_h + ey),
             px(kr),
         );
         if skip_knob {
@@ -504,10 +509,10 @@ impl Toggle {
                 scene,
                 images,
                 &Rect::new(
-                    px(kx - expand),
-                    px(ky - expand),
-                    px(kx + knob_w + expand),
-                    px(ky + knob_h + expand),
+                    px(kx - ex),
+                    px(ky - ey),
+                    px(kx + knob_w + ex),
+                    px(ky + knob_h + ey),
                 ),
                 px(kr),
                 GLASS_MAGNIFY,
@@ -520,12 +525,44 @@ impl Toggle {
                 None,
                 &knob,
             );
+            // Bevel like `GlassContainer`: specular top light and depth
+            // shade at the bottom, transparent flanks. Stroked fully inside
+            // the knob outline so no bright halo spills onto the track.
+            let bevel = RoundedRect::new(
+                px(kx - ex) + 1.0 * scale,
+                px(ky - ey) + 1.0 * scale,
+                px(kx + knob_w + ex) - 1.0 * scale,
+                px(ky + knob_h + ey) - 1.0 * scale,
+                (px(kr) - 1.0 * scale).max(0.0),
+            );
+            let bevel_brush = Gradient::new_linear(
+                Point::new(px(kx), px(ky - ey)),
+                Point::new(px(kx), px(ky + knob_h + ey)),
+            )
+            .with_stops([
+                ColorStop {
+                    offset: 0.0,
+                    color: Color::from_rgba8(255, 255, 255, 200).into(),
+                },
+                ColorStop {
+                    offset: 0.22,
+                    color: Color::TRANSPARENT.into(),
+                },
+                ColorStop {
+                    offset: 0.78,
+                    color: Color::TRANSPARENT.into(),
+                },
+                ColorStop {
+                    offset: 1.0,
+                    color: GLASS_DEPTH.into(),
+                },
+            ]);
             scene.stroke(
-                &Stroke::new(1.5 * scale),
+                &Stroke::new(2.0 * scale),
                 Affine::IDENTITY,
-                &Brush::Solid(Color::from_rgba8(255, 255, 255, 200)),
+                &Brush::Gradient(bevel_brush),
                 None,
-                &knob,
+                &bevel,
             );
         } else {
             scene.fill(

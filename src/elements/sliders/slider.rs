@@ -565,6 +565,20 @@ impl Slider {
                 &chroma_c,
             );
         } else {
+            // Minimal contact shadow under the white knob: small downward
+            // offset, tight blur, low alpha.
+            scene.draw_blurred_rounded_rect(
+                Affine::IDENTITY,
+                vello::kurbo::Rect::new(
+                    px(kx - kw),
+                    px(tcy - kh) + 1.5 * scale,
+                    px(kx + kw),
+                    px(tcy + kh) + 1.5 * scale,
+                ),
+                Color::from_rgba8(0, 0, 0, 35),
+                px(kr),
+                2.5 * scale,
+            );
             scene.fill(
                 Fill::NonZero,
                 Affine::IDENTITY,
