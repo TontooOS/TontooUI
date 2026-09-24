@@ -13,6 +13,7 @@ struct ToggleDemo {
     focused: bool,
     bg: Color,
     command: Option<WindowCommand>,
+    dragging: bool,
 }
 
 impl ToggleDemo {
@@ -42,6 +43,7 @@ impl ToggleDemo {
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
             command: None,
+            dragging: false,
         }
     }
 
@@ -124,6 +126,10 @@ impl App for ToggleDemo {
         self.command.take()
     }
 
+    fn wants_backdrop(&self) -> bool {
+        self.dragging
+    }
+
     fn mouse_down(&mut self, x: f64, y: f64) {
         match self.bar.press(x as f32, y as f32) {
             Some(TrafficAction::Close) => self.command = Some(WindowCommand::Close),
@@ -131,17 +137,36 @@ impl App for ToggleDemo {
             Some(TrafficAction::Maximize) => {
                 self.command = Some(WindowCommand::ToggleMaximize)
             }
-            None => self.each_toggle(|toggle| toggle.mouse_down(x, y)),
+            None => {
+                let mut dragging = false;
+                self.each_toggle(|toggle| {
+                    toggle.mouse_down(x, y);
+                    if toggle.is_dragging() {
+                        dragging = true;
+                    }
+                });
+                self.dragging = dragging;
+            }
         }
     }
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
-        self.each_toggle(|toggle| toggle.mouse_move(x, y));
+        let mut dragging = false;
+        self.each_toggle(|toggle| {
+            toggle.mouse_move(x, y);
+            if toggle.is_dragging() {
+                dragging = true;
+            }
+        });
+        if dragging {
+            self.dragging = true;
+        }
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {
         self.each_toggle(|toggle| toggle.mouse_up(x, y));
+        self.dragging = false;
     }
 
     fn set_focused(&mut self, focused: bool) {

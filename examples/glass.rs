@@ -56,6 +56,10 @@ impl App for GlassDemo {
         true
     }
 
+    fn wants_backdrop(&self) -> bool {
+        true
+    }
+
     fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
         Some(self.bar.drag_rect())
     }

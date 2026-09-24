@@ -7,6 +7,7 @@ use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
 use super::super::layout::View;
 use crate::animation::{Easing, Repeat, Tween, TweenAnim};
+use crate::renderer::backdrop::fill_backdrop;
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, draw_layout};
 use crate::theme::{GlassAmount, desaturate};
@@ -205,6 +206,13 @@ impl Slider {
         self.value
     }
 
+    /// True while the knob is held and follows the pointer. Apps use this
+    /// to return true from `App::wants_backdrop` so the shell runs the
+    /// backdrop blur pass.
+    pub fn is_dragging(&self) -> bool {
+        self.dragging
+    }
+
     pub fn set_value(&mut self, value: f64) {
         let snapped = self.snap(value.clamp(self.min, self.max));
         if snapped != self.value {
@@ -351,7 +359,13 @@ impl Slider {
         Color::from_rgba8(r, g, b, a)
     }
 
-    fn render(&mut self, scene: &mut Scene, fonts: &mut FontSystem, now: Instant) {
+    fn render(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+        now: Instant,
+    ) {
         self.advance(now);
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
@@ -435,17 +449,21 @@ impl Slider {
             }
         }
 
-        // Knob shadow first (under the knob).
+        // Knob shadow first (under the knob). Skipped on the capture pass
+        // while dragging so the blur sees the track behind the glass.
         let kw = SLIDER_KNOB_W / 2.0 + self.knob_expand * SLIDER_KNOB_EXPAND_W / 2.0;
         let kh = SLIDER_KNOB_H / 2.0 + self.knob_expand * SLIDER_KNOB_EXPAND_H / 2.0;
         let kr = kh;
-        scene.draw_blurred_rounded_rect(
-            Affine::IDENTITY,
-            vello::kurbo::Rect::new(px(kx - kw), px(tcy - kh), px(kx + kw), px(tcy + kh)),
-            Color::from_rgba8(0, 0, 0, 40),
-            px(kr),
-            6.0 * scale,
-        );
+        let skip_knob = self.dragging && images.is_capture_pass();
+        if !skip_knob {
+            scene.draw_blurred_rounded_rect(
+                Affine::IDENTITY,
+                vello::kurbo::Rect::new(px(kx - kw), px(tcy - kh), px(kx + kw), px(tcy + kh)),
+                Color::from_rgba8(0, 0, 0, 40),
+                px(kr),
+                6.0 * scale,
+            );
+        }
         let knob = RoundedRect::new(
             px(kx - kw),
             px(tcy - kh),
@@ -453,7 +471,10 @@ impl Slider {
             px(tcy + kh),
             px(kr),
         );
-        if self.dragging {
+        if skip_knob {
+            // Capture pass: leave the knob area empty for the blur.
+        } else if self.dragging {
+            fill_backdrop(scene, images, &knob);
             let tint = if self.dark {
                 Color::from_rgba8(255, 255, 255, 26)
             } else {
@@ -613,9 +634,9 @@ impl View for Slider {
         &mut self,
         scene: &mut Scene,
         fonts: &mut FontSystem,
-        _images: &mut ImageLoader<'_>,
+        images: &mut ImageLoader<'_>,
     ) {
-        self.render(scene, fonts, Instant::now());
+        self.render(scene, fonts, images, Instant::now());
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {

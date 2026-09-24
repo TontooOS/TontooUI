@@ -5,6 +5,7 @@ use super::layout::View;
 use vello::kurbo::{Affine, Point, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
+use crate::renderer::backdrop::fill_backdrop;
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
 use crate::theme::{GlassAmount, ThemeMode, desaturate};
@@ -26,9 +27,10 @@ pub const GLASS_CHROMA_CYAN: Color = Color::from_rgba8(90, 200, 255, 30);
 /// top light and depth shade, chromatic edge split and a soft shadow.
 /// Optional content draws on top.
 ///
-/// True backdrop blur and refraction need the compositor (it owns the
-/// desktop pixels behind a transparent window); this kit does everything
-/// downstream of that: tint, bevel, rim light, chroma and shadow.
+/// When the shell runs a backdrop pass (`App::wants_backdrop`), the body
+/// samples the blurred in-app capture so content behind the glass shows
+/// through. Desktop pixels behind a transparent window still need the
+/// compositor; without a backdrop the body is only the frost tint.
 pub struct GlassContainer {
     x: f32,
     y: f32,
@@ -140,6 +142,11 @@ impl GlassContainer {
         fonts: &mut FontSystem,
         images: &mut ImageLoader<'_>,
     ) {
+        // Capture pass: skip the whole container (body + children) so the
+        // blur sees only what sits behind the glass.
+        if images.is_capture_pass() {
+            return;
+        }
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
         let radius = self.radius as f64 * scale;
@@ -159,6 +166,9 @@ impl GlassContainer {
             radius,
             12.0 * scale,
         );
+
+        // Blurred in-app backdrop (when the shell ran the capture pass).
+        fill_backdrop(scene, images, &body);
 
         // Frosted body (gray when the window is inactive).
         let tint = if self.focused {

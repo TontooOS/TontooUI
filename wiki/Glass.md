@@ -3,7 +3,8 @@
 `GlassContainer`: liquid glass container with frosted body, liquid bevel
 rim (specular top light melting into bottom depth shade), chromatic edge
 split (red outside, cyan inside) and a soft drop shadow. Optional content
-draws on top.
+draws on top. When the shell runs `App::wants_backdrop`, the body samples
+the blurred in-app capture so content behind the glass shows through.
 
 ```rust
 pub fn new() -> Self
@@ -31,9 +32,10 @@ The `glass` daemon setting (LiquidGlass slider) drives the look:
 | `Glass` | Balanced frost (white 10%) | Balanced frost (black 8%) |
 | `Much` | Unchanged balanced frost (white 10%) | Lighter frost (white 5%) |
 
-Less glass adds a scattered black dash ring outside the crisp rim. True
-backdrop blur stays a compositor contract (it owns the desktop pixels);
-the stages control frost opacity, rim light and grain downstream of it.
+Less glass adds a scattered black dash ring outside the crisp rim. The
+stages control frost opacity, rim light and grain; the body fill layers
+the blurred in-app backdrop under the frost when `App::wants_backdrop`
+is enabled.
 
 | Token | Value |
 |---|---|
@@ -43,19 +45,22 @@ the stages control frost opacity, rim light and grain downstream of it.
 | `GLASS_DEPTH` | black 18% bottom shade |
 | `GLASS_CHROMA_RED` / `GLASS_CHROMA_CYAN` | faint rim split |
 
-True backdrop blur and refraction need the compositor (it owns the
-desktop pixels behind a transparent window); this kit does everything
-downstream of that: tint, bevel, rim light, chroma and shadow. Shell
-support: `App::transparent_body` skips the window background fill so only
-frame lines, bars and glass show over the desktop.
+Desktop pixels behind a transparent window still need the compositor (it
+owns those pixels); `App::transparent_body` skips the window background
+fill so only frame lines, bars and glass show over the desktop. Enable
+`App::wants_backdrop` for in-app blur of content the shell itself draws
+(window body, titlebar, tracks). On the capture pass the whole container
+(body and children) is omitted so the blur sees only what sits behind it.
 
 ## Usage / Example
 
 Run `cargo run --example glass`: transparent window, titlebar on top,
-one centered empty glass container. Nothing else.
+one centered empty glass container. Nothing else. The example returns
+true from `wants_backdrop` so the glass body blurs the in-app titlebar
+and frame content behind it.
 
 ## Cross References
 
-- [Renderer.md](Renderer.md) – `App::transparent_body`, frame, `View`/`App`
+- [Renderer.md](Renderer.md) – `App::transparent_body`, `App::wants_backdrop`, backdrop blur, `View`/`App`
 - [Layout.md](Layout.md) – stacks and modifiers for glass content
 - [Theme.md](Theme.md) – frost tints per mode, gray inactive state

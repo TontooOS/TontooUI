@@ -7,6 +7,7 @@ use vello::peniko::{Brush, Color, Fill};
 
 use super::super::layout::View;
 use crate::animation::{Animatable, Easing, Repeat, Tween, TweenAnim};
+use crate::renderer::backdrop::fill_backdrop;
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, draw_layout};
 use crate::theme::desaturate;
@@ -218,6 +219,12 @@ impl Toggle {
 
     pub fn is_on(&self) -> bool {
         self.on
+    }
+
+    /// True while the switch knob is held and follows the pointer.
+    /// Apps use this to return true from `App::wants_backdrop`.
+    pub fn is_dragging(&self) -> bool {
+        self.dragging
     }
 
     /// Set the state immediately (no animation). Fires `on_toggle` when
@@ -462,18 +469,23 @@ impl Toggle {
         let held = self.dragging && !self.disabled;
         let expand = if held { TOGGLE_KNOB_EXPAND } else { 0.0 };
         let kr = knob_h / 2.0 + expand;
-        scene.draw_blurred_rounded_rect(
-            Affine::IDENTITY,
-            Rect::new(
-                px(kx - expand),
-                px(ky - expand),
-                px(kx + knob_w + expand),
-                px(ky + knob_h + expand),
-            ),
-            Color::from_rgba8(0, 0, 0, 40),
-            px(kr),
-            6.0 * scale,
-        );
+        // Capture pass while held: leave the knob empty so the blur sees
+        // the track behind the glass.
+        let skip_knob = held && images.is_capture_pass();
+        if !skip_knob {
+            scene.draw_blurred_rounded_rect(
+                Affine::IDENTITY,
+                Rect::new(
+                    px(kx - expand),
+                    px(ky - expand),
+                    px(kx + knob_w + expand),
+                    px(ky + knob_h + expand),
+                ),
+                Color::from_rgba8(0, 0, 0, 40),
+                px(kr),
+                6.0 * scale,
+            );
+        }
         let knob = RoundedRect::new(
             px(kx - expand),
             px(ky - expand),
@@ -481,7 +493,10 @@ impl Toggle {
             px(ky + knob_h + expand),
             px(kr),
         );
-        if held {
+        if skip_knob {
+            // Capture pass: knob body omitted for the backdrop blur.
+        } else if held {
+            fill_backdrop(scene, images, &knob);
             scene.fill(
                 Fill::NonZero,
                 Affine::IDENTITY,

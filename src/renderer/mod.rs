@@ -1,8 +1,10 @@
+pub mod backdrop;
 pub mod frame;
 pub mod images;
 pub mod text;
 pub mod window;
 
+pub use backdrop::{BACKDROP_SIGMA, BackdropBlur, fill_backdrop};
 pub use frame::{EDGE, INNER_TOP, MARGIN, OUTER, content_rect};
 pub use images::{ImageCache, ImageLoader};
 pub use text::{FontSystem, SolidBrush, draw_layout};

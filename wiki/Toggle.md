@@ -57,6 +57,7 @@ pub fn fill(self, color: Color) -> Self
 pub fn disabled(self, disabled: bool) -> Self
 pub fn on_toggle(self, callback: impl FnMut(bool) + 'static) -> Self
 pub fn is_on(&self) -> bool
+pub fn is_dragging(&self) -> bool
 pub fn set_on(&mut self, on: bool)
 pub fn toggle(&mut self)
 pub fn set_label(&mut self, label: impl Into<String>)
@@ -79,6 +80,8 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
   follows the system default/color unless the dev sets it by hand.
 - `set_theme` takes the palette accent plus the dark mode flag, like
   `Slider::set_theme` without the glass stage.
+- `is_dragging` is true while the switch knob is held; return it from
+  `App::wants_backdrop` so the shell runs the backdrop blur pass.
 - Unfocused windows desaturate the toggle like the rest of the palette.
 
 ## Interaction
@@ -90,11 +93,13 @@ children). Pressing inside and releasing outside keeps the state.
 Switch style additionally supports dragging: pressing the track grabs
 the knob and it follows the pointer (`mouse_move`) live. While held the
 white knob turns liquid glass (translucent fill with bright rim, like
-the slider knob) and grows 3 px per side past the track. Releasing past
-halfway snaps to the nearer stop with a 0.15 s `CubicOut` tween and
-fires `on_toggle` when the state changed; releasing before halfway
-snaps back. A press without moving (under 4 px) counts as a tap and
-flips the state. Checkbox and button styles stay click-only.
+the slider knob) and grows 3 px per side past the track; with
+`App::wants_backdrop` the body also samples the blurred in-app backdrop
+(and is omitted on the capture pass so the blur sees the track behind
+it). Releasing past halfway snaps to the nearer stop with a 0.15 s
+`CubicOut` tween and fires `on_toggle` when the state changed; releasing
+before halfway snaps back. A press without moving (under 4 px) counts as
+a tap and flips the state. Checkbox and button styles stay click-only.
 
 Forward `mouse_down`, `mouse_move` and `mouse_up` from the app (see
 `examples/toggle.rs`). Animations are driven by real frame deltas, so
@@ -118,9 +123,9 @@ wifi.set_theme(accent, true);
 
 ## Cross References
 
-- [Slider.md](Slider.md) – accent fill, manual `fill`, click animation
+- [Slider.md](Slider.md) – accent fill, manual `fill`, click animation, backdrop knob
 - [Button.md](Button.md) – button metrics, icon loading, press overlay
 - [Layout.md](Layout.md) – stacks hosting toggles, `View` trait
-- [Renderer.md](Renderer.md) – `ImageLoader`, frame loop, `App`
+- [Renderer.md](Renderer.md) – `ImageLoader`, backdrop blur, frame loop, `App`
 - [Animation.md](Animation.md) – tween driver used by the knob slide
 - [Theme.md](Theme.md) – accent, mode and Multicolor default

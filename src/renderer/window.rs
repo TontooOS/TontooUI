@@ -13,6 +13,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowAttributes};
 
+use super::backdrop::BackdropBlur;
 use super::images::{ImageCache, ImageLoader};
 use super::text::FontSystem;
 
@@ -88,6 +89,14 @@ pub trait App {
     fn transparent_body(&self) -> bool {
         false
     }
+    /// When true the shell runs a second capture pass: draw without glass
+    /// bodies, blur that into an offscreen texture, then draw again with
+    /// the blur available to glass views via `ImageLoader::backdrop`.
+    /// Return true only while backdrop glass is on screen (e.g. a slider
+    /// knob is held) so idle frames stay single-pass.
+    fn wants_backdrop(&self) -> bool {
+        false
+    }
 }
 
 /// Open a window and run `app` until the window closes.
@@ -110,6 +119,7 @@ struct Active {
     fonts: FontSystem,
     images: ImageCache,
     scene: Scene,
+    backdrop: BackdropBlur,
     scale: f64,
     cursor_pos: (f64, f64),
     start: Instant,
@@ -155,71 +165,139 @@ impl<V: App> Shell<V> {
             return;
         }
 
-        active.scene.reset();
         let scale = active.scale as f32;
         active.fonts.scale = scale;
-
-        // Window frame behind content: shadows plus rounded body. The surface
-        // itself is cleared transparent so the corners stay see-through.
-        super::frame::draw_behind(
-            &mut active.scene,
-            size.width,
-            size.height,
-            scale,
-            if self.app.transparent_body() {
-                None
-            } else {
-                Some(self.app.background())
-            },
-        );
 
         let (vx, vy, vw, vh) = super::frame::content_rect(
             size.width as f32 / scale,
             size.height as f32 / scale,
         );
         let elapsed = active.start.elapsed().as_secs_f64();
-        let surface = &mut active.surface;
         let devices = &context.devices;
-        let device_handle = &devices[surface.dev_id];
-        let mut loader = ImageLoader::new(
-            &mut active.renderer,
-            &device_handle.device,
-            &device_handle.queue,
-            &mut active.images,
-        );
-        self.app.draw(
-            &mut active.scene,
-            &mut active.fonts,
-            &mut loader,
-            Viewport {
-                x: vx,
-                y: vy,
-                width: vw,
-                height: vh,
-            },
-            elapsed,
-        );
-
-        // Frame lines above content so bars and fields never cover them.
-        super::frame::draw_frame(&mut active.scene, size.width, size.height, scale);
-
+        let device_handle = &devices[active.surface.dev_id];
         let params = RenderParams {
             base_color: Color::TRANSPARENT,
             width: size.width,
             height: size.height,
             antialiasing_method: AaConfig::Msaa8,
         };
-        if let Err(err) = active.renderer.render_to_texture(
-            &device_handle.device,
-            &device_handle.queue,
-            &active.scene,
-            &surface.target_view,
-            &params,
-        ) {
-            eprintln!("render error: {err:?}");
-            return;
+        let viewport = Viewport {
+            x: vx,
+            y: vy,
+            width: vw,
+            height: vh,
+        };
+        let background = if self.app.transparent_body() {
+            None
+        } else {
+            Some(self.app.background())
+        };
+
+        if self.app.wants_backdrop() {
+            if active.backdrop.size() != Some((size.width, size.height)) {
+                active.backdrop.take_image(&mut active.renderer);
+                active.backdrop
+                    .ensure_size(&device_handle.device, size.width, size.height);
+            }
+
+            // Pass 1: capture without glass bodies (no frame lines: they
+            // sit above content and must not appear under glass).
+            active.scene.reset();
+            super::frame::draw_behind(
+                &mut active.scene,
+                size.width,
+                size.height,
+                scale,
+                background,
+            );
+            {
+                let mut loader = ImageLoader::new(
+                    &mut active.renderer,
+                    &device_handle.device,
+                    &device_handle.queue,
+                    &mut active.images,
+                );
+                loader.set_capture_pass(true);
+                self.app.draw(&mut active.scene, &mut active.fonts, &mut loader, viewport, elapsed);
+            }
+            if let Err(err) = active.renderer.render_to_texture(
+                &device_handle.device,
+                &device_handle.queue,
+                &active.scene,
+                active.backdrop.content_view(),
+                &params,
+            ) {
+                eprintln!("backdrop capture error: {err:?}");
+                return;
+            }
+            active
+                .backdrop
+                .run(&device_handle.device, &device_handle.queue);
+            let backdrop_image = active.backdrop.sync_image(&mut active.renderer);
+
+            // Pass 2: final frame with the blur available to glass.
+            active.scene.reset();
+            super::frame::draw_behind(
+                &mut active.scene,
+                size.width,
+                size.height,
+                scale,
+                background,
+            );
+            {
+                let mut loader = ImageLoader::new(
+                    &mut active.renderer,
+                    &device_handle.device,
+                    &device_handle.queue,
+                    &mut active.images,
+                );
+                loader.set_capture_pass(false);
+                loader.set_backdrop(backdrop_image);
+                self.app.draw(&mut active.scene, &mut active.fonts, &mut loader, viewport, elapsed);
+            }
+            super::frame::draw_frame(&mut active.scene, size.width, size.height, scale);
+            if let Err(err) = active.renderer.render_to_texture(
+                &device_handle.device,
+                &device_handle.queue,
+                &active.scene,
+                &active.surface.target_view,
+                &params,
+            ) {
+                eprintln!("render error: {err:?}");
+                return;
+            }
+        } else {
+            active.scene.reset();
+            super::frame::draw_behind(
+                &mut active.scene,
+                size.width,
+                size.height,
+                scale,
+                background,
+            );
+            {
+                let mut loader = ImageLoader::new(
+                    &mut active.renderer,
+                    &device_handle.device,
+                    &device_handle.queue,
+                    &mut active.images,
+                );
+                self.app.draw(&mut active.scene, &mut active.fonts, &mut loader, viewport, elapsed);
+            }
+            super::frame::draw_frame(&mut active.scene, size.width, size.height, scale);
+            if let Err(err) = active.renderer.render_to_texture(
+                &device_handle.device,
+                &device_handle.queue,
+                &active.scene,
+                &active.surface.target_view,
+                &params,
+            ) {
+                eprintln!("render error: {err:?}");
+                return;
+            }
         }
 
+        let surface = &mut active.surface;
         let frame = match surface.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame)
             | wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
@@ -297,6 +375,8 @@ impl<V: App> ApplicationHandler for Shell<V> {
         let surface: RenderSurface<'static> = surface;
 
         self.context = Some(context);
+        let backdrop_device = &self.context.as_ref().expect("context").devices[surface.dev_id].device;
+        let backdrop = BackdropBlur::new(backdrop_device);
         self.active = Some(Active {
             window,
             surface,
@@ -304,6 +384,7 @@ impl<V: App> ApplicationHandler for Shell<V> {
             fonts: FontSystem::new(),
             images: ImageCache::new(),
             scene: Scene::new(),
+            backdrop,
             scale,
             cursor_pos: (0.0, 0.0),
             start: Instant::now(),

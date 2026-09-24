@@ -8,9 +8,11 @@ result to the winit surface. There is no UIKit layer and no GTK dependency.
 
 | Module | Path | Description |
 |---|---|---|
-| `window` | `src/renderer/window.rs` | winit event loop, surface management, `View` trait, `run` |
+| `window` | `src/renderer/window.rs` | winit event loop, surface management, `App` trait, `run` |
 | `text` | `src/renderer/text.rs` | Parley font system and scene text drawing |
 | `frame` | `src/renderer/frame.rs` | Window frame: shadows, rounded body, edge, outline |
+| `backdrop` | `src/renderer/backdrop.rs` | Offscreen capture + separable gaussian blur for glass |
+| `images` | `src/renderer/images.rs` | SF Symbol cache, per-frame `ImageLoader`, backdrop access |
 
 ## Window
 
@@ -50,7 +52,14 @@ Opens a window with `title` and logical size `width` x `height` and runs
 
 ```rust
 pub trait App {
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, viewport: Viewport, time_secs: f64);
+    fn draw(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+        viewport: Viewport,
+        time_secs: f64,
+    );
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_move(&mut self, _x: f64, _y: f64) {}
     fn set_focused(&mut self, _focused: bool) {}
@@ -64,6 +73,12 @@ pub trait App {
     }
     fn background(&self) -> Color {
         BACKGROUND
+    }
+    fn transparent_body(&self) -> bool {
+        false
+    }
+    fn wants_backdrop(&self) -> bool {
+        false
     }
 }
 ```
@@ -108,6 +123,17 @@ arrive via `mouse_move` (logical px) and focus changes via `set_focused`.
 `background` is read every frame for the window body (see
 [Theme.md](Theme.md)); the default is the dark base color.
 
+```rust
+pub fn transparent_body(&self) -> bool
+pub fn wants_backdrop(&self) -> bool
+```
+
+- `transparent_body` skips the window background fill so only frame lines,
+  bars and glass show over the desktop.
+- `wants_backdrop` enables the two-pass backdrop blur (see Backdrop Blur).
+  Return true only while backdrop glass is on screen (e.g. a slider knob is
+  held) so idle frames stay single-pass.
+
 Non-printable keys forwarded to the view. Printable input arrives via
 `text()` as already-decoded strings (including key repeat).
 
@@ -128,6 +154,10 @@ Each `RedrawRequested` event runs these steps:
 4. `TextureBlitter` copies the target texture to the acquired surface texture.
 5. The surface texture is presented.
 
+When `App::wants_backdrop()` is true the shell inserts a capture pass before
+step 1 of the final draw (see Backdrop Blur); frame lines are recorded only
+on the final pass.
+
 Surface errors are handled per frame:
 
 | Condition | Behavior |
@@ -138,6 +168,38 @@ Surface errors are handled per frame:
 
 `Resized` events with non-zero dimensions call
 `RenderContext::resize_surface`. Zero-size events are ignored.
+
+## Backdrop Blur
+
+When `App::wants_backdrop()` returns true, the shell runs two Vello passes
+per frame so glass can sample a blurred copy of the in-app content behind
+it (window body, tracks, labels, bars):
+
+1. Capture: `scene.reset()`, `draw_behind()`, `App::draw()` with
+   `ImageLoader::set_capture_pass(true)` (glass bodies skip themselves),
+   no frame lines. Rendered into the offscreen `content` texture.
+2. Blur: two compute dispatches (horizontal then vertical) gaussian-blur
+   `content` into `output` (sigma `BACKDROP_SIGMA`, default 8 physical px,
+   clamp-to-edge).
+3. Final: `scene.reset()`, `draw_behind()`, `App::draw()` with
+   `ImageLoader::set_backdrop(Some(image))`, frame lines, render to the
+   surface target, blit.
+
+Desktop pixels behind a transparent window still belong to the compositor;
+this pass blurs only what the app itself draws.
+
+```rust
+pub const BACKDROP_SIGMA: f32;
+pub struct BackdropBlur { .. }
+pub fn fill_backdrop(scene: &mut Scene, images: &ImageLoader<'_>, shape: &impl Shape)
+```
+
+- `BackdropBlur` owns the three offscreen targets and the compute pipeline;
+  the shell creates one per window and resizes it with `ensure_size`.
+- `fill_backdrop` paints `shape` with the blurred capture when
+  `ImageLoader::backdrop()` is `Some`; no-op otherwise (single-pass frames).
+  Scene coordinates are physical px and the texture is full-window physical
+  size, so identity maps image pixel (0, 0) to scene (0, 0).
 
 ## FontSystem
 
@@ -178,6 +240,8 @@ inline boxes are skipped.
 
 ```rust
 pub fn get(&mut self, name: &str, tint: Color, target_px: u32) -> Option<(ImageData, u32, u32)>
+pub fn backdrop(&self) -> Option<&ImageData>
+pub fn is_capture_pass(&self) -> bool
 ```
 
 Per-frame SF Symbol access for views. Resolves CoreIcon artwork by name
@@ -188,6 +252,13 @@ Lanczos3 to `target_px` (pass ~2x the display size) because GPU
 minification without mipmaps turns them to mush. Returns the upload plus
 natural size; callers scale with the draw transform preserving aspect.
 Missing or undecodable assets return `None` so callers skip the icon.
+
+Backdrop access during the two-pass frame:
+
+| Method | Returns |
+|---|---|
+| `backdrop()` | Blurred capture for glass fills, or `None` on the capture pass / single-pass frames |
+| `is_capture_pass()` | True while recording the pre-blur capture; glass bodies must skip drawing |
 
 ## Frame
 

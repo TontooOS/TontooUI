@@ -29,11 +29,17 @@ impl ImageCache {
 /// Per-frame image access for views. Resolves CoreIcon SF Symbols by name,
 /// recolors glyphs to `tint` (assets are black with alpha) and uploads
 /// them once; later frames hit the cache.
+///
+/// During a backdrop capture pass (`set_capture_pass(true)`) glass views
+/// skip their body so the blur sees what is behind them. On the final
+/// pass `backdrop` is the blurred capture that glass samples.
 pub struct ImageLoader<'a> {
     renderer: &'a mut Renderer,
     device: &'a Device,
     queue: &'a Queue,
     cache: &'a mut ImageCache,
+    backdrop: Option<ImageData>,
+    capture_pass: bool,
 }
 
 impl<'a> ImageLoader<'a> {
@@ -48,7 +54,30 @@ impl<'a> ImageLoader<'a> {
             device,
             queue,
             cache,
+            backdrop: None,
+            capture_pass: false,
         }
+    }
+
+    /// Blurred in-app backdrop for glass fills, or `None` on the capture
+    /// pass or when the shell did not run the backdrop pass.
+    pub fn backdrop(&self) -> Option<&ImageData> {
+        self.backdrop.as_ref()
+    }
+
+    /// True while the shell is recording the pre-blur capture pass.
+    /// Glass bodies (and their shadows) must skip drawing so the blur
+    /// sees the content behind them.
+    pub fn is_capture_pass(&self) -> bool {
+        self.capture_pass
+    }
+
+    pub fn set_backdrop(&mut self, backdrop: Option<ImageData>) {
+        self.backdrop = backdrop;
+    }
+
+    pub fn set_capture_pass(&mut self, capture_pass: bool) {
+        self.capture_pass = capture_pass;
     }
 
     /// Get `(image, width, height)` for an SF Symbol name, downscaled with
