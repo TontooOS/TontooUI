@@ -482,7 +482,7 @@ pub fn fill_backdrop_veil(
 
 /// Blur veil alpha for the frosted glass type: heavy frost over the whole
 /// body on top of the lens, just below full blur.
-pub const GLASS_FROST_VEIL: f32 = 0.85;
+pub const GLASS_FROST_VEIL: f32 = 0.95;
 
 /// Frosted liquid glass body: the lens (clear zoomed center, strong rim)
 /// plus a heavy blur veil over everything, so behind shows through but
