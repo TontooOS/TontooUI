@@ -57,8 +57,8 @@ under it `stroke_backdrop_edge` strokes a 6 px blurred rim fully inside the
 body outline; the center fills with the sharp capture magnified around the
 body center (`fill_backdrop_lens`, `GLASS_MAGNIFY`), so the magnifier covers
 the whole middle. Tiny bodies (smaller than twice the band) fall back to a
-full `fill_backdrop` blur. Small knobs (slider, toggle) keep the full blur
-fill; only `GlassContainer` uses the lens.
+full `fill_backdrop` blur. The held toggle knob and the dragged slider knob
+use the same lens via `fill_lens_glass` with a narrower 4 px rim.
 
 Desktop pixels behind a transparent window still need the compositor (it
 owns those pixels); `App::transparent_body` skips the window background

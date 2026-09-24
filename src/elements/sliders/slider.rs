@@ -2,12 +2,13 @@ use std::any::Any;
 use std::time::Instant;
 
 use vello::Scene;
-use vello::kurbo::{Affine, Circle, Point, RoundedRect, Stroke};
+use vello::kurbo::{Affine, Circle, Point, Rect, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
 use super::super::layout::View;
+use super::super::glass::GLASS_MAGNIFY;
 use crate::animation::{Easing, Repeat, Tween, TweenAnim};
-use crate::renderer::backdrop::fill_backdrop;
+use crate::renderer::backdrop::fill_lens_glass;
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, draw_layout};
 use crate::theme::{GlassAmount, desaturate};
@@ -18,10 +19,10 @@ pub const SLIDER_TRACK_H: f32 = 6.0;
 pub const SLIDER_KNOB_W: f32 = 24.0;
 /// Knob height in logical px.
 pub const SLIDER_KNOB_H: f32 = 19.0;
-/// Extra width when pressed (glass expand).
-pub const SLIDER_KNOB_EXPAND_W: f32 = 4.0;
-/// Extra height when pressed (glass expand).
-pub const SLIDER_KNOB_EXPAND_H: f32 = 3.0;
+/// Extra width when pressed (glass expand): 20% of the knob width.
+pub const SLIDER_KNOB_EXPAND_W: f32 = 4.8;
+/// Extra height when pressed (glass expand): 20% of the knob height.
+pub const SLIDER_KNOB_EXPAND_H: f32 = 3.8;
 /// Label size for header text.
 pub const SLIDER_HEADER_SIZE: f32 = 15.0;
 /// Label size for min/max text.
@@ -474,7 +475,17 @@ impl Slider {
         if skip_knob {
             // Capture pass: leave the knob area empty for the blur.
         } else if self.dragging {
-            fill_backdrop(scene, images, &knob);
+            // Liquid glass knob: clear magnified center, thin blurred rim
+            // only (same lens as `GlassContainer`, narrower band for the
+            // small knob).
+            fill_lens_glass(
+                scene,
+                images,
+                &Rect::new(px(kx - kw), px(tcy - kh), px(kx + kw), px(tcy + kh)),
+                px(kr),
+                GLASS_MAGNIFY,
+                4.0 * scale,
+            );
             let tint = if self.dark {
                 Color::from_rgba8(255, 255, 255, 26)
             } else {

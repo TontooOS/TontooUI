@@ -196,6 +196,7 @@ pub struct BackdropBlur { .. }
 pub fn fill_backdrop(scene: &mut Scene, images: &ImageLoader<'_>, shape: &impl Shape)
 pub fn fill_backdrop_lens(scene: &mut Scene, images: &ImageLoader<'_>, shape: &impl Shape, center: Point, zoom: f64)
 pub fn stroke_backdrop_edge(scene: &mut Scene, images: &ImageLoader<'_>, ring: &RoundedRect, width: f64)
+pub fn fill_lens_glass(scene: &mut Scene, images: &ImageLoader<'_>, rect: &Rect, radius: f64, zoom: f64, edge_width: f64)
 ```
 
 - `BackdropBlur` owns the three offscreen targets and the compute pipeline;

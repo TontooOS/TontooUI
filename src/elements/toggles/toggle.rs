@@ -7,7 +7,7 @@ use vello::peniko::{Brush, Color, Fill};
 
 use super::super::layout::View;
 use crate::animation::{Animatable, Easing, Repeat, Tween, TweenAnim};
-use crate::renderer::backdrop::fill_backdrop;
+use crate::renderer::backdrop::fill_lens_glass;
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, draw_layout};
 use crate::theme::desaturate;
@@ -16,6 +16,7 @@ use super::super::buttons::{
     BUTTON_BG_DARK, BUTTON_BG_LIGHT, BUTTON_FONT_SIZE, BUTTON_GAP, BUTTON_ICON_SIZE,
     BUTTON_PAD_X, BUTTON_PAD_Y, BUTTON_RADIUS,
 };
+use super::super::glass::GLASS_MAGNIFY;
 
 /// Switch track width in logical px (stretched long and slim,
 /// macOS style).
@@ -496,11 +497,26 @@ impl Toggle {
         if skip_knob {
             // Capture pass: knob body omitted for the backdrop blur.
         } else if held {
-            fill_backdrop(scene, images, &knob);
+            // Liquid glass knob: clear magnified center, thin blurred rim
+            // only (same lens as `GlassContainer`, narrower band for the
+            // small knob).
+            fill_lens_glass(
+                scene,
+                images,
+                &Rect::new(
+                    px(kx - expand),
+                    px(ky - expand),
+                    px(kx + knob_w + expand),
+                    px(ky + knob_h + expand),
+                ),
+                px(kr),
+                GLASS_MAGNIFY,
+                4.0 * scale,
+            );
             scene.fill(
                 Fill::NonZero,
                 Affine::IDENTITY,
-                &Brush::Solid(Color::from_rgba8(255, 255, 255, 64)),
+                &Brush::Solid(Color::from_rgba8(255, 255, 255, 28)),
                 None,
                 &knob,
             );

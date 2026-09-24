@@ -5,9 +5,7 @@ use super::layout::View;
 use vello::kurbo::{Affine, Point, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
-use crate::renderer::backdrop::{
-    fill_backdrop, fill_backdrop_lens, stroke_backdrop_edge,
-};
+use crate::renderer::backdrop::fill_lens_glass;
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
 use crate::theme::{GlassAmount, ThemeMode, desaturate};
@@ -175,29 +173,10 @@ impl GlassContainer {
             12.0 * scale,
         );
 
-        // Liquid lens: clear magnified center, blurred rim band only.
-        // The sharp capture is zoomed around the body center so content
-        // behind the glass looks slightly enlarged; the blurred capture is
-        // stroked as a narrow band fully inside the body outline so only
-        // the very edge frosts. Tiny bodies fall back to a full blur fill.
+        // Liquid lens: clear magnified center, blurred rim band only (see
+        // `fill_lens_glass`; tiny bodies fall back to a full blur fill).
         let band = GLASS_EDGE_WIDTH as f64 * scale;
-        let min_side = (rect.x1 - rect.x0).min(rect.y1 - rect.y0);
-        if min_side <= band * 2.0 {
-            fill_backdrop(scene, images, &body);
-        } else {
-            let center =
-                Point::new((rect.x0 + rect.x1) * 0.5, (rect.y0 + rect.y1) * 0.5);
-            fill_backdrop_lens(scene, images, &body, center, GLASS_MAGNIFY);
-            let inset = band * 0.5;
-            let ring = RoundedRect::new(
-                rect.x0 + inset,
-                rect.y0 + inset,
-                rect.x1 - inset,
-                rect.y1 - inset,
-                (radius - inset).max(0.0),
-            );
-            stroke_backdrop_edge(scene, images, &ring, band);
-        }
+        fill_lens_glass(scene, images, &rect, radius, GLASS_MAGNIFY, band);
 
         // Frosted body (gray when the window is inactive).
         let tint = if self.focused {

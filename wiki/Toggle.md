@@ -92,11 +92,12 @@ children). Pressing inside and releasing outside keeps the state.
 
 Switch style additionally supports dragging: pressing the track grabs
 the knob and it follows the pointer (`mouse_move`) live. While held the
-white knob turns liquid glass (translucent fill with bright rim, like
-the slider knob) and grows 3 px per side past the track; with
-`App::wants_backdrop` the body also samples the blurred in-app backdrop
-(and is omitted on the capture pass so the blur sees the track behind
-it). Releasing past halfway snaps to the nearer stop with a 0.15 s
+white knob turns into the shared liquid glass lens (`fill_lens_glass`:
+clear magnified center, thin 4 px blurred rim, light frost fill with bright
+rim, like the slider knob) and grows 3 px per side past the track; with
+`App::wants_backdrop` the lens also samples the sharp and blurred in-app
+backdrop (and is omitted on the capture pass so the blur sees the track
+behind it). Releasing past halfway snaps to the nearer stop with a 0.15 s
 `CubicOut` tween and fires `on_toggle` when the state changed; releasing
 before halfway snaps back. A press without moving (under 4 px) counts as
 a tap and flips the state. Checkbox and button styles stay click-only.

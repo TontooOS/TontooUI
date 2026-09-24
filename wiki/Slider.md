@@ -12,6 +12,7 @@ blur (when the shell runs `App::wants_backdrop`).
 |---|---|
 | `SLIDER_TRACK_H` | 6 px line |
 | `SLIDER_KNOB_D` | 28 px white knob with soft shadow |
+| `SLIDER_KNOB_EXPAND_W` / `SLIDER_KNOB_EXPAND_H` | +4.8 / +3.8 px while pressed (20% larger glass knob) |
 | `SLIDER_HEADER_SIZE` / `SLIDER_SMALL_SIZE` | 15 px semibold header / 11 px labels |
 | `SLIDER_ANIM_SECONDS` | 0.25 s click-to-point animation |
 | `SLIDER_TRACK_DARK` / `SLIDER_TRACK_LIGHT` | `#3A3A3C` / `#E5E5E5` |
@@ -60,11 +61,11 @@ dragging; `mouse_up` ends the drag. The filled part, knob and ticks track
 the animated display value, labels track the logical value. Forward all
 three mouse methods from the app (see `examples/slider.rs`).
 
-While held the knob body fills with the blurred in-app backdrop
-(`ImageLoader::backdrop`) plus the existing frost tint, bevel and chroma;
-on the capture pass the knob (and its shadow) is omitted so the blur sees
-the track behind it. Without a backdrop pass the knob keeps the solid
-frost tint only.
+While held the knob turns into the shared liquid glass lens
+(`fill_lens_glass`): clear magnified center plus a thin 4 px blurred rim,
+frost tint, bevel and chroma; on the capture pass the knob (and its shadow)
+is omitted so the blur sees the track behind it. Without a backdrop pass
+the knob keeps the solid frost tint only.
 
 ## Usage / Example
 

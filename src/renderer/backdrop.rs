@@ -1,4 +1,4 @@
-use vello::kurbo::{Affine, Point, RoundedRect, Stroke};
+use vello::kurbo::{Affine, Point, Rect, RoundedRect, Stroke};
 use vello::peniko::{Extend, Fill, ImageBrush, ImageData, ImageQuality};
 use vello::Renderer;
 use wgpu::{
@@ -215,18 +215,23 @@ impl BackdropBlur {
         }
         let content = create_target(
             device,
+            "tontooui backdrop content",
             width,
             height,
-            TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING,
+            TextureUsages::STORAGE_BINDING
+                | TextureUsages::TEXTURE_BINDING
+                | TextureUsages::COPY_SRC,
         );
         let temp = create_target(
             device,
+            "tontooui backdrop temp",
             width,
             height,
             TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING,
         );
         let output = create_target(
             device,
+            "tontooui backdrop blurred",
             width,
             height,
             TextureUsages::STORAGE_BINDING
@@ -413,6 +418,38 @@ pub fn fill_backdrop_lens(
     );
 }
 
+/// Shared liquid glass body: clear magnified center with only a thin
+/// blurred rim band inside the outline. `rect`/`radius` are in physical px,
+/// `zoom` is the lens magnification (1.0 = none) and `edge_width` the rim
+/// band width in physical px. Bodies smaller than twice the band fall back
+/// to a full blur fill.
+pub fn fill_lens_glass(
+    scene: &mut vello::Scene,
+    images: &crate::renderer::images::ImageLoader<'_>,
+    rect: &Rect,
+    radius: f64,
+    zoom: f64,
+    edge_width: f64,
+) {
+    let body = RoundedRect::from_rect(*rect, radius);
+    let min_side = (rect.x1 - rect.x0).min(rect.y1 - rect.y0);
+    if edge_width <= 0.0 || min_side <= edge_width * 2.0 {
+        fill_backdrop(scene, images, &body);
+        return;
+    }
+    let center = Point::new((rect.x0 + rect.x1) * 0.5, (rect.y0 + rect.y1) * 0.5);
+    fill_backdrop_lens(scene, images, &body, center, zoom);
+    let inset = edge_width * 0.5;
+    let ring = RoundedRect::new(
+        rect.x0 + inset,
+        rect.y0 + inset,
+        rect.x1 - inset,
+        rect.y1 - inset,
+        (radius - inset).max(0.0),
+    );
+    stroke_backdrop_edge(scene, images, &ring, edge_width);
+}
+
 /// Liquid glass edge: strokes `ring` with the blurred capture. Callers pass
 /// a rounded rect inset by half the band width with a stroke width equal to
 /// the band, so the blur sits fully inside the glass body (outer stroke
@@ -441,9 +478,15 @@ pub fn stroke_backdrop_edge(
     );
 }
 
-fn create_target(device: &Device, width: u32, height: u32, usage: TextureUsages) -> Texture {
+fn create_target(
+    device: &Device,
+    label: &str,
+    width: u32,
+    height: u32,
+    usage: TextureUsages,
+) -> Texture {
     device.create_texture(&TextureDescriptor {
-        label: Some("tontooui backdrop"),
+        label: Some(label),
         size: wgpu::Extent3d {
             width,
             height,
