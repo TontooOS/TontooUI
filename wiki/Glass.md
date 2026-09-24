@@ -13,13 +13,28 @@ pub fn new() -> Self
 pub fn bounds(self, x: f32, y: f32, width: f32, height: f32) -> Self
 pub fn radius(self, px: f32) -> Self
 pub fn tint(mut self, tint: Color) -> Self
+pub fn glass_type(mut self, glass_type: GlassType) -> Self
 pub fn content(self, child: impl View + 'static) -> Self
 pub fn set_bounds(&mut self, x: f32, y: f32, width: f32, height: f32)
 pub fn set_tint(&mut self, tint: Color)
+pub fn set_glass_type(&mut self, glass_type: GlassType)
 pub fn set_theme(&mut self, mode: ThemeMode, amount: GlassAmount)
 pub fn set_focused(&mut self, focused: bool)
 pub fn child_mut<T: View + 'static>(&mut self) -> Option<&mut T>
 ```
+
+```rust
+pub enum GlassType {
+    Lens,
+    Frosted,
+}
+```
+
+- `Lens` (default): clear minified center, blur only on the narrow edge
+  band. Slider and toggle knobs always use this finish.
+- `Frosted`: same lens plus a light blur veil (`GLASS_FROST_VEIL`, 0.35)
+  over the whole body, so frost shows everywhere with the strongest frost
+  at the edge and only light frost inside.
 
 Defaults: 320 x 180, 24 px radius, dark frost tint. `set_tint` overrides
 manually; `set_theme` follows the system glass stage.

@@ -452,6 +452,52 @@ pub fn fill_lens_glass(
     stroke_backdrop_edge(scene, images, &ring, edge_width);
 }
 
+/// Light blur veil over the whole `shape`: the blurred capture at `alpha`
+/// (0.0 transparent, 1.0 full frost). Layered under a full-strength edge
+/// band it reads as frost everywhere with the strongest frost at the rim.
+pub fn fill_backdrop_veil(
+    scene: &mut vello::Scene,
+    images: &crate::renderer::images::ImageLoader<'_>,
+    shape: &impl vello::kurbo::Shape,
+    alpha: f32,
+) {
+    let Some(bd) = images.backdrop() else {
+        return;
+    };
+    if alpha <= 0.0 {
+        return;
+    }
+    scene.fill(
+        Fill::NonZero,
+        Affine::IDENTITY,
+        &vello::peniko::Brush::Image(
+            ImageBrush::new(bd.clone())
+                .with_extend(Extend::Pad)
+                .with_alpha(alpha.clamp(0.0, 1.0)),
+        ),
+        None,
+        shape,
+    );
+}
+
+/// Frosted liquid glass body: same lens as `fill_lens_glass` (clear zoomed
+/// center, strong blurred rim) plus a light blur veil over everything, so
+/// the frost is strongest at the edge and light inside. `veil_alpha` around
+/// 0.3-0.5 keeps the center readable.
+pub fn fill_frosted_glass(
+    scene: &mut vello::Scene,
+    images: &crate::renderer::images::ImageLoader<'_>,
+    rect: &Rect,
+    radius: f64,
+    zoom: f64,
+    edge_width: f64,
+    veil_alpha: f32,
+) {
+    fill_lens_glass(scene, images, rect, radius, zoom, edge_width);
+    let body = RoundedRect::from_rect(*rect, radius);
+    fill_backdrop_veil(scene, images, &body, veil_alpha);
+}
+
 /// Liquid glass edge: strokes `ring` with the blurred capture. Callers pass
 /// a rounded rect inset by half the band width with a stroke width equal to
 /// the band, so the blur sits fully inside the glass body (outer stroke

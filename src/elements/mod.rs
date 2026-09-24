@@ -28,6 +28,6 @@ pub use toggles::{
     TOGGLE_OFF_LIGHT, TOGGLE_GLASS_DELAY, TOGGLE_SNAP_SECONDS, TOGGLE_SWIPE_PX, TOGGLE_SWITCH_H,
     TOGGLE_SWITCH_W,
 };
-pub use glass::GlassContainer;
+pub use glass::{GlassContainer, GlassType};
 pub use layout::{Align, Background, Frame, HStack, Padding, Spacer, View, VStack, ZStack};
 pub use titlebar::{Titlebar, TitlebarHeight, TrafficAction};

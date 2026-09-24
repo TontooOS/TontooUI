@@ -5,7 +5,7 @@ use super::layout::View;
 use vello::kurbo::{Affine, Point, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
-use crate::renderer::backdrop::fill_lens_glass;
+use crate::renderer::backdrop::{fill_frosted_glass, fill_lens_glass};
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
 use crate::theme::{GlassAmount, ThemeMode, desaturate};
@@ -44,6 +44,20 @@ pub fn glass_edge_width(min_side: f32) -> f32 {
 /// Lens zoom of the clear center: below 1.0 the backdrop behind the glass
 /// shrinks (minify), above 1.0 it grows. Default minifies slightly.
 pub const GLASS_ZOOM: f64 = 0.80;
+/// Blur veil alpha for the frosted glass type: light frost over the whole
+/// body on top of the lens, so the edge stays strongest.
+pub const GLASS_FROST_VEIL: f32 = 0.35;
+
+/// Glass finish: how the backdrop shows through the body.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GlassType {
+    /// Clear minified center, blur only on the narrow edge band.
+    #[default]
+    Lens,
+    /// Same lens plus a light blur veil over the whole body: frost
+    /// everywhere, strongest at the edge, light inside.
+    Frosted,
+}
 
 /// Liquid glass container: clear minified lens center, frosted edge band,
 /// liquid bevel rim with specular top light and depth shade, chromatic edge
@@ -64,6 +78,7 @@ pub struct GlassContainer {
     specular: Color,
     grain: bool,
     focused: bool,
+    glass_type: GlassType,
     child: Option<Box<dyn View>>,
 }
 
@@ -79,6 +94,7 @@ impl GlassContainer {
             specular: GLASS_SPECULAR,
             grain: false,
             focused: true,
+            glass_type: GlassType::Lens,
             child: None,
         }
     }
@@ -101,6 +117,13 @@ impl GlassContainer {
         self
     }
 
+    /// Glass finish: `GlassType::Lens` (default, clear center) or
+    /// `GlassType::Frosted` (light blur everywhere, strongest at the edge).
+    pub fn glass_type(mut self, glass_type: GlassType) -> Self {
+        self.glass_type = glass_type;
+        self
+    }
+
     pub fn content(mut self, child: impl View + 'static) -> Self {
         self.child = Some(Box::new(child));
         self
@@ -115,6 +138,10 @@ impl GlassContainer {
 
     pub fn set_tint(&mut self, tint: Color) {
         self.tint = tint;
+    }
+
+    pub fn set_glass_type(&mut self, glass_type: GlassType) {
+        self.glass_type = glass_type;
     }
 
     /// Inactive windows desaturate the frost like the rest of the palette.
@@ -191,12 +218,27 @@ impl GlassContainer {
             8.0 * scale,
         );
 
-        // Liquid lens: clear magnified center, blurred rim band only (see
-        // `fill_lens_glass`; tiny bodies fall back to a full blur fill).
-        // Small glass gets a 1 px edge, large glass a 2 px edge.
+        // Backdrop finish: clear lens center with a blurred rim band, or
+        // the same lens plus a light blur veil everywhere for Frosted.
+        // Tiny bodies fall back to a full blur fill (see backdrop).
         let edge_logical = glass_edge_width(self.width.min(self.height));
         let band = edge_logical as f64 * scale;
-        fill_lens_glass(scene, images, &rect, radius, GLASS_ZOOM, band);
+        match self.glass_type {
+            GlassType::Lens => {
+                fill_lens_glass(scene, images, &rect, radius, GLASS_ZOOM, band);
+            }
+            GlassType::Frosted => {
+                fill_frosted_glass(
+                    scene,
+                    images,
+                    &rect,
+                    radius,
+                    GLASS_ZOOM,
+                    band,
+                    GLASS_FROST_VEIL,
+                );
+            }
+        }
 
         // Frosted body (gray when the window is inactive).
         let tint = if self.focused {
