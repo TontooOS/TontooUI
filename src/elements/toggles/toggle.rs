@@ -117,6 +117,9 @@ pub struct Toggle {
     anim: Option<TweenAnim<f32>>,
     anim_time: f32,
     last_draw: Option<Instant>,
+    /// Glass grow factor: 0.0 at rest, 1.0 fully grown while held.
+    /// Animated in `advance` like the slider knob expand.
+    grow: f32,
     on_toggle: Option<Box<dyn FnMut(bool)>>,
 }
 
@@ -155,6 +158,7 @@ impl Toggle {
             anim: None,
             anim_time: 0.0,
             last_draw: None,
+            grow: 0.0,
             on_toggle: None,
         }
     }
@@ -378,6 +382,21 @@ impl Toggle {
             None => 0.0,
         };
         self.last_draw = Some(now);
+        // Glass grow animation: ease toward held (1.0) or rest (0.0) at
+        // the same rate as the slider knob expand. Runs before the
+        // dragging early-return so release shrinks smoothly too.
+        let grow_target = if self.dragging && !self.disabled {
+            1.0f32
+        } else {
+            0.0
+        };
+        let grow_speed = 14.0;
+        self.grow += (grow_target - self.grow)
+            .min(grow_speed * dt)
+            .max(-grow_speed * dt);
+        if (self.grow - grow_target).abs() < 0.005 {
+            self.grow = grow_target;
+        }
         if self.dragging {
             // While held the pointer owns `shown`; never snap it back to
             // the on/off endpoint or the knob would freeze mid-drag.
@@ -471,8 +490,11 @@ impl Toggle {
         let kx = self.sx + TOGGLE_KNOB_PAD + self.shown.clamp(0.0, 1.0) * travel;
         let ky = self.sy + TOGGLE_KNOB_PAD;
         let held = self.dragging && !self.disabled;
-        let ex = if held { TOGGLE_KNOB_EXPAND_W } else { 0.0 };
-        let ey = if held { TOGGLE_KNOB_EXPAND_H } else { 0.0 };
+        // Animated glass size; the glass look lingers while the bubble
+        // shrinks after release.
+        let glass = held || self.grow > 0.001;
+        let ex = self.grow * TOGGLE_KNOB_EXPAND_W;
+        let ey = self.grow * TOGGLE_KNOB_EXPAND_H;
         let kr = knob_h / 2.0 + ey;
         // Capture pass while held: leave the knob empty so the blur sees
         // the track behind the glass.
@@ -500,7 +522,7 @@ impl Toggle {
         );
         if skip_knob {
             // Capture pass: knob body omitted for the backdrop blur.
-        } else if held {
+        } else if glass {
             // Liquid glass knob: clear magnified center, thin blurred rim
             // only (same lens as `GlassContainer`, narrower band for the
             // small knob).
