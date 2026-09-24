@@ -1,36 +1,36 @@
 use std::any::Any;
-use std::time::Instant;
 
 use vello::Scene;
 use vello::kurbo::{Affine, Line, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, Fill};
 
 use super::super::layout::View;
-use crate::animation::{Easing, Repeat, Tween, TweenAnim};
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, draw_layout};
 use crate::theme::desaturate;
 
 /// Segmented control height in logical px (macOS segmented measure).
-pub const SEGMENTED_HEIGHT: f32 = 32.0;
+pub const SEGMENTED_HEIGHT: f32 = 16.0;
 /// Outer track corner radius in logical px.
-pub const SEGMENTED_RADIUS: f32 = 8.0;
+pub const SEGMENTED_RADIUS: f32 = 4.0;
 /// Selected pill inset inside the track in logical px.
-pub const SEGMENTED_PAD: f32 = 2.0;
+pub const SEGMENTED_PAD: f32 = 1.0;
 /// Selected pill corner radius in logical px.
-pub const SEGMENTED_PILL_RADIUS: f32 = 6.5;
+pub const SEGMENTED_PILL_RADIUS: f32 = 3.25;
 /// Segment label size in logical px.
-pub const SEGMENTED_FONT_SIZE: f32 = 15.0;
+pub const SEGMENTED_FONT_SIZE: f32 = 7.5;
 /// Leading label size in logical px (settings-row measure).
-pub const SEGMENTED_LABEL_SIZE: f32 = 17.0;
+pub const SEGMENTED_LABEL_SIZE: f32 = 8.5;
 /// Gap between the leading label and the track in logical px.
-pub const SEGMENTED_GAP: f32 = 12.0;
+pub const SEGMENTED_GAP: f32 = 6.0;
 /// Horizontal text padding inside a segment in logical px.
-pub const SEGMENTED_PAD_X: f32 = 16.0;
+pub const SEGMENTED_PAD_X: f32 = 8.0;
 /// Minimum segment width in logical px.
-pub const SEGMENTED_MIN_SEG_W: f32 = 72.0;
-/// Selection slide time in seconds.
-pub const SEGMENTED_ANIM_SECONDS: f32 = 0.20;
+pub const SEGMENTED_MIN_SEG_W: f32 = 36.0;
+/// Pressed-segment fill for light mode (shown while held, like macOS).
+pub const SEGMENTED_PRESSED_LIGHT: Color = Color::from_rgb8(0xd1, 0xd1, 0xd6);
+/// Pressed-segment fill for dark mode (shown while held, like macOS).
+pub const SEGMENTED_PRESSED_DARK: Color = Color::from_rgb8(0x63, 0x63, 0x66);
 /// Track fill for light mode.
 pub const SEGMENTED_TRACK_LIGHT: Color = Color::from_rgb8(0xe5, 0xe5, 0xe5);
 /// Track fill for dark mode.
@@ -41,7 +41,10 @@ pub const SEGMENTED_ACCENT: Color = Color::from_rgb8(0x00, 0x7a, 0xff);
 /// Segmented picker (SwiftUI `Picker` with `.segmented` style): an
 /// optional leading label plus a macOS-style segmented track. The
 /// selected segment draws as an accent pill, the rest as plain labels
-/// with hairline dividers between unselected neighbors.
+/// with hairline dividers between unselected neighbors. Like macOS
+/// there is no hover state and no selection animation: pressing a
+/// segment shows a gray hold highlight and releasing there switches
+/// to it instantly.
 ///
 /// Clicks select on release inside the track (`mouse_down` arms,
 /// `View::mouse_up` fires); the shell forwards both.
@@ -49,7 +52,6 @@ pub struct SegmentedPicker {
     label: String,
     options: Vec<String>,
     selected: usize,
-    shown: f32,
     accent: Color,
     accent_manual: bool,
     dark: bool,
@@ -66,12 +68,9 @@ pub struct SegmentedPicker {
     label_x: f32,
     label_y: f32,
     armed: bool,
-    hovered: Option<usize>,
+    pressed: Option<usize>,
     disabled: bool,
     focused: bool,
-    anim: Option<TweenAnim<f32>>,
-    anim_time: f32,
-    last_draw: Option<Instant>,
     on_select: Option<Box<dyn FnMut(usize)>>,
 }
 
@@ -82,7 +81,6 @@ impl SegmentedPicker {
             label: label.into(),
             options,
             selected,
-            shown: selected as f32,
             accent: SEGMENTED_ACCENT,
             accent_manual: false,
             dark: true,
@@ -99,12 +97,9 @@ impl SegmentedPicker {
             label_x: 0.0,
             label_y: 0.0,
             armed: false,
-            hovered: None,
+            pressed: None,
             disabled: false,
             focused: true,
-            anim: None,
-            anim_time: 0.0,
-            last_draw: None,
             on_select: None,
         }
     }
@@ -117,12 +112,9 @@ impl SegmentedPicker {
         )
     }
 
-    /// Initial selection without animation and without firing `on_select`.
+    /// Initial selection without firing `on_select`.
     pub fn selected(mut self, index: usize) -> Self {
-        let clamped = self.clamp_index(index);
-        self.selected = clamped;
-        self.shown = clamped as f32;
-        self.anim = None;
+        self.selected = self.clamp_index(index);
         self
     }
 
@@ -192,32 +184,20 @@ impl SegmentedPicker {
         }
     }
 
-    /// Select immediately with pill animation. Fires `on_select` when
-    /// the selection changed.
+    /// Select instantly, like macOS (no slide animation). Fires
+    /// `on_select` when the selection changed.
     pub fn select(&mut self, index: usize) {
         let clamped = self.clamp_index(index);
         if clamped != self.selected {
             self.selected = clamped;
-            self.anim = Some(TweenAnim::new(
-                Tween::new(self.shown, clamped as f32, SEGMENTED_ANIM_SECONDS)
-                    .easing(Easing::CubicOut)
-                    .repeat(Repeat::Never),
-            ));
-            self.anim_time = 0.0;
             self.notify();
         }
     }
 
-    /// Set the selection immediately (no animation). Fires `on_select`
-    /// when the selection changed.
+    /// Set the selection instantly. Fires `on_select` when the
+    /// selection changed.
     pub fn set_selected(&mut self, index: usize) {
-        let clamped = self.clamp_index(index);
-        if clamped != self.selected {
-            self.selected = clamped;
-            self.shown = clamped as f32;
-            self.anim = None;
-            self.notify();
-        }
+        self.select(index);
     }
 
     fn notify(&mut self) {
@@ -299,13 +279,18 @@ impl SegmentedPicker {
         if self.disabled {
             return;
         }
-        if self.segment_at(x as f32, y as f32).is_some() {
+        if let Some(index) = self.segment_at(x as f32, y as f32) {
             self.armed = true;
+            self.pressed = Some(index);
         }
     }
 
+    /// While held the gray highlight follows the pointer; otherwise
+    /// there is no hover state, like macOS.
     pub fn mouse_move(&mut self, x: f64, y: f64) {
-        self.hovered = self.segment_at(x as f32, y as f32);
+        if self.armed {
+            self.pressed = self.segment_at(x as f32, y as f32);
+        }
     }
 
     pub fn mouse_up(&mut self, x: f64, y: f64) {
@@ -314,30 +299,22 @@ impl SegmentedPicker {
 
     fn finish_up(&mut self, x: f64, y: f64) {
         let was_armed = self.armed;
+        let was_pressed = self.pressed.take();
         self.armed = false;
         if was_armed && !self.disabled {
-            if let Some(index) = self.segment_at(x as f32, y as f32) {
-                self.select(index);
+            if let Some(index) = was_pressed {
+                if self.segment_at(x as f32, y as f32) == Some(index) {
+                    self.select(index);
+                }
             }
         }
     }
 
-    fn advance(&mut self, now: Instant) {
-        let dt = match self.last_draw {
-            Some(last) => now.saturating_duration_since(last).as_secs_f32().min(0.1),
-            None => 0.0,
-        };
-        self.last_draw = Some(now);
-        if let Some(anim) = self.anim.as_mut() {
-            self.anim_time += dt;
-            let done = anim.update(self.anim_time);
-            self.shown = *anim.value();
-            if done {
-                self.anim = None;
-                self.shown = self.selected as f32;
-            }
-        } else if !self.options.is_empty() {
-            self.shown = self.selected as f32;
+    fn pressed_color(&self) -> Color {
+        if self.dark {
+            SEGMENTED_PRESSED_DARK
+        } else {
+            SEGMENTED_PRESSED_LIGHT
         }
     }
 }
@@ -382,7 +359,6 @@ impl View for SegmentedPicker {
     }
 
     fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, _images: &mut ImageLoader<'_>) {
-        self.advance(Instant::now());
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
         if self.options.is_empty() {
@@ -416,9 +392,9 @@ impl View for SegmentedPicker {
             &track,
         );
 
-        // Selected pill slides with `shown` (fractional index).
-        let clamped = self.shown.clamp(0.0, (self.options.len() - 1).max(0) as f32);
-        let pill_x0 = self.track_x + clamped * self.seg_w + SEGMENTED_PAD;
+        // Selected pill sits on the selected segment (no animation,
+        // like macOS).
+        let pill_x0 = self.track_x + self.selected as f32 * self.seg_w + SEGMENTED_PAD;
         let pill_x1 = pill_x0 + self.seg_w - SEGMENTED_PAD * 2.0;
         let pill = RoundedRect::new(
             px(pill_x0),
@@ -437,7 +413,7 @@ impl View for SegmentedPicker {
             ),
             Color::from_rgba8(0, 0, 0, 40),
             px(SEGMENTED_PILL_RADIUS),
-            6.0 * scale,
+            3.0 * scale,
         );
         scene.fill(
             Fill::NonZero,
@@ -456,8 +432,8 @@ impl View for SegmentedPicker {
             }
             let dx = self.track_x + i as f32 * self.seg_w;
             let line = Line::new(
-                (px(dx), px(self.track_y + 8.0)),
-                (px(dx), px(self.track_y + SEGMENTED_HEIGHT - 8.0)),
+                (px(dx), px(self.track_y + 4.0)),
+                (px(dx), px(self.track_y + SEGMENTED_HEIGHT - 4.0)),
             );
             scene.stroke(
                 &Stroke::new(1.0 * scale),
@@ -468,13 +444,35 @@ impl View for SegmentedPicker {
             );
         }
 
-        // Segment labels centered in each cell.
+        // Gray hold highlight on the pressed segment (not on the
+        // already-selected one, which keeps its accent pill).
+        if let Some(held) = self.pressed {
+            if held != selected && !self.disabled {
+                let hx0 = self.track_x + held as f32 * self.seg_w + SEGMENTED_PAD;
+                let hx1 = hx0 + self.seg_w - SEGMENTED_PAD * 2.0;
+                let hold = RoundedRect::new(
+                    px(hx0),
+                    px(self.track_y + SEGMENTED_PAD),
+                    px(hx1),
+                    px(self.track_y + SEGMENTED_HEIGHT - SEGMENTED_PAD),
+                    px(SEGMENTED_PILL_RADIUS),
+                );
+                scene.fill(
+                    Fill::NonZero,
+                    Affine::IDENTITY,
+                    &Brush::Solid(self.eff(self.pressed_color())),
+                    None,
+                    &hold,
+                );
+            }
+        }
+
+        // Segment labels centered in each cell. No hover state, like
+        // macOS: unselected labels stay dim.
         for (i, option) in self.options.clone().iter().enumerate() {
             let is_selected = i == selected;
             let color = if is_selected {
                 Color::WHITE
-            } else if Some(i) == self.hovered && !self.disabled {
-                self.text_color
             } else {
                 self.text_dim
             };
@@ -527,17 +525,43 @@ mod tests {
         // Release without press does nothing.
         p.mouse_up(1000.0, 1000.0);
         assert_eq!(p.selected_index(), 0);
-        // Press and release inside the last segment selects it.
-        let x = (p.track_x + p.track_w - 4.0) as f64;
+        // Press and release inside the last segment selects it
+        // instantly (no animation, like macOS).
+        let x = (p.track_x + p.track_w - 2.0) as f64;
         let y = (p.track_y + SEGMENTED_HEIGHT / 2.0) as f64;
         p.mouse_down(x, y);
+        // While held the pressed segment shows the gray highlight.
+        assert_eq!(p.pressed, Some(2));
         p.mouse_up(x, y);
         assert_eq!(p.selected_index(), 2);
         assert_eq!(p.selected_label(), Some("Three"));
-        assert!(p.anim.is_some());
+        assert_eq!(p.pressed, None);
         // Press inside, release outside keeps the selection.
         p.mouse_down(x, y);
         p.mouse_up(5000.0, 5000.0);
+        assert_eq!(p.selected_index(), 2);
+    }
+
+    #[test]
+    fn hold_highlight_follows_pointer_and_has_no_hover() {
+        let mut p = picker();
+        let mut fonts = FontSystem::new();
+        let (w, h) = p.measure(&mut fonts);
+        p.place(&mut fonts, 0.0, 0.0, w, h);
+        let y = (p.track_y + SEGMENTED_HEIGHT / 2.0) as f64;
+        // Hovering without pressing highlights nothing.
+        let x = (p.track_x + p.seg_w * 1.5) as f64;
+        p.mouse_move(x, y);
+        assert_eq!(p.pressed, None);
+        // Pressing highlights the segment under the pointer...
+        p.mouse_down(x, y);
+        assert_eq!(p.pressed, Some(1));
+        // ...follows it while held...
+        let x2 = (p.track_x + p.seg_w * 2.5) as f64;
+        p.mouse_move(x2, y);
+        assert_eq!(p.pressed, Some(2));
+        // ...and releases there.
+        p.mouse_up(x2, y);
         assert_eq!(p.selected_index(), 2);
     }
 
@@ -558,8 +582,7 @@ mod tests {
         let mut p = picker();
         p.set_selected(99);
         assert_eq!(p.selected_index(), 2);
-        assert!(p.anim.is_none());
-        assert_eq!(p.shown, 2.0);
+        assert_eq!(p.selected_label(), Some("Three"));
     }
 
     #[test]

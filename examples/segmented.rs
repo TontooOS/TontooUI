@@ -1,4 +1,6 @@
-use tontooui::elements::{SegmentedPicker, Titlebar, TrafficAction, View, VStack};
+use tontooui::elements::{
+    SegmentedPicker, Titlebar, TrafficAction, View, VStack, SEGMENTED_HEIGHT,
+};
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::text::draw_layout;
@@ -109,7 +111,7 @@ impl App for SegmentedDemo {
         let layout = fonts.layout_text_weighted(&caption, 17.0, self.text, 600.0, None);
         let (tw, _) = FontSystem::layout_size(&layout);
         let cx = viewport.x + (viewport.width - tw / fonts.scale) / 2.0;
-        let cy = top + 16.0 + 32.0 + 16.0;
+        let cy = top + 8.0 + SEGMENTED_HEIGHT + 8.0;
         draw_layout(scene, &layout, cx, cy, fonts.scale);
     }
 

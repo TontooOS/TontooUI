@@ -12,19 +12,19 @@ use crate::renderer::text::{FontSystem, draw_layout};
 use crate::theme::desaturate;
 
 /// Radio dot outer radius in logical px.
-pub const INLINE_RADIO_R: f32 = 12.0;
+pub const INLINE_RADIO_R: f32 = 6.0;
 /// Selected inner dot radius in logical px (white center).
-pub const INLINE_DOT_R: f32 = 5.0;
+pub const INLINE_DOT_R: f32 = 2.5;
 /// Row height in logical px.
-pub const INLINE_ROW_H: f32 = 32.0;
+pub const INLINE_ROW_H: f32 = 16.0;
 /// Vertical gap between rows in logical px.
-pub const INLINE_ROW_SPACING: f32 = 4.0;
+pub const INLINE_ROW_SPACING: f32 = 2.0;
 /// Gap between the leading label and the options column in logical px.
-pub const INLINE_GAP_X: f32 = 16.0;
+pub const INLINE_GAP_X: f32 = 8.0;
 /// Gap between a radio dot and its option text in logical px.
-pub const INLINE_RADIO_GAP: f32 = 10.0;
+pub const INLINE_RADIO_GAP: f32 = 5.0;
 /// Option/leading label size in logical px (settings-row measure).
-pub const INLINE_FONT_SIZE: f32 = 17.0;
+pub const INLINE_FONT_SIZE: f32 = 8.5;
 /// Dot pop animation time in seconds.
 pub const INLINE_ANIM_SECONDS: f32 = 0.15;
 /// Radio off fill for light mode.
@@ -382,6 +382,23 @@ impl View for InlinePicker {
             let cy = self.row_center_y(i);
             let cx = self.options_x + INLINE_RADIO_R;
             let is_selected = i == self.selected;
+
+            // Small shadow under the selected dot: active elements
+            // carry a shadow.
+            if is_selected {
+                scene.draw_blurred_rounded_rect(
+                    Affine::IDENTITY,
+                    vello::kurbo::Rect::new(
+                        px(cx - INLINE_RADIO_R),
+                        px(cy - INLINE_RADIO_R),
+                        px(cx + INLINE_RADIO_R),
+                        px(cy + INLINE_RADIO_R),
+                    ),
+                    Color::from_rgba8(0, 0, 0, 40),
+                    px(INLINE_RADIO_R),
+                    2.0 * scale,
+                );
+            }
 
             // Radio dot: accent when selected, mode gray otherwise.
             let fill = if is_selected {

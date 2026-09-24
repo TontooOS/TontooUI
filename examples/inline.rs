@@ -1,4 +1,6 @@
-use tontooui::elements::{InlinePicker, Titlebar, TrafficAction, View, VStack};
+use tontooui::elements::{
+    InlinePicker, Titlebar, TrafficAction, View, VStack, INLINE_ROW_H, INLINE_ROW_SPACING,
+};
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::text::draw_layout;
@@ -101,7 +103,7 @@ impl App for InlineDemo {
         let layout = fonts.layout_text_weighted(&caption, 17.0, self.text, 600.0, None);
         let (tw, _) = FontSystem::layout_size(&layout);
         let cx = viewport.x + (viewport.width - tw / fonts.scale) / 2.0;
-        let cy = top + 16.0 + 4.0 * 36.0 + 16.0;
+        let cy = top + 8.0 + 4.0 * (INLINE_ROW_H + INLINE_ROW_SPACING) + 8.0;
         draw_layout(scene, &layout, cx, cy, fonts.scale);
     }
 
