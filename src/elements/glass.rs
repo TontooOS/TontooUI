@@ -228,7 +228,7 @@ impl GlassContainer {
                 fill_lens_glass(scene, images, &rect, radius, GLASS_ZOOM, band);
             }
             GlassType::Frosted => {
-                fill_frosted_glass(scene, images, &rect, radius, band);
+                fill_frosted_glass(scene, images, &rect, radius, GLASS_ZOOM, band);
             }
         }
 
