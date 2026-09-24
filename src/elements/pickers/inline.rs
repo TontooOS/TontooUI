@@ -12,19 +12,19 @@ use crate::renderer::text::{FontSystem, draw_layout};
 use crate::theme::desaturate;
 
 /// Radio dot outer radius in logical px.
-pub const INLINE_RADIO_R: f32 = 6.0;
+pub const INLINE_RADIO_R: f32 = 9.0;
 /// Selected inner dot radius in logical px (white center).
-pub const INLINE_DOT_R: f32 = 2.5;
+pub const INLINE_DOT_R: f32 = 3.75;
 /// Row height in logical px.
-pub const INLINE_ROW_H: f32 = 16.0;
+pub const INLINE_ROW_H: f32 = 24.0;
 /// Vertical gap between rows in logical px.
-pub const INLINE_ROW_SPACING: f32 = 2.0;
+pub const INLINE_ROW_SPACING: f32 = 3.0;
 /// Gap between the leading label and the options column in logical px.
-pub const INLINE_GAP_X: f32 = 8.0;
+pub const INLINE_GAP_X: f32 = 12.0;
 /// Gap between a radio dot and its option text in logical px.
-pub const INLINE_RADIO_GAP: f32 = 5.0;
+pub const INLINE_RADIO_GAP: f32 = 7.5;
 /// Option/leading label size in logical px (settings-row measure).
-pub const INLINE_FONT_SIZE: f32 = 8.5;
+pub const INLINE_FONT_SIZE: f32 = 13.0;
 /// Dot pop animation time in seconds.
 pub const INLINE_ANIM_SECONDS: f32 = 0.15;
 /// Radio off fill for light mode.
@@ -396,7 +396,7 @@ impl View for InlinePicker {
                     ),
                     Color::from_rgba8(0, 0, 0, 40),
                     px(INLINE_RADIO_R),
-                    2.0 * scale,
+                    3.0 * scale,
                 );
             }
 

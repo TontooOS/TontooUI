@@ -12,18 +12,18 @@ manually with `accent`.
 
 | Token | Value |
 |---|---|
-| `SEGMENTED_HEIGHT` / `SEGMENTED_RADIUS` | 16 px track, 4 px radius |
-| `SEGMENTED_PAD` / `SEGMENTED_PILL_RADIUS` | 1 px pill inset, 3.25 px pill radius |
-| `SEGMENTED_FONT_SIZE` / `SEGMENTED_LABEL_SIZE` | 7.5 px segments / 8.5 px leading label |
-| `SEGMENTED_GAP` / `SEGMENTED_PAD_X` | 6 px label-to-track gap / 8 px text padding |
-| `SEGMENTED_MIN_SEG_W` | 36 px minimum segment width |
+| `SEGMENTED_HEIGHT` / `SEGMENTED_RADIUS` | 24 px track, 6 px radius |
+| `SEGMENTED_PAD` / `SEGMENTED_PILL_RADIUS` | 1.5 px pill inset, 5 px pill radius |
+| `SEGMENTED_FONT_SIZE` / `SEGMENTED_LABEL_SIZE` | 11 px segments / 13 px leading label |
+| `SEGMENTED_GAP` / `SEGMENTED_PAD_X` | 9 px label-to-track gap / 12 px text padding |
+| `SEGMENTED_MIN_SEG_W` | 54 px minimum segment width |
 | `SEGMENTED_PRESSED_DARK` / `SEGMENTED_PRESSED_LIGHT` | `#636366` / `#D1D1D6` hold highlight |
 | `SEGMENTED_TRACK_DARK` / `SEGMENTED_TRACK_LIGHT` | `#3A3A3C` / `#E5E5E5` |
 | `SEGMENTED_ACCENT` | `#007AFF` default selected fill |
-| `INLINE_RADIO_R` / `INLINE_DOT_R` | 6 px radio, 2.5 px white center dot |
-| `INLINE_ROW_H` / `INLINE_ROW_SPACING` | 16 px rows, 2 px row gap |
-| `INLINE_GAP_X` / `INLINE_RADIO_GAP` | 8 px label-to-options gap, 5 px radio-to-text gap |
-| `INLINE_FONT_SIZE` | 8.5 px options and leading label |
+| `INLINE_RADIO_R` / `INLINE_DOT_R` | 9 px radio, 3.75 px white center dot |
+| `INLINE_ROW_H` / `INLINE_ROW_SPACING` | 24 px rows, 3 px row gap |
+| `INLINE_GAP_X` / `INLINE_RADIO_GAP` | 12 px label-to-options gap, 7.5 px radio-to-text gap |
+| `INLINE_FONT_SIZE` | 13 px options and leading label |
 | `INLINE_ANIM_SECONDS` | 0.15 s dot pop |
 | `INLINE_OFF_DARK` / `INLINE_OFF_LIGHT` | `#3A3A3C` / `#E5E5E5` |
 | `INLINE_ACCENT` | `#007AFF` default selected fill |

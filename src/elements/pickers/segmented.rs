@@ -10,23 +10,23 @@ use crate::renderer::text::{FontSystem, draw_layout};
 use crate::theme::desaturate;
 
 /// Segmented control height in logical px (macOS segmented measure).
-pub const SEGMENTED_HEIGHT: f32 = 16.0;
+pub const SEGMENTED_HEIGHT: f32 = 24.0;
 /// Outer track corner radius in logical px.
-pub const SEGMENTED_RADIUS: f32 = 4.0;
+pub const SEGMENTED_RADIUS: f32 = 6.0;
 /// Selected pill inset inside the track in logical px.
-pub const SEGMENTED_PAD: f32 = 1.0;
+pub const SEGMENTED_PAD: f32 = 1.5;
 /// Selected pill corner radius in logical px.
-pub const SEGMENTED_PILL_RADIUS: f32 = 3.25;
+pub const SEGMENTED_PILL_RADIUS: f32 = 5.0;
 /// Segment label size in logical px.
-pub const SEGMENTED_FONT_SIZE: f32 = 7.5;
+pub const SEGMENTED_FONT_SIZE: f32 = 11.0;
 /// Leading label size in logical px (settings-row measure).
-pub const SEGMENTED_LABEL_SIZE: f32 = 8.5;
+pub const SEGMENTED_LABEL_SIZE: f32 = 13.0;
 /// Gap between the leading label and the track in logical px.
-pub const SEGMENTED_GAP: f32 = 6.0;
+pub const SEGMENTED_GAP: f32 = 9.0;
 /// Horizontal text padding inside a segment in logical px.
-pub const SEGMENTED_PAD_X: f32 = 8.0;
+pub const SEGMENTED_PAD_X: f32 = 12.0;
 /// Minimum segment width in logical px.
-pub const SEGMENTED_MIN_SEG_W: f32 = 36.0;
+pub const SEGMENTED_MIN_SEG_W: f32 = 54.0;
 /// Pressed-segment fill for light mode (shown while held, like macOS).
 pub const SEGMENTED_PRESSED_LIGHT: Color = Color::from_rgb8(0xd1, 0xd1, 0xd6);
 /// Pressed-segment fill for dark mode (shown while held, like macOS).
@@ -413,7 +413,7 @@ impl View for SegmentedPicker {
             ),
             Color::from_rgba8(0, 0, 0, 40),
             px(SEGMENTED_PILL_RADIUS),
-            3.0 * scale,
+            4.5 * scale,
         );
         scene.fill(
             Fill::NonZero,
@@ -432,8 +432,8 @@ impl View for SegmentedPicker {
             }
             let dx = self.track_x + i as f32 * self.seg_w;
             let line = Line::new(
-                (px(dx), px(self.track_y + 4.0)),
-                (px(dx), px(self.track_y + SEGMENTED_HEIGHT - 4.0)),
+                (px(dx), px(self.track_y + 6.0)),
+                (px(dx), px(self.track_y + SEGMENTED_HEIGHT - 6.0)),
             );
             scene.stroke(
                 &Stroke::new(1.0 * scale),
