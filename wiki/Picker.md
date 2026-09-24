@@ -17,6 +17,7 @@ manually with `accent`.
 | `SEGMENTED_FONT_SIZE` / `SEGMENTED_LABEL_SIZE` | 11 px segments / 13 px leading label |
 | `SEGMENTED_GAP` / `SEGMENTED_PAD_X` | 9 px label-to-track gap / 12 px text padding |
 | `SEGMENTED_MIN_SEG_W` | 54 px minimum segment width |
+| `SEGMENTED_ANIM_SECONDS` | 0.20 s pill slide |
 | `SEGMENTED_PRESSED_DARK` / `SEGMENTED_PRESSED_LIGHT` | `#636366` / `#D1D1D6` hold highlight |
 | `SEGMENTED_TRACK_DARK` / `SEGMENTED_TRACK_LIGHT` | `#3A3A3C` / `#E5E5E5` |
 | `SEGMENTED_ACCENT` | `#007AFF` default selected fill |
@@ -51,9 +52,10 @@ pub fn mouse_move(&mut self, x: f64, y: f64)
 pub fn mouse_up(&mut self, x: f64, y: f64)
 ```
 
-- `selected` sets the initial segment without firing `on_select`;
-  `select` and `set_selected` switch instantly (no slide animation,
-  like macOS) and fire `on_select` when the selection changed.
+- `selected` sets the initial segment without animation and without
+  firing `on_select`; `set_selected` sets it immediately and fires
+  `on_select` when the selection changed; `select` slides the pill
+  with a 0.20 s `CubicOut` tween and fires `on_select`.
 - Segments share the track equally; at intrinsic size each keeps at
   least its text width plus padding or `SEGMENTED_MIN_SEG_W`.
 - The pill carries a soft shadow; hairline dividers render only
@@ -130,5 +132,5 @@ size.set_theme(accent, true);
 - [Button.md](Button.md) – control metrics, press overlay
 - [Layout.md](Layout.md) – stacks hosting pickers, `View` trait
 - [Renderer.md](Renderer.md) – frame loop, `App` shell, mouse forwarding
-- [Animation.md](Animation.md) – tween driver used by the inline dot pop
+- [Animation.md](Animation.md) – tween drivers used by pill slide and dot pop
 - [Theme.md](Theme.md) – accent, mode and Multicolor default

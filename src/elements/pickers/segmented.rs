@@ -1,10 +1,12 @@
 use std::any::Any;
+use std::time::Instant;
 
 use vello::Scene;
 use vello::kurbo::{Affine, Line, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, Fill};
 
 use super::super::layout::View;
+use crate::animation::{Easing, Repeat, Tween, TweenAnim};
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, draw_layout};
 use crate::theme::desaturate;
@@ -27,6 +29,8 @@ pub const SEGMENTED_GAP: f32 = 9.0;
 pub const SEGMENTED_PAD_X: f32 = 12.0;
 /// Minimum segment width in logical px.
 pub const SEGMENTED_MIN_SEG_W: f32 = 54.0;
+/// Pill slide time in seconds.
+pub const SEGMENTED_ANIM_SECONDS: f32 = 0.20;
 /// Pressed-segment fill for light mode (shown while held, like macOS).
 pub const SEGMENTED_PRESSED_LIGHT: Color = Color::from_rgb8(0xd1, 0xd1, 0xd6);
 /// Pressed-segment fill for dark mode (shown while held, like macOS).
@@ -42,9 +46,9 @@ pub const SEGMENTED_ACCENT: Color = Color::from_rgb8(0x00, 0x7a, 0xff);
 /// optional leading label plus a macOS-style segmented track. The
 /// selected segment draws as an accent pill, the rest as plain labels
 /// with hairline dividers between unselected neighbors. Like macOS
-/// there is no hover state and no selection animation: pressing a
-/// segment shows a gray hold highlight and releasing there switches
-/// to it instantly.
+/// there is no hover state: pressing a segment shows a gray hold
+/// highlight and releasing there slides the pill over with a short
+/// tween.
 ///
 /// Clicks select on release inside the track (`mouse_down` arms,
 /// `View::mouse_up` fires); the shell forwards both.
@@ -52,6 +56,7 @@ pub struct SegmentedPicker {
     label: String,
     options: Vec<String>,
     selected: usize,
+    shown: f32,
     accent: Color,
     accent_manual: bool,
     dark: bool,
@@ -71,6 +76,9 @@ pub struct SegmentedPicker {
     pressed: Option<usize>,
     disabled: bool,
     focused: bool,
+    anim: Option<TweenAnim<f32>>,
+    anim_time: f32,
+    last_draw: Option<Instant>,
     on_select: Option<Box<dyn FnMut(usize)>>,
 }
 
@@ -81,6 +89,7 @@ impl SegmentedPicker {
             label: label.into(),
             options,
             selected,
+            shown: selected as f32,
             accent: SEGMENTED_ACCENT,
             accent_manual: false,
             dark: true,
@@ -100,6 +109,9 @@ impl SegmentedPicker {
             pressed: None,
             disabled: false,
             focused: true,
+            anim: None,
+            anim_time: 0.0,
+            last_draw: None,
             on_select: None,
         }
     }
@@ -112,9 +124,13 @@ impl SegmentedPicker {
         )
     }
 
-    /// Initial selection without firing `on_select`.
+    /// Initial selection without animation and without firing
+    /// `on_select`.
     pub fn selected(mut self, index: usize) -> Self {
-        self.selected = self.clamp_index(index);
+        let clamped = self.clamp_index(index);
+        self.selected = clamped;
+        self.shown = clamped as f32;
+        self.anim = None;
         self
     }
 
@@ -184,20 +200,32 @@ impl SegmentedPicker {
         }
     }
 
-    /// Select instantly, like macOS (no slide animation). Fires
-    /// `on_select` when the selection changed.
+    /// Select with a pill slide animation. Fires `on_select` when the
+    /// selection changed.
     pub fn select(&mut self, index: usize) {
         let clamped = self.clamp_index(index);
         if clamped != self.selected {
             self.selected = clamped;
+            self.anim = Some(TweenAnim::new(
+                Tween::new(self.shown, clamped as f32, SEGMENTED_ANIM_SECONDS)
+                    .easing(Easing::CubicOut)
+                    .repeat(Repeat::Never),
+            ));
+            self.anim_time = 0.0;
             self.notify();
         }
     }
 
-    /// Set the selection instantly. Fires `on_select` when the
-    /// selection changed.
+    /// Set the selection immediately (no animation). Fires `on_select`
+    /// when the selection changed.
     pub fn set_selected(&mut self, index: usize) {
-        self.select(index);
+        let clamped = self.clamp_index(index);
+        if clamped != self.selected {
+            self.selected = clamped;
+            self.shown = clamped as f32;
+            self.anim = None;
+            self.notify();
+        }
     }
 
     fn notify(&mut self) {
@@ -317,6 +345,25 @@ impl SegmentedPicker {
             SEGMENTED_PRESSED_LIGHT
         }
     }
+
+    fn advance(&mut self, now: Instant) {
+        let dt = match self.last_draw {
+            Some(last) => now.saturating_duration_since(last).as_secs_f32().min(0.1),
+            None => 0.0,
+        };
+        self.last_draw = Some(now);
+        if let Some(anim) = self.anim.as_mut() {
+            self.anim_time += dt;
+            let done = anim.update(self.anim_time);
+            self.shown = *anim.value();
+            if done {
+                self.anim = None;
+                self.shown = self.selected as f32;
+            }
+        } else if !self.options.is_empty() {
+            self.shown = self.selected as f32;
+        }
+    }
 }
 
 impl View for SegmentedPicker {
@@ -359,6 +406,7 @@ impl View for SegmentedPicker {
     }
 
     fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, _images: &mut ImageLoader<'_>) {
+        self.advance(Instant::now());
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
         if self.options.is_empty() {
@@ -392,9 +440,9 @@ impl View for SegmentedPicker {
             &track,
         );
 
-        // Selected pill sits on the selected segment (no animation,
-        // like macOS).
-        let pill_x0 = self.track_x + self.selected as f32 * self.seg_w + SEGMENTED_PAD;
+        // Selected pill slides with `shown` (fractional index).
+        let clamped = self.shown.clamp(0.0, (self.options.len() - 1).max(0) as f32);
+        let pill_x0 = self.track_x + clamped * self.seg_w + SEGMENTED_PAD;
         let pill_x1 = pill_x0 + self.seg_w - SEGMENTED_PAD * 2.0;
         let pill = RoundedRect::new(
             px(pill_x0),
@@ -536,6 +584,8 @@ mod tests {
         assert_eq!(p.selected_index(), 2);
         assert_eq!(p.selected_label(), Some("Three"));
         assert_eq!(p.pressed, None);
+        // Releasing starts the pill slide animation.
+        assert!(p.anim.is_some());
         // Press inside, release outside keeps the selection.
         p.mouse_down(x, y);
         p.mouse_up(5000.0, 5000.0);
@@ -583,6 +633,8 @@ mod tests {
         p.set_selected(99);
         assert_eq!(p.selected_index(), 2);
         assert_eq!(p.selected_label(), Some("Three"));
+        assert!(p.anim.is_none());
+        assert_eq!(p.shown, 2.0);
     }
 
     #[test]
