@@ -32,9 +32,9 @@ pub enum GlassType {
 
 - `Lens` (default): clear minified center, blur only on the narrow edge
   band. Slider and toggle knobs always use this finish.
-- `Frosted`: same lens plus a light blur veil (`GLASS_FROST_VEIL`, 0.35)
-  over the whole body, so frost shows everywhere with the strongest frost
-  at the edge and only light frost inside.
+- `Frosted`: full blur everywhere (behind shows through but stays
+  unrecognizable, like the original frost) with an extra-strong blurred
+  edge band on top.
 
 Defaults: 320 x 180, 24 px radius, dark frost tint. `set_tint` overrides
 manually; `set_theme` follows the system glass stage.

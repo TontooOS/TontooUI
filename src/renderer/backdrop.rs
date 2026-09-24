@@ -480,22 +480,31 @@ pub fn fill_backdrop_veil(
     );
 }
 
-/// Frosted liquid glass body: same lens as `fill_lens_glass` (clear zoomed
-/// center, strong blurred rim) plus a light blur veil over everything, so
-/// the frost is strongest at the edge and light inside. `veil_alpha` around
-/// 0.3-0.5 keeps the center readable.
+/// Frosted liquid glass body: full blur everywhere (shapes behind show
+/// through but stay unrecognizable) plus the strong blurred rim band, so
+/// the frost is strongest at the edge. Tiny bodies just get the full fill.
 pub fn fill_frosted_glass(
     scene: &mut vello::Scene,
     images: &crate::renderer::images::ImageLoader<'_>,
     rect: &Rect,
     radius: f64,
-    zoom: f64,
     edge_width: f64,
-    veil_alpha: f32,
 ) {
-    fill_lens_glass(scene, images, rect, radius, zoom, edge_width);
     let body = RoundedRect::from_rect(*rect, radius);
-    fill_backdrop_veil(scene, images, &body, veil_alpha);
+    let min_side = (rect.x1 - rect.x0).min(rect.y1 - rect.y0);
+    fill_backdrop(scene, images, &body);
+    if edge_width <= 0.0 || min_side <= edge_width * 2.0 {
+        return;
+    }
+    let inset = edge_width * 0.5;
+    let ring = RoundedRect::new(
+        rect.x0 + inset,
+        rect.y0 + inset,
+        rect.x1 - inset,
+        rect.y1 - inset,
+        (radius - inset).max(0.0),
+    );
+    stroke_backdrop_edge(scene, images, &ring, edge_width);
 }
 
 /// Liquid glass edge: strokes `ring` with the blurred capture. Callers pass

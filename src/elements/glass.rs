@@ -44,18 +44,14 @@ pub fn glass_edge_width(min_side: f32) -> f32 {
 /// Lens zoom of the clear center: below 1.0 the backdrop behind the glass
 /// shrinks (minify), above 1.0 it grows. Default minifies slightly.
 pub const GLASS_ZOOM: f64 = 0.80;
-/// Blur veil alpha for the frosted glass type: light frost over the whole
-/// body on top of the lens, so the edge stays strongest.
-pub const GLASS_FROST_VEIL: f32 = 0.35;
-
 /// Glass finish: how the backdrop shows through the body.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum GlassType {
     /// Clear minified center, blur only on the narrow edge band.
     #[default]
     Lens,
-    /// Same lens plus a light blur veil over the whole body: frost
-    /// everywhere, strongest at the edge, light inside.
+    /// Full blur everywhere (behind shows through but stays
+    /// unrecognizable) with an extra-strong blurred edge band.
     Frosted,
 }
 
@@ -228,15 +224,7 @@ impl GlassContainer {
                 fill_lens_glass(scene, images, &rect, radius, GLASS_ZOOM, band);
             }
             GlassType::Frosted => {
-                fill_frosted_glass(
-                    scene,
-                    images,
-                    &rect,
-                    radius,
-                    GLASS_ZOOM,
-                    band,
-                    GLASS_FROST_VEIL,
-                );
+                fill_frosted_glass(scene, images, &rect, radius, band);
             }
         }
 
