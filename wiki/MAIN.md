@@ -18,6 +18,7 @@ theme, animation and a Vello/WGPU renderer.
 | Glass | [Glass.md](Glass.md) | Liquid glass container and backdrop blur |
 | Layout | [Layout.md](Layout.md) | VStack, HStack, ZStack, modifiers, `View` |
 | Renderer | [Renderer.md](Renderer.md) | Window shell, frame pipeline, backdrop blur |
+| Picker | [Picker.md](Picker.md) | Segmented and inline pickers with labels |
 | Slider | [Slider.md](Slider.md) | Slider with steps, labels, ticks, glass |
 | Theme | [Theme.md](Theme.md) | Live dark/light, accent, glass stage |
 | Titlebar | [Titlebar.md](Titlebar.md) | Custom decoration bar with drag region |
