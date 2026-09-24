@@ -2,13 +2,16 @@
 
 Picker category in `src/elements/pickers/`: `SegmentedPicker` in
 `segmented.rs` (SwiftUI `Picker` with `.segmented` style),
-`InlinePicker` in `inline.rs` (SwiftUI `Picker` with `.inline` style)
-and `MenuPicker` in `menu.rs` (SwiftUI `Picker` with `.menu` style).
-All carry an optional leading label, select on release inside the
-control and fire an `on_select` callback. Accent-driven fills follow
-the system accent (Multicolor renders blue) unless the dev sets them
-manually (`accent` for segmented/inline, `accent` and `hover_fill`
-for menu).
+`InlinePicker` in `inline.rs` (SwiftUI `Picker` with `.inline` style),
+`MenuPicker` in `menu.rs` (SwiftUI `Picker` with `.menu` style) and
+`DatePicker` in `date.rs` (graphical calendar). Segmented, inline
+and menu carry an optional leading label; all select on release
+inside the control and fire an `on_select` callback. Accent-driven
+fills follow the system accent (Multicolor renders blue) unless the
+dev sets them manually (`accent` for segmented/inline/date,
+`accent` and `hover_fill` for menu). The date selection circle
+defaults to the label color (black in light mode, like the
+reference) instead.
 
 ## Geometry
 
@@ -41,6 +44,16 @@ for menu).
 | `MENU_PANEL_GAP` | 4 px button-to-panel gap |
 | `MENU_SHADOW_BLUR` | 24 px heavy edge shadow |
 | `MENU_ACCENT` | `#007AFF` default hover fill |
+| `DATE_CELL_W` / `DATE_CELL_H` | 32 px by 28 px day cells, 7 columns, 6 rows |
+| `DATE_HEADER_H` / `DATE_WEEK_H` | 32 px title bar / 20 px weekday row |
+| `DATE_PAD` / `DATE_RADIUS` | 8 px panel padding / 9 px panel radius |
+| `DATE_TITLE_SIZE` / `DATE_DAY_SIZE` | 14 px title and day numbers |
+| `DATE_WEEK_SIZE` / `DATE_EDIT_SIZE` | 10 px weekday header / 13 px input text |
+| `DATE_SEL_R` | 12 px selection circle radius |
+| `DATE_NAV_W` | 28 px month stepper hit width |
+| `DATE_SHADOW_BLUR` | 24 px heavy edge shadow |
+| `DATE_ACCENT` | `#007AFF` manual selection fill |
+| `DATE_MONTHS` / `DATE_WEEKDAYS` | English month names / Monday-first headers |
 
 ## SegmentedPicker
 
@@ -166,6 +179,55 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
 - Empty option lists draw only the label and never open; out-of-range
   indices clamp to the last option.
 
+## DatePicker
+
+```rust
+pub fn new() -> Self
+pub fn selected(self, year: i32, month: u32, day: u32) -> Self
+pub fn accent(self, color: Color) -> Self
+pub fn disabled(self, disabled: bool) -> Self
+pub fn on_select(self, callback: impl FnMut(i32, u32, u32) + 'static) -> Self
+pub fn selected_date(&self) -> (i32, u32, u32)
+pub fn viewed(&self) -> (i32, u32)
+pub fn is_editing(&self) -> bool
+pub fn set_selected(&mut self, year: i32, month: u32, day: u32)
+pub fn step_month(&mut self, delta: i32)
+pub fn set_theme(&mut self, accent: Color, dark: bool)
+pub fn set_glass(&mut self, mode: ThemeMode, glass: GlassAmount)
+pub fn set_focused(&mut self, focused: bool)
+pub fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32)
+pub fn text(&mut self, input: &str)
+pub fn key(&mut self, key: Key)
+pub fn mouse_down(&mut self, x: f64, y: f64)
+pub fn mouse_move(&mut self, x: f64, y: f64)
+pub fn mouse_up(&mut self, x: f64, y: f64)
+```
+
+- The frosted glass panel shows a 7-column Monday-first grid with a
+  fixed 6-row height (no resize jitter across months), gray weekday
+  header and blank cells outside the month. Clicking a day selects
+  it with a filled circle (`set_selected` clamps the day and fires
+  `on_select` when the date changed).
+- The header shows "Month Year" plus a blue edit chevron and
+  `<`/`>` steppers that move one month (wrapping years). Clicking
+  the title turns it into a text input: typing edits the buffer
+  (16 chars max, blinking caret), `Enter` commits `"July 2026"`,
+  `"jul 2026"`, `"7/2026"` or `"7 2026"` (years 1900-2100),
+  `Escape` cancels, clicking outside commits. Invalid input keeps
+  the viewed month.
+- Date math is dependency-free (civil algorithms, Gregorian leap
+  rule); the default selection is today from the system clock.
+- Like the menu, the panel clamps into the `set_viewport` bounds so
+  the glass never samples outside the window. Apps must call
+  `set_viewport` every frame, forward `text`/`key` and return true
+  from `App::wants_backdrop` (the calendar is always glass).
+
+```rust
+pub fn days_in_month(year: i32, month: u32) -> u32
+pub fn first_weekday(year: i32, month: u32) -> u32
+pub fn parse_month_year(input: &str) -> Option<(i32, u32)>
+```
+
 ## Usage / Example
 
 Run `cargo run --example segmented`: `Options` (`One`, `Two`,
@@ -196,6 +258,11 @@ let mut color = MenuPicker::from_slice("Color", &["Red", "Green", "Blue"])
 color.set_theme(accent, true);
 color.set_glass(ThemeMode::Dark, GlassAmount::Glass);
 ```
+
+Run `cargo run --example date`: July 2026 calendar defaulting to
+today (16 July 2026 in the reference) with a `Selected: ...`
+caption. Click the title to type a month, use `<`/`>` to step
+months, click a day to select.
 
 ## Cross References
 

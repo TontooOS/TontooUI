@@ -1,6 +1,14 @@
+pub mod date;
 pub mod inline;
 pub mod menu;
 pub mod segmented;
+
+pub use date::{
+    DatePicker, DATE_ACCENT, DATE_CELL_H, DATE_CELL_W, DATE_CHEV_GAP, DATE_DAY_SIZE,
+    DATE_EDIT_SIZE, DATE_HEADER_H, DATE_MONTHS, DATE_NAV_W, DATE_PAD, DATE_RADIUS,
+    DATE_SEL_R, DATE_SHADOW_BLUR, DATE_TITLE_SIZE, DATE_WEEKDAYS, DATE_WEEK_H,
+    DATE_WEEK_SIZE,
+};
 
 pub use menu::{
     MenuPicker, MENU_ACCENT, MENU_BUTTON_H, MENU_BUTTON_RADIUS, MENU_BTN_PAD_X,
