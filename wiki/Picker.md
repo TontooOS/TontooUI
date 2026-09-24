@@ -34,7 +34,7 @@ for menu).
 | `MENU_FONT_SIZE` | 13 px button, rows and leading label |
 | `MENU_GAP` / `MENU_BTN_PAD_X` | 9 px label-to-button gap / 10 px text padding |
 | `MENU_CHEV_W` / `MENU_CHEV_GAP` | 12 px chevron box / 8 px text-to-chevron gap |
-| `MENU_PAD` / `MENU_RADIUS` | 6 px panel padding / 2 px panel radius |
+| `MENU_PAD` / `MENU_RADIUS` | 6 px panel padding / 3 px panel radius |
 | `MENU_ROW_H` / `MENU_ROW_SPACING` | 26 px rows, 2 px row gap |
 | `MENU_CHECK_COL` / `MENU_TEXT_GAP` | 20 px check column / 6 px check-to-text gap |
 | `MENU_CHECK_W` / `MENU_CHECK_H` | 10 px by 7.5 px fixed checkmark glyph |
