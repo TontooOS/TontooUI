@@ -24,7 +24,7 @@ pub const GLASS_CHROMA_RED: Color = Color::from_rgba8(255, 90, 120, 30);
 pub const GLASS_CHROMA_CYAN: Color = Color::from_rgba8(90, 200, 255, 30);
 /// Width of the frosted edge band in logical px. Only this thin rim samples
 /// the blurred backdrop; the center stays clear.
-pub const GLASS_EDGE_WIDTH: f32 = 6.0;
+pub const GLASS_EDGE_WIDTH: f32 = 4.0;
 /// Lens zoom of the clear center: below 1.0 the backdrop behind the glass
 /// shrinks (minify), above 1.0 it grows. Default minifies slightly.
 pub const GLASS_ZOOM: f64 = 0.80;
