@@ -47,7 +47,7 @@ the frost when `App::wants_backdrop` is enabled.
 | `GLASS_DEPTH` | black 18% bottom shade |
 | `GLASS_CHROMA_RED` / `GLASS_CHROMA_CYAN` | faint rim split |
 | `GLASS_EDGE_WIDTH` | 6 logical px thin frosted rim band |
-| `GLASS_ZOOM` | 0.93x lens zoom of the clear center (minify) |
+| `GLASS_ZOOM` | 0.9125x lens zoom of the clear center (minify) |
 
 ## Lens
 
