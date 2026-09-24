@@ -1,0 +1,1 @@
+1. When a Window is not selectet but you hover over Close/minimize/Maximize button then the Icon has Color but it should be gray
