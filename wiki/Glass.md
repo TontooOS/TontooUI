@@ -16,6 +16,7 @@ pub fn tint(mut self, tint: Color) -> Self
 pub fn glass_type(mut self, glass_type: GlassType) -> Self
 pub fn content(self, child: impl View + 'static) -> Self
 pub fn set_bounds(&mut self, x: f32, y: f32, width: f32, height: f32)
+pub fn set_radius(&mut self, px: f32)
 pub fn set_tint(&mut self, tint: Color)
 pub fn set_glass_type(&mut self, glass_type: GlassType)
 pub fn set_theme(&mut self, mode: ThemeMode, amount: GlassAmount)

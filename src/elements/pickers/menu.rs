@@ -384,6 +384,7 @@ impl MenuPicker {
         self.menu_w = w;
         self.menu_h = h;
         self.glass.set_bounds(x, y, w, h);
+        self.glass.set_radius(MENU_RADIUS);
     }
 
     fn button_hit(&self, x: f32, y: f32) -> bool {

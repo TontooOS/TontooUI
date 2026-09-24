@@ -132,6 +132,10 @@ impl GlassContainer {
         self.height = height.max(0.0);
     }
 
+    pub fn set_radius(&mut self, px: f32) {
+        self.radius = px.max(0.0);
+    }
+
     pub fn set_tint(&mut self, tint: Color) {
         self.tint = tint;
     }
