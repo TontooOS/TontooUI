@@ -5,7 +5,9 @@ use super::layout::View;
 use vello::kurbo::{Affine, Point, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
-use crate::renderer::backdrop::fill_backdrop;
+use crate::renderer::backdrop::{
+    fill_backdrop, fill_backdrop_lens, stroke_backdrop_edge,
+};
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
 use crate::theme::{GlassAmount, ThemeMode, desaturate};
@@ -22,15 +24,21 @@ pub const GLASS_DEPTH: Color = Color::from_rgba8(0, 0, 0, 46);
 pub const GLASS_CHROMA_RED: Color = Color::from_rgba8(255, 90, 120, 30);
 /// Chromatic rim split, cyan side.
 pub const GLASS_CHROMA_CYAN: Color = Color::from_rgba8(90, 200, 255, 30);
+/// Width of the frosted edge band in logical px. Only this rim samples the
+/// blurred backdrop; the center stays clear.
+pub const GLASS_EDGE_WIDTH: f32 = 14.0;
+/// Magnification of the clear lens center (1.0 = no zoom).
+pub const GLASS_MAGNIFY: f64 = 1.07;
 
-/// Liquid glass container: frosted body, liquid bevel rim with specular
-/// top light and depth shade, chromatic edge split and a soft shadow.
-/// Optional content draws on top.
+/// Liquid glass container: clear magnified lens center, frosted edge band,
+/// liquid bevel rim with specular top light and depth shade, chromatic edge
+/// split and a soft shadow. Optional content draws on top.
 ///
-/// When the shell runs a backdrop pass (`App::wants_backdrop`), the body
-/// samples the blurred in-app capture so content behind the glass shows
-/// through. Desktop pixels behind a transparent window still need the
-/// compositor; without a backdrop the body is only the frost tint.
+/// When the shell runs a backdrop pass (`App::wants_backdrop`), the center
+/// samples the sharp in-app capture slightly magnified so content behind
+/// the glass shows through enlarged, while only a narrow rim band samples
+/// the blurred capture. Desktop pixels behind a transparent window still
+/// need the compositor; without a backdrop the body is only the frost tint.
 pub struct GlassContainer {
     x: f32,
     y: f32,
@@ -167,8 +175,29 @@ impl GlassContainer {
             12.0 * scale,
         );
 
-        // Blurred in-app backdrop (when the shell ran the capture pass).
-        fill_backdrop(scene, images, &body);
+        // Liquid lens: clear magnified center, blurred rim band only.
+        // The sharp capture is zoomed around the body center so content
+        // behind the glass looks slightly enlarged; the blurred capture is
+        // stroked as a narrow band fully inside the body outline so only
+        // the very edge frosts. Tiny bodies fall back to a full blur fill.
+        let band = GLASS_EDGE_WIDTH as f64 * scale;
+        let min_side = (rect.x1 - rect.x0).min(rect.y1 - rect.y0);
+        if min_side <= band * 2.0 {
+            fill_backdrop(scene, images, &body);
+        } else {
+            let center =
+                Point::new((rect.x0 + rect.x1) * 0.5, (rect.y0 + rect.y1) * 0.5);
+            fill_backdrop_lens(scene, images, &body, center, GLASS_MAGNIFY);
+            let inset = band * 0.5;
+            let ring = RoundedRect::new(
+                rect.x0 + inset,
+                rect.y0 + inset,
+                rect.x1 - inset,
+                rect.y1 - inset,
+                (radius - inset).max(0.0),
+            );
+            stroke_backdrop_edge(scene, images, &ring, band);
+        }
 
         // Frosted body (gray when the window is inactive).
         let tint = if self.focused {

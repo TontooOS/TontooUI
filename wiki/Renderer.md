@@ -180,9 +180,11 @@ it (window body, tracks, labels, bars):
    no frame lines. Rendered into the offscreen `content` texture.
 2. Blur: two compute dispatches (horizontal then vertical) gaussian-blur
    `content` into `output` (sigma `BACKDROP_SIGMA`, default 8 physical px,
-   clamp-to-edge).
+   clamp-to-edge). The sharp `content` texture is registered alongside the
+   blurred `output` so views can sample both.
 3. Final: `scene.reset()`, `draw_behind()`, `App::draw()` with
-   `ImageLoader::set_backdrop(Some(image))`, frame lines, render to the
+   `ImageLoader::set_backdrop(Some(image))` plus
+   `set_backdrop_sharp(Some(sharp))`, frame lines, render to the
    surface target, blit.
 
 Desktop pixels behind a transparent window still belong to the compositor;
@@ -192,6 +194,8 @@ this pass blurs only what the app itself draws.
 pub const BACKDROP_SIGMA: f32;
 pub struct BackdropBlur { .. }
 pub fn fill_backdrop(scene: &mut Scene, images: &ImageLoader<'_>, shape: &impl Shape)
+pub fn fill_backdrop_lens(scene: &mut Scene, images: &ImageLoader<'_>, shape: &impl Shape, center: Point, zoom: f64)
+pub fn stroke_backdrop_edge(scene: &mut Scene, images: &ImageLoader<'_>, ring: &RoundedRect, width: f64)
 ```
 
 - `BackdropBlur` owns the three offscreen targets and the compute pipeline;
@@ -200,6 +204,12 @@ pub fn fill_backdrop(scene: &mut Scene, images: &ImageLoader<'_>, shape: &impl S
   `ImageLoader::backdrop()` is `Some`; no-op otherwise (single-pass frames).
   Scene coordinates are physical px and the texture is full-window physical
   size, so identity maps image pixel (0, 0) to scene (0, 0).
+- `fill_backdrop_lens` paints `shape` with the sharp capture magnified by
+  `zoom` around `center` (both physical px) via the brush transform; no-op
+  when `backdrop_sharp()` is `None`.
+- `stroke_backdrop_edge` strokes `ring` with the blurred capture; callers
+  inset the ring by half the band and stroke at full band width so the frost
+  sits inside the body outline.
 
 ## FontSystem
 
@@ -241,6 +251,7 @@ inline boxes are skipped.
 ```rust
 pub fn get(&mut self, name: &str, tint: Color, target_px: u32) -> Option<(ImageData, u32, u32)>
 pub fn backdrop(&self) -> Option<&ImageData>
+pub fn backdrop_sharp(&self) -> Option<&ImageData>
 pub fn is_capture_pass(&self) -> bool
 ```
 
@@ -257,7 +268,8 @@ Backdrop access during the two-pass frame:
 
 | Method | Returns |
 |---|---|
-| `backdrop()` | Blurred capture for glass fills, or `None` on the capture pass / single-pass frames |
+| `backdrop()` | Blurred capture for glass edge fills, or `None` on the capture pass / single-pass frames |
+| `backdrop_sharp()` | Sharp capture for the magnified lens center, or `None` on the capture pass / single-pass frames |
 | `is_capture_pass()` | True while recording the pre-blur capture; glass bodies must skip drawing |
 
 ## Frame

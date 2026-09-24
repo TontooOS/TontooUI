@@ -234,6 +234,7 @@ impl<V: App> Shell<V> {
                 .backdrop
                 .run(&device_handle.device, &device_handle.queue);
             let backdrop_image = active.backdrop.sync_image(&mut active.renderer);
+            let backdrop_sharp = active.backdrop.sync_sharp_image(&mut active.renderer);
 
             // Pass 2: final frame with the blur available to glass.
             active.scene.reset();
@@ -253,6 +254,7 @@ impl<V: App> Shell<V> {
                 );
                 loader.set_capture_pass(false);
                 loader.set_backdrop(backdrop_image);
+                loader.set_backdrop_sharp(backdrop_sharp);
                 self.app.draw(&mut active.scene, &mut active.fonts, &mut loader, viewport, elapsed);
             }
             super::frame::draw_frame(&mut active.scene, size.width, size.height, scale);
@@ -294,6 +296,16 @@ impl<V: App> Shell<V> {
             ) {
                 eprintln!("render error: {err:?}");
                 return;
+            }
+        }
+
+        // TEMP TIMING TEST via TONTOOUI_DELAY_FIRST: stall once before
+        // the first present to replicate the debug-binary timing.
+        if std::env::var("TONTOOUI_DELAY_FIRST").is_ok() {
+            static DELAYED: std::sync::atomic::AtomicBool =
+                std::sync::atomic::AtomicBool::new(false);
+            if !DELAYED.swap(true, std::sync::atomic::Ordering::SeqCst) {
+                std::thread::sleep(std::time::Duration::from_millis(500));
             }
         }
 

@@ -1,4 +1,5 @@
-use vello::peniko::{Extend, ImageBrush, ImageData};
+use vello::kurbo::{Affine, Point, RoundedRect, Stroke};
+use vello::peniko::{Extend, Fill, ImageBrush, ImageData, ImageQuality};
 use vello::Renderer;
 use wgpu::{
     BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
@@ -111,6 +112,7 @@ pub struct BackdropBlur {
     layout: BindGroupLayout,
     targets: Option<PassTargets>,
     image: Option<ImageData>,
+    sharp: Option<ImageData>,
     sigma: f32,
 }
 
@@ -173,6 +175,7 @@ impl BackdropBlur {
             layout,
             targets: None,
             image: None,
+            sharp: None,
             sigma: BACKDROP_SIGMA,
         }
     }
@@ -189,8 +192,11 @@ impl BackdropBlur {
             .map(|t| (t.content.width(), t.content.height()))
     }
 
-    /// Unregister the previous output before the targets are replaced.
+    /// Unregister the previous outputs before the targets are replaced.
     pub fn take_image(&mut self, renderer: &mut Renderer) -> Option<ImageData> {
+        if let Some(sharp) = self.sharp.take() {
+            renderer.unregister_texture(sharp);
+        }
         let img = self.image.take()?;
         renderer.unregister_texture(img.clone());
         Some(img)
@@ -240,6 +246,7 @@ impl BackdropBlur {
             output_view,
         });
         self.image = None;
+        self.sharp = None;
     }
 
     /// View Vello renders the backdrop capture into.
@@ -323,6 +330,29 @@ impl BackdropBlur {
     pub fn image(&self) -> Option<&ImageData> {
         self.image.as_ref()
     }
+
+    /// Sharp (unblurred) capture for the magnified glass center. Registered
+    /// from the same `content` texture the blur reads, so it stays in sync
+    /// frame by frame. `None` before `ensure_size`.
+    pub fn sync_sharp_image(&mut self, renderer: &mut Renderer) -> Option<ImageData> {
+        let t = self.targets.as_ref()?;
+        let tex = t.content.clone();
+        match &self.sharp {
+            Some(img) => {
+                renderer.mark_override_image_dirty(img);
+                Some(img.clone())
+            }
+            None => {
+                let img = renderer.register_texture(tex);
+                self.sharp = Some(img.clone());
+                Some(img)
+            }
+        }
+    }
+
+    pub fn sharp_image(&self) -> Option<&ImageData> {
+        self.sharp.as_ref()
+    }
 }
 
 /// Fill `shape` with the blurred in-app backdrop when available.
@@ -345,6 +375,69 @@ pub fn fill_backdrop(
         ),
         None,
         shape,
+    );
+}
+
+/// Liquid glass lens center: fills `shape` with the sharp (unblurred)
+/// capture, magnified by `zoom` around `center` (both in physical px).
+/// The brush transform maps brush pixels onto the surface, so scaling it
+/// up by `zoom` samples a smaller backdrop region stretched over the
+/// shape: content behind the glass looks slightly enlarged and stays
+/// crisp. Falls back to nothing when no sharp capture is available.
+pub fn fill_backdrop_lens(
+    scene: &mut vello::Scene,
+    images: &crate::renderer::images::ImageLoader<'_>,
+    shape: &impl vello::kurbo::Shape,
+    center: Point,
+    zoom: f64,
+) {
+    let Some(sharp) = images.backdrop_sharp() else {
+        return;
+    };
+    let z = zoom.max(1.0);
+    // Brush -> surface: scale up around the glass center so each surface
+    // point samples closer to the center (magnifier).
+    let brush_transform = Affine::translate((center.x, center.y))
+        * Affine::scale(z)
+        * Affine::translate((-center.x, -center.y));
+    scene.fill(
+        Fill::NonZero,
+        Affine::IDENTITY,
+        &vello::peniko::Brush::Image(
+            ImageBrush::new(sharp.clone())
+                .with_extend(Extend::Pad)
+                .with_quality(ImageQuality::High),
+        ),
+        Some(brush_transform),
+        shape,
+    );
+}
+
+/// Liquid glass edge: strokes `ring` with the blurred capture. Callers pass
+/// a rounded rect inset by half the band width with a stroke width equal to
+/// the band, so the blur sits fully inside the glass body (outer stroke
+/// edge aligns with the body outline). Only the rim stays frosted while
+/// the lens center above stays clear.
+pub fn stroke_backdrop_edge(
+    scene: &mut vello::Scene,
+    images: &crate::renderer::images::ImageLoader<'_>,
+    ring: &RoundedRect,
+    width: f64,
+) {
+    let Some(bd) = images.backdrop() else {
+        return;
+    };
+    if width <= 0.0 {
+        return;
+    }
+    scene.stroke(
+        &Stroke::new(width),
+        Affine::IDENTITY,
+        &vello::peniko::Brush::Image(
+            ImageBrush::new(bd.clone()).with_extend(Extend::Pad),
+        ),
+        None,
+        ring,
     );
 }
 

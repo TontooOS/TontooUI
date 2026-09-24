@@ -39,6 +39,7 @@ pub struct ImageLoader<'a> {
     queue: &'a Queue,
     cache: &'a mut ImageCache,
     backdrop: Option<ImageData>,
+    backdrop_sharp: Option<ImageData>,
     capture_pass: bool,
 }
 
@@ -55,6 +56,7 @@ impl<'a> ImageLoader<'a> {
             queue,
             cache,
             backdrop: None,
+            backdrop_sharp: None,
             capture_pass: false,
         }
     }
@@ -63,6 +65,11 @@ impl<'a> ImageLoader<'a> {
     /// pass or when the shell did not run the backdrop pass.
     pub fn backdrop(&self) -> Option<&ImageData> {
         self.backdrop.as_ref()
+    }
+
+    /// Sharp (unblurred) capture for the magnified glass center.
+    pub fn backdrop_sharp(&self) -> Option<&ImageData> {
+        self.backdrop_sharp.as_ref()
     }
 
     /// True while the shell is recording the pre-blur capture pass.
@@ -74,6 +81,10 @@ impl<'a> ImageLoader<'a> {
 
     pub fn set_backdrop(&mut self, backdrop: Option<ImageData>) {
         self.backdrop = backdrop;
+    }
+
+    pub fn set_backdrop_sharp(&mut self, sharp: Option<ImageData>) {
+        self.backdrop_sharp = sharp;
     }
 
     pub fn set_capture_pass(&mut self, capture_pass: bool) {
