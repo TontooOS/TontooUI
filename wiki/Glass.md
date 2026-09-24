@@ -51,9 +51,9 @@ The `glass` daemon setting (LiquidGlass slider) drives the look:
 | `Much` | Unchanged balanced frost (white 10%) | Lighter frost (white 5%) |
 
 Less glass adds a scattered black dash ring outside the crisp rim. The
-stages control frost opacity, rim light and grain; the lens layers the sharp
-minified capture in the center and the blurred capture as an edge band under
-the frost when `App::wants_backdrop` is enabled.
+stages control frost opacity, rim light and grain for the Lens finish;
+the Frosted finish ignores the glass amount and always renders the
+balanced stage (it still follows dark/light mode).
 
 | Token | Value |
 |---|---|

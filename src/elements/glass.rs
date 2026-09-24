@@ -152,9 +152,15 @@ impl GlassContainer {
     /// Live glass stage from the system setting. Less glass is mostly
     /// opaque mode color with a brighter rim and a grainy black outer
     /// edge; balanced glass sits in the middle; much glass keeps the dark
-    /// look unchanged and goes lighter in light mode.
+    /// look unchanged and goes lighter in light mode. Only the Lens finish
+    /// follows the setting: Frosted keeps its fixed balanced look (it still
+    /// follows dark/light mode, just never the glass amount).
     pub fn set_theme(&mut self, mode: ThemeMode, amount: GlassAmount) {
         let dark = mode == ThemeMode::Dark;
+        let amount = match self.glass_type {
+            GlassType::Lens => amount,
+            GlassType::Frosted => GlassAmount::Glass,
+        };
         let (tint, specular, grain) = match (amount, dark) {
             (GlassAmount::Less, true) => (
                 Color::from_rgba8(10, 10, 12, 150),
