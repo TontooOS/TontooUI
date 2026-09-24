@@ -22,9 +22,14 @@ pub const GLASS_DEPTH: Color = Color::from_rgba8(0, 0, 0, 46);
 pub const GLASS_CHROMA_RED: Color = Color::from_rgba8(255, 90, 120, 30);
 /// Chromatic rim split, cyan side.
 pub const GLASS_CHROMA_CYAN: Color = Color::from_rgba8(90, 200, 255, 30);
-/// Width of the frosted edge band in logical px. Only this thin rim samples
-/// the blurred backdrop; the center stays clear.
-pub const GLASS_EDGE_WIDTH: f32 = 2.0;
+/// Width of the frosted edge band in logical px for small glass.
+/// Large glass (see `GLASS_LARGE_MIN_SIDE`) uses `GLASS_EDGE_WIDTH_LARGE`.
+pub const GLASS_EDGE_WIDTH: f32 = 1.0;
+/// Edge band width in logical px once the glass counts as large.
+pub const GLASS_EDGE_WIDTH_LARGE: f32 = 2.0;
+/// Minimum smaller side in logical px from which a glass counts as large
+/// (gets the 2 px edge band instead of 1 px).
+pub const GLASS_LARGE_MIN_SIDE: f32 = 200.0;
 /// Lens zoom of the clear center: below 1.0 the backdrop behind the glass
 /// shrinks (minify), above 1.0 it grows. Default minifies slightly.
 pub const GLASS_ZOOM: f64 = 0.80;
@@ -165,18 +170,25 @@ impl GlassContainer {
         );
         let body = RoundedRect::from_rect(rect, radius);
 
-        // Soft shadow under the glass.
+        // Soft shadow under the glass: tight and subtle so the outer
+        // edge never reads as a thick dark rim.
         scene.draw_blurred_rounded_rect(
             Affine::IDENTITY,
             rect,
-            Color::from_rgba8(0, 0, 0, 64),
+            Color::from_rgba8(0, 0, 0, 48),
             radius,
-            12.0 * scale,
+            8.0 * scale,
         );
 
         // Liquid lens: clear magnified center, blurred rim band only (see
         // `fill_lens_glass`; tiny bodies fall back to a full blur fill).
-        let band = GLASS_EDGE_WIDTH as f64 * scale;
+        // Small glass gets a 1 px edge, large glass a 2 px edge.
+        let edge_logical = if self.width.min(self.height) >= GLASS_LARGE_MIN_SIDE {
+            GLASS_EDGE_WIDTH_LARGE
+        } else {
+            GLASS_EDGE_WIDTH
+        };
+        let band = edge_logical as f64 * scale;
         fill_lens_glass(scene, images, &rect, radius, GLASS_ZOOM, band);
 
         // Frosted body (gray when the window is inactive).

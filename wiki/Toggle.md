@@ -90,18 +90,20 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
 the state with animation (`View::mouse_up` does the same for boxed
 children). Pressing inside and releasing outside keeps the state.
 
-Switch style additionally supports dragging: pressing the track grabs
-the knob and it follows the pointer (`mouse_move`) live. While held the
-white knob turns into the shared liquid glass lens (`fill_lens_glass`:
-clear magnified center, thin 4 px blurred rim, light frost fill with
-top/bottom bevel, like the slider knob) and grows to a 2x bubble standing
-outside the track (+9.9 px per side wide, +7.3 px tall); with
-`App::wants_backdrop` the lens also samples the sharp and blurred in-app
-backdrop (and is omitted on the capture pass so the blur sees the track
-behind it). Releasing past halfway snaps to the nearer stop with a 0.15 s
-`CubicOut` tween and fires `on_toggle` when the state changed; releasing
-before halfway snaps back. A press without moving (under 4 px) counts as
-a tap and flips the state. Checkbox and button styles stay click-only.
+Switch style additionally supports swiping: pressing the track grabs
+the knob, but it never follows the pointer freely. A fling past
+`TOGGLE_SWIPE_PX` (12 px) commits that direction at once (track repaints
+directly, `on_toggle` fires) with a 0.15 s `CubicOut` snap; pulling back
+past the opposite threshold flips back within the same hold, anything less
+snaps back. While held the white knob turns into the shared liquid glass
+lens (`fill_lens_glass`: clear minified center, thin 4 px blurred rim,
+light frost fill with top/bottom bevel, like the slider knob) and grows to
+a 1.8x bubble standing outside the track (+9.9 px per side wide,
++7.3 px tall), lingering until release; with `App::wants_backdrop` the
+lens also samples the sharp and blurred in-app backdrop (and is omitted on
+the capture pass so the blur sees the track behind it). A press without
+moving (under 4 px) counts as a tap and flips the state on release.
+Checkbox and button styles stay click-only.
 
 Forward `mouse_down`, `mouse_move` and `mouse_up` from the app (see
 `examples/toggle.rs`). Animations are driven by real frame deltas, so

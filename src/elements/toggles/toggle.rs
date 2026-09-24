@@ -40,6 +40,9 @@ pub const TOGGLE_KNOB_EXPAND_H: f32 = 7.3;
 pub const TOGGLE_ANIM_SECONDS: f32 = 0.20;
 /// Drag-release snap time in seconds.
 pub const TOGGLE_SNAP_SECONDS: f32 = 0.15;
+/// Swipe distance in logical px from the press point that commits the
+/// switch: fling far enough left/right and the state flips with a snap.
+pub const TOGGLE_SWIPE_PX: f32 = 12.0;
 /// Checkbox box size in logical px.
 pub const TOGGLE_BOX: f32 = 21.12;
 /// Checkbox corner radius in logical px.
@@ -110,6 +113,10 @@ pub struct Toggle {
     armed: bool,
     hovered: bool,
     dragging: bool,
+    /// True once the current hold crossed a swipe threshold. Release then
+    /// settles to the committed state instead of the nearer stop, so a fast
+    /// fling-release cannot revert mid-snap.
+    committed: bool,
     down_x: f32,
     dragged: bool,
     disabled: bool,
@@ -151,6 +158,7 @@ impl Toggle {
             armed: false,
             hovered: false,
             dragging: false,
+            committed: false,
             down_x: 0.0,
             dragged: false,
             disabled: false,
@@ -229,8 +237,8 @@ impl Toggle {
         self.on
     }
 
-    /// True while the switch knob is held and follows the pointer.
-    /// Apps use this to return true from `App::wants_backdrop`.
+    /// True while the switch knob is held for a swipe. Apps use this to
+    /// return true from `App::wants_backdrop`.
     pub fn is_dragging(&self) -> bool {
         self.dragging
     }
@@ -285,31 +293,22 @@ impl Toggle {
         TOGGLE_SWITCH_W - TOGGLE_KNOB_PAD * 2.0 - Self::knob_w()
     }
 
-    /// Knob position for a pointer x over the track, 0.0 (off) to 1.0
-    /// (on). The knob center maps to the pointer so a grabbed knob does
-    /// not jump.
-    fn shown_at(&self, x: f32) -> f32 {
-        let travel = Self::travel();
-        if travel <= 0.0 {
-            return if self.on { 1.0 } else { 0.0 };
-        }
-        ((x - (self.sx + TOGGLE_KNOB_PAD + Self::knob_w() / 2.0)) / travel).clamp(0.0, 1.0)
-    }
-
     pub fn mouse_down(&mut self, x: f64, y: f64) {
         if self.disabled {
             return;
         }
         let (x, y) = (x as f32, y as f32);
-        // Pressing the switch track starts a drag: the knob follows the
-        // pointer until release. Everything else arms a plain click.
+        // Pressing the switch track grabs the knob, but the knob never
+        // follows the pointer freely: a fling past TOGGLE_SWIPE_PX commits
+        // the direction with a snap, anything less snaps back.
+        // Everything else arms a plain click.
         if self.style == ToggleStyle::Switch && self.switch_hit(x, y) {
             self.dragging = true;
             self.down_x = x;
             self.dragged = false;
+            self.committed = false;
             self.armed = true;
             self.anim = None;
-            self.shown = self.shown_at(x);
         } else if self.hit(x, y) {
             self.armed = true;
         }
@@ -319,11 +318,41 @@ impl Toggle {
         let (x, y) = (x as f32, y as f32);
         self.hovered = self.hit(x, y);
         if self.dragging {
-            if (x - self.down_x).abs() > 4.0 {
+            let dx = x - self.down_x;
+            if dx.abs() > 4.0 {
                 self.dragged = true;
             }
-            self.shown = self.shown_at(x);
+            // Commit on crossing a threshold away from the press point.
+            // Re-crossing the opposite threshold flips back, so pulling
+            // back after a commit works within the same hold. The
+            // `self.on` guard fires only on a real direction change.
+            if dx >= TOGGLE_SWIPE_PX && !self.on {
+                self.commit(true);
+            } else if dx <= -TOGGLE_SWIPE_PX && self.on {
+                self.commit(false);
+            }
         }
+    }
+
+    /// Swipe commit: flip the state at once (track repaints directly) and
+    /// run the short snap for the knob. The drag stays active so the glass
+    /// bubble lingers until release; the snap animation progresses anyway
+    /// (see `advance`).
+    fn commit(&mut self, target: bool) {
+        self.committed = true;
+        self.dragged = true;
+        self.armed = false;
+        if target != self.on {
+            self.on = target;
+            self.notify();
+        }
+        let end = if target { 1.0 } else { 0.0 };
+        self.anim = Some(TweenAnim::new(
+            Tween::new(self.shown, end, TOGGLE_SNAP_SECONDS)
+                .easing(Easing::CubicOut)
+                .repeat(Repeat::Never),
+        ));
+        self.anim_time = 0.0;
     }
 
     pub fn mouse_up(&mut self, x: f64, y: f64) {
@@ -345,9 +374,16 @@ impl Toggle {
                 }
                 return;
             }
-            // Dragged: snap to the nearer stop, firing when the state
-            // changed.
-            let target = self.shown > 0.5;
+            // Released after moving but below the swipe threshold: the knob
+            // never left rest, so snapping to the nearer stop just settles
+            // back to the current state. After a commit the nearer stop
+            // could still be the old one mid-snap, so settle to the
+            // committed state instead.
+            let target = if self.committed {
+                self.on
+            } else {
+                self.shown > 0.5
+            };
             if target != self.on {
                 self.on = target;
                 self.notify();
@@ -397,9 +433,10 @@ impl Toggle {
         if (self.grow - grow_target).abs() < 0.005 {
             self.grow = grow_target;
         }
-        if self.dragging {
-            // While held the pointer owns `shown`; never snap it back to
-            // the on/off endpoint or the knob would freeze mid-drag.
+        if self.dragging && self.anim.is_none() {
+            // While held with no snap running the knob rests: never drift
+            // `shown` toward an endpoint. A running commit snap below is
+            // free to progress while held.
             return;
         }
         if let Some(anim) = self.anim.as_mut() {
@@ -878,23 +915,22 @@ mod tests {
     }
 
     #[test]
-    fn dragging_survives_frame_advance() {
+    fn held_knob_ignores_frame_advance() {
         // Regression: draw() must not reset the held knob to the on/off
-        // endpoint, or dragging left would do nothing and snap back on.
+        // endpoint while a swipe is in progress.
         let mut toggle = Toggle::new("Wi-Fi").on(true);
         let mut fonts = FontSystem::new();
         let (w, _) = toggle.measure(&mut fonts);
         toggle.place(&mut fonts, 0.0, 0.0, w, TOGGLE_SWITCH_H);
-        let left = (w - TOGGLE_SWITCH_W + 3.0) as f64;
         let right = (w - 3.0) as f64;
         toggle.mouse_down(right, 14.0);
-        toggle.mouse_move(left, 14.0);
-        let held = toggle.shown;
-        assert!(held < 0.5);
+        // Small move below the swipe threshold: knob stays put.
+        toggle.mouse_move(right - 6.0, 14.0);
+        assert_eq!(toggle.shown, 1.0);
         toggle.advance(Instant::now());
-        assert_eq!(toggle.shown, held);
-        toggle.mouse_up(left, 14.0);
-        assert!(!toggle.is_on());
+        assert_eq!(toggle.shown, 1.0);
+        toggle.mouse_up(right - 6.0, 14.0);
+        assert!(toggle.is_on());
     }
 
     #[test]
@@ -924,36 +960,57 @@ mod tests {
     }
 
     #[test]
-    fn drag_slides_knob_and_snaps_on_release() {
+    fn swipe_past_threshold_commits_with_snap() {
         let mut toggle = Toggle::new("Wi-Fi");
         let mut fonts = FontSystem::new();
         let (w, _) = toggle.measure(&mut fonts);
         toggle.place(&mut fonts, 0.0, 0.0, w, TOGGLE_SWITCH_H);
         let left = (w - TOGGLE_SWITCH_W + 3.0) as f64;
-        let right = (w - 3.0) as f64;
         toggle.mouse_down(left, 14.0);
-        toggle.mouse_move(right, 14.0);
-        // Knob followed the pointer past halfway.
-        assert!(toggle.shown > 0.5);
-        toggle.mouse_up(right, 14.0);
+        // Fling past the swipe threshold: state flips at once with the
+        // snap running, and the drag (glass) stays active while held.
+        toggle.mouse_move(left + TOGGLE_SWIPE_PX as f64 + 4.0, 14.0);
         assert!(toggle.is_on());
-        // Snap animation runs to the on stop.
         assert!(toggle.anim.is_some());
+        assert!(toggle.dragging);
+        toggle.mouse_up(left + 20.0, 14.0);
+        assert!(toggle.is_on());
+        assert!(!toggle.dragging);
     }
 
     #[test]
-    fn drag_below_half_snaps_back_off() {
-        let mut toggle = Toggle::new("Wi-Fi").on(true);
+    fn swipe_back_flips_back_within_same_hold() {
+        let mut toggle = Toggle::new("Wi-Fi");
         let mut fonts = FontSystem::new();
         let (w, _) = toggle.measure(&mut fonts);
         toggle.place(&mut fonts, 0.0, 0.0, w, TOGGLE_SWITCH_H);
         let left = (w - TOGGLE_SWITCH_W + 3.0) as f64;
-        let right = (w - 3.0) as f64;
-        toggle.mouse_down(right, 14.0);
-        toggle.mouse_move(left, 14.0);
-        assert!(toggle.shown < 0.5);
+        toggle.mouse_down(left, 14.0);
+        toggle.mouse_move(left + TOGGLE_SWIPE_PX as f64 + 4.0, 14.0);
+        assert!(toggle.is_on());
+        // Pull back past the opposite threshold: flips back to off while
+        // still held.
+        toggle.mouse_move(left - TOGGLE_SWIPE_PX as f64 - 4.0, 14.0);
+        assert!(!toggle.is_on());
+        assert!(toggle.dragging);
         toggle.mouse_up(left, 14.0);
         assert!(!toggle.is_on());
+        assert!(!toggle.dragging);
+    }
+
+    #[test]
+    fn swipe_below_threshold_snaps_back_off() {
+        let mut toggle = Toggle::new("Wi-Fi").on(true);
+        let mut fonts = FontSystem::new();
+        let (w, _) = toggle.measure(&mut fonts);
+        toggle.place(&mut fonts, 0.0, 0.0, w, TOGGLE_SWITCH_H);
+        let right = (w - 3.0) as f64;
+        toggle.mouse_down(right, 14.0);
+        // Small move below the threshold: knob never leaves rest.
+        toggle.mouse_move(right - 6.0, 14.0);
+        assert_eq!(toggle.shown, 1.0);
+        toggle.mouse_up(right - 6.0, 14.0);
+        assert!(toggle.is_on());
     }
 
     #[test]
