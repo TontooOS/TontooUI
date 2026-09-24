@@ -46,18 +46,19 @@ the frost when `App::wants_backdrop` is enabled.
 | `GLASS_SPECULAR` | white 45% top light |
 | `GLASS_DEPTH` | black 18% bottom shade |
 | `GLASS_CHROMA_RED` / `GLASS_CHROMA_CYAN` | faint rim split |
-| `GLASS_EDGE_WIDTH` | 14 logical px frosted rim band |
+| `GLASS_EDGE_WIDTH` | 6 logical px thin frosted rim band |
 | `GLASS_MAGNIFY` | 1.07x lens zoom of the clear center |
 
 ## Lens
 
-The body renders in two backdrop layers: `fill_backdrop_lens` fills the full
-rounded rect with the sharp capture magnified around the body center
-(`GLASS_MAGNIFY`), then `stroke_backdrop_edge` strokes a rounded rect inset
-by half the band with the blurred capture at full band width, so the blur
-sits fully inside the body outline. Tiny bodies (smaller than twice the band)
-fall back to a full `fill_backdrop` blur. Small knobs (slider, toggle) keep
-the full blur fill; only `GlassContainer` uses the lens.
+Top to bottom: the liquid bevel strokes specular white at the top and depth
+shade at the bottom with a transparent middle, so the flanks stay clean;
+under it `stroke_backdrop_edge` strokes a 6 px blurred rim fully inside the
+body outline; the center fills with the sharp capture magnified around the
+body center (`fill_backdrop_lens`, `GLASS_MAGNIFY`), so the magnifier covers
+the whole middle. Tiny bodies (smaller than twice the band) fall back to a
+full `fill_backdrop` blur. Small knobs (slider, toggle) keep the full blur
+fill; only `GlassContainer` uses the lens.
 
 Desktop pixels behind a transparent window still need the compositor (it
 owns those pixels); `App::transparent_body` skips the window background

@@ -24,9 +24,9 @@ pub const GLASS_DEPTH: Color = Color::from_rgba8(0, 0, 0, 46);
 pub const GLASS_CHROMA_RED: Color = Color::from_rgba8(255, 90, 120, 30);
 /// Chromatic rim split, cyan side.
 pub const GLASS_CHROMA_CYAN: Color = Color::from_rgba8(90, 200, 255, 30);
-/// Width of the frosted edge band in logical px. Only this rim samples the
-/// blurred backdrop; the center stays clear.
-pub const GLASS_EDGE_WIDTH: f32 = 14.0;
+/// Width of the frosted edge band in logical px. Only this thin rim samples
+/// the blurred backdrop; the center stays clear.
+pub const GLASS_EDGE_WIDTH: f32 = 6.0;
 /// Magnification of the clear lens center (1.0 = no zoom).
 pub const GLASS_MAGNIFY: f64 = 1.07;
 
@@ -213,7 +213,9 @@ impl GlassContainer {
             &body,
         );
 
-        // Liquid bevel: specular top melting into depth shade at the bottom.
+        // Liquid bevel: specular top light and depth shade at the bottom,
+        // transparent along the sides (long transparent mid stops so the
+        // vertical gradient leaves the flanks clean).
         let bevel = RoundedRect::new(
             rect.x0 + 1.0 * scale,
             rect.y0 + 1.0 * scale,
@@ -231,7 +233,11 @@ impl GlassContainer {
                 color: self.specular.into(),
             },
             ColorStop {
-                offset: 0.35,
+                offset: 0.22,
+                color: Color::TRANSPARENT.into(),
+            },
+            ColorStop {
+                offset: 0.78,
                 color: Color::TRANSPARENT.into(),
             },
             ColorStop {
