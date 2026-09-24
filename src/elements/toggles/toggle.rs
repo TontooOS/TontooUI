@@ -18,9 +18,9 @@ use super::super::buttons::{
 };
 use super::super::glass::{GLASS_DEPTH, GLASS_ZOOM};
 
-/// Switch track width in logical px (stretched long and slim,
-/// macOS style).
-pub const TOGGLE_SWITCH_W: f32 = 64.0;
+/// Switch track width in logical px (compact: the white knob keeps its size,
+/// the gray track behind it is shorter).
+pub const TOGGLE_SWITCH_W: f32 = 48.0;
 /// Switch track height in logical px (three quarters of the iOS
 /// measure).
 pub const TOGGLE_SWITCH_H: f32 = 22.32;
@@ -862,7 +862,7 @@ mod tests {
         let mut fonts = FontSystem::new();
         let (w, h) = toggle.measure(&mut fonts);
         assert_eq!((w, h), (TOGGLE_SWITCH_W, TOGGLE_SWITCH_H));
-        assert_eq!((TOGGLE_SWITCH_W, TOGGLE_SWITCH_H), (64.0, 22.32));
+        assert_eq!((TOGGLE_SWITCH_W, TOGGLE_SWITCH_H), (48.0, 22.32));
     }
 
     #[test]
