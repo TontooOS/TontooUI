@@ -104,6 +104,22 @@ impl App for MenuDemo {
         let cy = top + 8.0 + 24.0 + 8.0;
         draw_layout(scene, &layout, cx, cy, fonts.scale);
 
+        // Sample text under the picker: opening the menu blurs these
+        // lines through the frosted glass (glass test).
+        let sample = [
+            "Lorem ipsum dolor sit amet,",
+            "consectetur adipiscing elit,",
+            "sed do eiusmod tempor incididunt,",
+            "ut labore et dolore magna aliqua.",
+            "The quick brown fox jumps over the lazy dog.",
+        ];
+        let mut ly = top + 64.0;
+        for line in sample {
+            let layout = fonts.layout_text_weighted(line, 13.0, self.text, 400.0, None);
+            draw_layout(scene, &layout, viewport.x + 24.0, ly, fonts.scale);
+            ly += 22.0;
+        }
+
         self.stack.place(
             fonts,
             viewport.x + 24.0,

@@ -179,7 +179,8 @@ titlebar plus a `Selected: ...` caption.
 Run `cargo run --example menu`: `Color` (`Red`, `Green`, `Blue`,
 `Yellow`, `Purple`) pop-up button in a `VStack` with the selection
 in the titlebar plus a `Selected: ...` caption; the open glass menu
-floats above the caption.
+floats above the caption and sample text lines that show the frost
+blur behind it.
 
 ```rust
 let mut options = SegmentedPicker::from_slice("Options", &["One", "Two", "Three"])
