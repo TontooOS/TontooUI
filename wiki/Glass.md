@@ -1,12 +1,12 @@
 # Glass
 
-`GlassContainer`: liquid glass lens container with a clear magnified center,
+`GlassContainer`: liquid glass lens container with a clear minified center,
 a frosted edge band, liquid bevel rim (specular top light melting into bottom
 depth shade), chromatic edge split (red outside, cyan inside) and a soft drop
 shadow. Optional content draws on top. When the shell runs
 `App::wants_backdrop`, the center samples the sharp in-app capture slightly
-magnified while only a narrow rim band samples the blurred capture, so content
-behind the glass shows through enlarged with frost only at the very edge.
+minified while only a narrow rim band samples the blurred capture, so content
+behind the glass shows through shrunk with frost only at the very edge.
 
 ```rust
 pub fn new() -> Self
@@ -36,7 +36,7 @@ The `glass` daemon setting (LiquidGlass slider) drives the look:
 
 Less glass adds a scattered black dash ring outside the crisp rim. The
 stages control frost opacity, rim light and grain; the lens layers the sharp
-magnified capture in the center and the blurred capture as an edge band under
+minified capture in the center and the blurred capture as an edge band under
 the frost when `App::wants_backdrop` is enabled.
 
 | Token | Value |
@@ -47,15 +47,15 @@ the frost when `App::wants_backdrop` is enabled.
 | `GLASS_DEPTH` | black 18% bottom shade |
 | `GLASS_CHROMA_RED` / `GLASS_CHROMA_CYAN` | faint rim split |
 | `GLASS_EDGE_WIDTH` | 6 logical px thin frosted rim band |
-| `GLASS_MAGNIFY` | 1.07x lens zoom of the clear center |
+| `GLASS_ZOOM` | 0.93x lens zoom of the clear center (minify) |
 
 ## Lens
 
 Top to bottom: the liquid bevel strokes specular white at the top and depth
 shade at the bottom with a transparent middle, so the flanks stay clean;
 under it `stroke_backdrop_edge` strokes a 6 px blurred rim fully inside the
-body outline; the center fills with the sharp capture magnified around the
-body center (`fill_backdrop_lens`, `GLASS_MAGNIFY`), so the magnifier covers
+body outline; the center fills with the sharp capture minified around the
+body center (`fill_backdrop_lens`, `GLASS_ZOOM`), so the minifier covers
 the whole middle. Tiny bodies (smaller than twice the band) fall back to a
 full `fill_backdrop` blur. The held toggle knob and the dragged slider knob
 use the same lens via `fill_lens_glass` with a narrower 4 px rim.

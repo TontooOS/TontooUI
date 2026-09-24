@@ -205,8 +205,9 @@ pub fn fill_lens_glass(scene: &mut Scene, images: &ImageLoader<'_>, rect: &Rect,
   `ImageLoader::backdrop()` is `Some`; no-op otherwise (single-pass frames).
   Scene coordinates are physical px and the texture is full-window physical
   size, so identity maps image pixel (0, 0) to scene (0, 0).
-- `fill_backdrop_lens` paints `shape` with the sharp capture magnified by
-  `zoom` around `center` (both physical px) via the brush transform; no-op
+- `fill_backdrop_lens` paints `shape` with the sharp capture zoomed by
+  `zoom` around `center` (both physical px) via the brush transform
+  (below 1.0 minifies, above 1.0 magnifies); no-op
   when `backdrop_sharp()` is `None`.
 - `stroke_backdrop_edge` strokes `ring` with the blurred capture; callers
   inset the ring by half the band and stroke at full band width so the frost
@@ -270,7 +271,7 @@ Backdrop access during the two-pass frame:
 | Method | Returns |
 |---|---|
 | `backdrop()` | Blurred capture for glass edge fills, or `None` on the capture pass / single-pass frames |
-| `backdrop_sharp()` | Sharp capture for the magnified lens center, or `None` on the capture pass / single-pass frames |
+| `backdrop_sharp()` | Sharp capture for the zoomed lens center, or `None` on the capture pass / single-pass frames |
 | `is_capture_pass()` | True while recording the pre-blur capture; glass bodies must skip drawing |
 
 ## Frame

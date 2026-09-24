@@ -6,7 +6,7 @@ use vello::kurbo::{Affine, Circle, Point, Rect, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
 use super::super::layout::View;
-use super::super::glass::GLASS_MAGNIFY;
+use super::super::glass::GLASS_ZOOM;
 use crate::animation::{Easing, Repeat, Tween, TweenAnim};
 use crate::renderer::backdrop::fill_lens_glass;
 use crate::renderer::images::ImageLoader;
@@ -483,7 +483,7 @@ impl Slider {
                 images,
                 &Rect::new(px(kx - kw), px(tcy - kh), px(kx + kw), px(tcy + kh)),
                 px(kr),
-                GLASS_MAGNIFY,
+                GLASS_ZOOM,
                 4.0 * scale,
             );
             let tint = if self.dark {

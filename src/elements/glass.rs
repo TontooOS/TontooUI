@@ -25,16 +25,17 @@ pub const GLASS_CHROMA_CYAN: Color = Color::from_rgba8(90, 200, 255, 30);
 /// Width of the frosted edge band in logical px. Only this thin rim samples
 /// the blurred backdrop; the center stays clear.
 pub const GLASS_EDGE_WIDTH: f32 = 6.0;
-/// Magnification of the clear lens center (1.0 = no zoom).
-pub const GLASS_MAGNIFY: f64 = 1.07;
+/// Lens zoom of the clear center: below 1.0 the backdrop behind the glass
+/// shrinks (minify), above 1.0 it grows. Default minifies slightly.
+pub const GLASS_ZOOM: f64 = 0.93;
 
-/// Liquid glass container: clear magnified lens center, frosted edge band,
+/// Liquid glass container: clear minified lens center, frosted edge band,
 /// liquid bevel rim with specular top light and depth shade, chromatic edge
 /// split and a soft shadow. Optional content draws on top.
 ///
 /// When the shell runs a backdrop pass (`App::wants_backdrop`), the center
-/// samples the sharp in-app capture slightly magnified so content behind
-/// the glass shows through enlarged, while only a narrow rim band samples
+/// samples the sharp in-app capture slightly minified so content behind
+/// the glass shows through shrunk, while only a narrow rim band samples
 /// the blurred capture. Desktop pixels behind a transparent window still
 /// need the compositor; without a backdrop the body is only the frost tint.
 pub struct GlassContainer {
@@ -176,7 +177,7 @@ impl GlassContainer {
         // Liquid lens: clear magnified center, blurred rim band only (see
         // `fill_lens_glass`; tiny bodies fall back to a full blur fill).
         let band = GLASS_EDGE_WIDTH as f64 * scale;
-        fill_lens_glass(scene, images, &rect, radius, GLASS_MAGNIFY, band);
+        fill_lens_glass(scene, images, &rect, radius, GLASS_ZOOM, band);
 
         // Frosted body (gray when the window is inactive).
         let tint = if self.focused {

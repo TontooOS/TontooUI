@@ -384,11 +384,12 @@ pub fn fill_backdrop(
 }
 
 /// Liquid glass lens center: fills `shape` with the sharp (unblurred)
-/// capture, magnified by `zoom` around `center` (both in physical px).
-/// The brush transform maps brush pixels onto the surface, so scaling it
-/// up by `zoom` samples a smaller backdrop region stretched over the
-/// shape: content behind the glass looks slightly enlarged and stays
-/// crisp. Falls back to nothing when no sharp capture is available.
+/// capture, zoomed by `zoom` around `center` (both in physical px).
+/// The brush transform maps brush pixels onto the surface, so a `zoom`
+/// above 1.0 samples a smaller backdrop region stretched over the shape
+/// (content looks enlarged) while a `zoom` below 1.0 samples a larger
+/// region compressed into the shape (content looks shrunk). Falls back to
+/// nothing when no sharp capture is available.
 pub fn fill_backdrop_lens(
     scene: &mut vello::Scene,
     images: &crate::renderer::images::ImageLoader<'_>,
@@ -399,9 +400,10 @@ pub fn fill_backdrop_lens(
     let Some(sharp) = images.backdrop_sharp() else {
         return;
     };
-    let z = zoom.max(1.0);
-    // Brush -> surface: scale up around the glass center so each surface
-    // point samples closer to the center (magnifier).
+    let z = if zoom <= 0.0 { 1.0 } else { zoom };
+    // Brush -> surface: scale around the glass center so each surface
+    // point samples away from (z < 1, minify) or toward (z > 1, magnify)
+    // the center.
     let brush_transform = Affine::translate((center.x, center.y))
         * Affine::scale(z)
         * Affine::translate((-center.x, -center.y));
@@ -418,11 +420,11 @@ pub fn fill_backdrop_lens(
     );
 }
 
-/// Shared liquid glass body: clear magnified center with only a thin
+/// Shared liquid glass body: clear zoomed center with only a thin
 /// blurred rim band inside the outline. `rect`/`radius` are in physical px,
-/// `zoom` is the lens magnification (1.0 = none) and `edge_width` the rim
-/// band width in physical px. Bodies smaller than twice the band fall back
-/// to a full blur fill.
+/// `zoom` is the lens zoom (below 1.0 minifies, above 1.0 magnifies) and
+/// `edge_width` the rim band width in physical px. Bodies smaller than twice
+/// the band fall back to a full blur fill.
 pub fn fill_lens_glass(
     scene: &mut vello::Scene,
     images: &crate::renderer::images::ImageLoader<'_>,

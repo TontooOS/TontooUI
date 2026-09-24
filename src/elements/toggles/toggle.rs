@@ -16,7 +16,7 @@ use super::super::buttons::{
     BUTTON_BG_DARK, BUTTON_BG_LIGHT, BUTTON_FONT_SIZE, BUTTON_GAP, BUTTON_ICON_SIZE,
     BUTTON_PAD_X, BUTTON_PAD_Y, BUTTON_RADIUS,
 };
-use super::super::glass::{GLASS_DEPTH, GLASS_MAGNIFY};
+use super::super::glass::{GLASS_DEPTH, GLASS_ZOOM};
 
 /// Switch track width in logical px (stretched long and slim,
 /// macOS style).
@@ -536,7 +536,7 @@ impl Toggle {
                     px(ky + knob_h + ey),
                 ),
                 px(kr),
-                GLASS_MAGNIFY,
+                GLASS_ZOOM,
                 4.0 * scale,
             );
             scene.fill(
