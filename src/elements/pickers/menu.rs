@@ -31,8 +31,8 @@ pub const MENU_PAD: f32 = 6.0;
 pub const MENU_ROW_H: f32 = 26.0;
 /// Vertical gap between menu rows in logical px.
 pub const MENU_ROW_SPACING: f32 = 2.0;
-/// Menu panel corner radius in logical px (clearly rounded).
-pub const MENU_RADIUS: f32 = 6.0;
+/// Menu panel corner radius in logical px (round, like the reference).
+pub const MENU_RADIUS: f32 = 9.0;
 /// Column reserved for the checkmark in logical px.
 pub const MENU_CHECK_COL: f32 = 20.0;
 /// Gap between checkmark column and row text in logical px.
