@@ -46,14 +46,14 @@ the frost when `App::wants_backdrop` is enabled.
 | `GLASS_SPECULAR` | white 45% top light |
 | `GLASS_DEPTH` | black 18% bottom shade |
 | `GLASS_CHROMA_RED` / `GLASS_CHROMA_CYAN` | faint rim split |
-| `GLASS_EDGE_WIDTH` | 4 logical px thin frosted rim band |
+| `GLASS_EDGE_WIDTH` | 2 logical px thin frosted rim band |
 | `GLASS_ZOOM` | 0.80x lens zoom of the clear center (minify) |
 
 ## Lens
 
 Top to bottom: the liquid bevel strokes specular white at the top and depth
 shade at the bottom with a transparent middle, so the flanks stay clean;
-under it `stroke_backdrop_edge` strokes a 4 px blurred rim fully inside the
+under it `stroke_backdrop_edge` strokes a 2 px blurred rim fully inside the
 body outline; the center fills with the sharp capture minified around the
 body center (`fill_backdrop_lens`, `GLASS_ZOOM`), so the minifier covers
 the whole middle. Tiny bodies (smaller than twice the band) fall back to a
