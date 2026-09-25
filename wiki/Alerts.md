@@ -229,6 +229,14 @@ bar.set_modal_blocked(alert.is_visible());
 alert.set_viewport(viewport.x, top, viewport.width, content_h);
 alert.draw(scene, fonts, images);
 
+// Blur wiring: frosted cards sample the shell's blurred backdrop,
+// which only exists while the app opts into the capture pass.
+// Without this the card falls back to its flat tint and reads as
+// clear glass instead of frosted.
+fn wants_backdrop(&self) -> bool {
+    alert.is_visible()
+}
+
 // Input: modal, only the alert hears clicks while visible.
 fn mouse_up(&mut self, x: f64, y: f64) {
     if alert.is_visible() {

@@ -457,29 +457,35 @@ impl View for BasicAlert {
         if self.vw <= 0.0 || self.vh <= 0.0 {
             return;
         }
-        self.layout_card(fonts);
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
-        // Whole overlay (dim plus frost card) fades as one layer.
-        let clip = Rect::new(
-            px(self.vx),
-            px(self.vy),
-            px(self.vx + self.vw),
-            px(self.vy + self.vh),
-        );
-        scene.push_layer(
-            Fill::NonZero,
-            BlendMode::default(),
-            self.opacity.clamp(0.0, 1.0),
-            Affine::IDENTITY,
-            &clip,
-        );
         // Dim the app behind the card.
         let dim = Rect::new(
             px(self.vx),
             px(self.vy),
             px(self.vx + self.vw),
             px(self.vy + self.vh),
+        );
+        if images.is_capture_pass() {
+            // Backdrop capture: paint only the dim, so the blur sees
+            // the dimmed app without the card, texts or buttons.
+            scene.fill(
+                Fill::NonZero,
+                Affine::IDENTITY,
+                &Brush::Solid(Color::from_rgba8(0, 0, 0, ALERT_DIM_ALPHA)),
+                None,
+                &dim,
+            );
+            return;
+        }
+        self.layout_card(fonts);
+        // Whole overlay (dim plus frost card) fades as one layer.
+        scene.push_layer(
+            Fill::NonZero,
+            BlendMode::default(),
+            self.opacity.clamp(0.0, 1.0),
+            Affine::IDENTITY,
+            &dim,
         );
         scene.fill(
             Fill::NonZero,

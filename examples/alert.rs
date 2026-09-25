@@ -282,6 +282,11 @@ impl App for AlertDemo {
         self.bg
     }
 
+    fn wants_backdrop(&self) -> bool {
+        // Frosted alert cards need the blur pass while visible.
+        self.any_visible()
+    }
+
     fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
         Some(self.bar.drag_rect())
     }
