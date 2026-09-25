@@ -154,6 +154,8 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
   the app; reports every change through `on_change`, reads back via
   `selected`; outside clicks dismiss keeping the selection.
 - Drags track across moves with clamping; sliders map linearly.
+  Knob centers travel inset by the knob radius and the crosshair
+  clamps inside the disc, so rings never leave their bars.
   Skips itself in the backdrop capture pass, so the frost samples
   only what sits behind it — the app opts in with
   `wants_backdrop` while visible (see the demo, like the date

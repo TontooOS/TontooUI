@@ -26,6 +26,7 @@ theme, animation and a Vello/WGPU renderer.
 | Images | [Images.md](Images.md) | SF Symbol, app resource, URL and overlay card |
 | Layout | [Layout.md](Layout.md) | VStack, HStack, ZStack, modifiers, `View` |
 | List | [List.md](List.md) | Static text list with row dividers |
+| Link | [Link.md](Link.md) | Blue link opening the default browser |
 | Menu | [Menu.md](Menu.md) | Simple dropdown with action rows, picker base |
 | Material | [Material.md](Material.md) | Translucent material veils in five thicknesses |
 | Renderer | [Renderer.md](Renderer.md) | Window shell, frame pipeline, backdrop blur |

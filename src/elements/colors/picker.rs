@@ -357,11 +357,32 @@ impl ColorPicker {
         (hue, dist)
     }
 
-    /// Selected point on the wheel in logical px.
+    /// Selected point on the wheel in logical px. Clamped inside
+    /// the disc minus the crosshair ring, so the ring never leaves
+    /// the wheel.
     pub fn hs_point(&self) -> (f32, f32) {
         let (cx, cy, r) = self.wheel_rect();
         let angle = self.hsv.h * std::f32::consts::TAU;
-        (cx + angle.cos() * self.hsv.s * r, cy + angle.sin() * self.hsv.s * r)
+        let rr = (self.hsv.s * r).min((r - 13.0).max(0.0));
+        (cx + angle.cos() * rr, cy + angle.sin() * rr)
+    }
+
+    /// Knob radius in logical px (shared by both slider bars).
+    pub fn knob_radius() -> f32 {
+        PICKER_BAR_H / 2.0 - 2.0
+    }
+
+    /// Map a press x to a slider value: the knob travels inset by its
+    /// radius, so it always stays inside the bar.
+    pub fn slider_t(rx: f32, rw: f32, x: f32) -> f32 {
+        let kr = Self::knob_radius();
+        ((x - (rx + kr)) / (rw - kr * 2.0).max(1.0)).clamp(0.0, 1.0)
+    }
+
+    /// Knob center x for a slider value (stays inside the bar).
+    pub fn slider_x(rx: f32, rw: f32, t: f32) -> f32 {
+        let kr = Self::knob_radius();
+        rx + kr + t.clamp(0.0, 1.0) * (rw - kr * 2.0).max(0.0)
     }
 
     fn fire(&mut self) {
@@ -397,12 +418,12 @@ impl ColorPicker {
         } else if Self::in_rect(x, y, self.brightness_rect()) {
             self.drag = Some(DragTarget::Brightness);
             let (bx, _, bw, _) = self.brightness_rect();
-            self.hsv.v = ((x - bx) / bw).clamp(0.0, 1.0);
+            self.hsv.v = Self::slider_t(bx, bw, x);
             self.fire();
         } else if Self::in_rect(x, y, self.opacity_rect()) {
             self.drag = Some(DragTarget::Opacity);
             let (ox, _, ow, _) = self.opacity_rect();
-            self.opacity = ((x - ox) / ow).clamp(0.0, 1.0);
+            self.opacity = Self::slider_t(ox, ow, x);
             self.fire();
         } else if !Self::in_rect(x, y, self.card_rect()) {
             // Outside click dismisses, keeping the selection.
@@ -421,12 +442,12 @@ impl ColorPicker {
             }
             Some(DragTarget::Brightness) => {
                 let (bx, _, bw, _) = self.brightness_rect();
-                self.hsv.v = ((x - bx) / bw).clamp(0.0, 1.0);
+                self.hsv.v = Self::slider_t(bx, bw, x);
                 self.fire();
             }
             Some(DragTarget::Opacity) => {
                 let (ox, _, ow, _) = self.opacity_rect();
-                self.opacity = ((x - ox) / ow).clamp(0.0, 1.0);
+                self.opacity = Self::slider_t(ox, ow, x);
                 self.fire();
             }
             None => {}
@@ -575,7 +596,7 @@ impl View for ColorPicker {
             None,
             &bar,
         );
-        knob(scene, scale, bx + self.hsv.v * bw, by + bh / 2.0, bh / 2.0 - 2.0);
+        knob(scene, scale, Self::slider_x(bx, bw, self.hsv.v), by + bh / 2.0, bh / 2.0 - 2.0);
 
         // Opacity label and checker transparency bar with percent pill.
         self.ensure_labels(fonts);
@@ -630,7 +651,7 @@ impl View for ColorPicker {
             &obar,
         );
         scene.pop_layer();
-        knob(scene, scale, ox + self.opacity * ow, oy + oh / 2.0, oh / 2.0 - 2.0);
+        knob(scene, scale, Self::slider_x(ox, ow, self.opacity), oy + oh / 2.0, oh / 2.0 - 2.0);
 
         // Percent pill on the row's right end.
         let pill = RoundedRect::new(
@@ -761,8 +782,41 @@ mod tests {
         picker.mouse_down((bx + bw / 2.0) as f64, (by + bh / 2.0) as f64);
         assert!((picker.hsv_value().v - 0.5).abs() < 1e-6);
         let (ox, oy, ow, oh) = picker.opacity_rect();
-        picker.mouse_down((ox + ow / 4.0) as f64, (oy + oh / 2.0) as f64);
-        assert!((picker.selected().to_rgba8().a as f32 - 255.0 * 0.25).abs() < 2.0);
+        picker.mouse_down((ox + ow / 2.0) as f64, (oy + oh / 2.0) as f64);
+        assert!((picker.selected().to_rgba8().a as f32 - 255.0 * 0.5).abs() < 2.0);
+    }
+
+    #[test]
+    fn knobs_stay_inside_their_bars() {
+        let mut picker = ColorPicker::new();
+        picker.set_viewport(0.0, 0.0, 800.0, 600.0);
+        picker.show();
+        let kr = ColorPicker::knob_radius();
+        for (rx, rw) in [
+            {
+                let (x, _, w, _) = picker.brightness_rect();
+                (x, w)
+            },
+            {
+                let (x, _, w, _) = picker.opacity_rect();
+                (x, w)
+            },
+        ] {
+            // Ends clamp to the inset travel, middles map exactly.
+            assert_eq!(ColorPicker::slider_t(rx, rw, rx - 50.0), 0.0);
+            assert_eq!(ColorPicker::slider_t(rx, rw, rx + rw + 50.0), 1.0);
+            assert!((ColorPicker::slider_t(rx, rw, rx + rw / 2.0) - 0.5).abs() < 1e-6);
+            assert_eq!(ColorPicker::slider_x(rx, rw, 0.0), rx + kr);
+            assert_eq!(ColorPicker::slider_x(rx, rw, 1.0), rx + rw - kr);
+        }
+        // Crosshair ring stays inside the disc at full saturation.
+        let (cx, cy, r) = picker.wheel_rect();
+        let (hx, hy) = {
+            picker.hsv.h = 0.0;
+            picker.hsv.s = 1.0;
+            picker.hs_point()
+        };
+        assert!((hx - cx).hypot(hy - cy) <= r - 13.0 + 1e-4);
     }
 
     #[test]

@@ -145,6 +145,11 @@ impl BasicText {
         }
     }
 
+    /// Placed rect (x, y, width, height) in logical px.
+    pub fn rect(&self) -> (f32, f32, f32, f32) {
+        (self.x, self.y, self.width, self.height)
+    }
+
     /// Live theme: picks the semantic foreground colors. Fixed
     /// `Color`/`Gradient` foregrounds stay as set.
     pub fn set_theme(&mut self, mode: ThemeMode) {
