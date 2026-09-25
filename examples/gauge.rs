@@ -29,6 +29,14 @@ impl GaugeDemo {
                 Gauge::new(82.0, 0.0, 100.0)
                     .title("Storage")
                     .fill(Color::from_rgb8(0xff, 0x2d, 0x55)),
+            )
+            .child(
+                Gauge::new(72.0, 0.0, 100.0)
+                    .title("Temperature")
+                    .min_label("0°")
+                    .max_label("100°")
+                    .value_text(|v| format!("{v:.0}°"))
+                    .fill(Color::from_rgb8(0x34, 0xc7, 0x59)),
             );
         Self {
             bar: Titlebar::new("Gauge"),

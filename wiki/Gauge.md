@@ -13,6 +13,8 @@ renders blue) unless the dev sets it manually with `fill`.
 | `GAUGE_TRACK_H` / `GAUGE_RADIUS` | 12 px bar, 6 px radius (rounded ends) |
 | `GAUGE_TITLE_SIZE` / `GAUGE_TITLE_GAP` | 13 px centered title / 8 px title gap |
 | `GAUGE_ANIM_SECONDS` | 0.25 s fill tween |
+| `GAUGE_SIDE_SIZE` / `GAUGE_SIDE_GAP` | 11 px side labels / 8 px label gap |
+| `GAUGE_VALUE_SIZE` / `GAUGE_VALUE_GAP` | 13 px value caption / 8 px caption gap |
 | `GAUGE_TRACK_DARK` / `GAUGE_TRACK_LIGHT` | `#3A3A3C` / `#E5E5E5` |
 | `GAUGE_FILL` | `#007AFF` default value fill |
 
@@ -21,6 +23,9 @@ renders blue) unless the dev sets it manually with `fill`.
 ```rust
 pub fn new(value: f64, min: f64, max: f64) -> Self
 pub fn title(self, title: impl Into<String>) -> Self
+pub fn min_label(self, label: impl Into<String>) -> Self
+pub fn max_label(self, label: impl Into<String>) -> Self
+pub fn value_text(self, f: impl Fn(f64) -> String + 'static) -> Self
 pub fn fill(self, color: Color) -> Self
 pub fn track_color(self, color: Color) -> Self
 pub fn value(&self) -> f64
@@ -32,6 +37,11 @@ pub fn set_focused(&mut self, focused: bool)
 
 - `new` clamps the value into `min..=max` (`min`/`max` swap-safe);
   `fraction` is 0.0 for an empty range.
+- `min_label`/`max_label` draw left and right of the bar (the track
+  shrinks between them); `value_text` draws a live caption centered
+  under the bar (e.g. `|v| format!("{v:.0}°")` tracks the logical
+  value). Without labels the gauge is the plain bar from the
+  reference.
 - `set_value` clamps and tweens the fill with a 0.25 s `CubicOut`
   tween (driven by real frame deltas, so Hz-independent).
 - `fill` wins over the system accent until cleared; `track_color`
@@ -42,8 +52,9 @@ pub fn set_focused(&mut self, focused: bool)
 
 ## Usage / Example
 
-Run `cargo run --example gauge`: green `Progress`, theme-accent and
-red `Storage` gauges in a `VStack`.
+Run `cargo run --example gauge`: green `Progress`, theme-accent,
+red `Storage` and labeled green `Temperature` (`0°`/`100°`,
+`72°`) gauges in a `VStack`.
 
 ```rust
 let mut progress = Gauge::new(0.6, 0.0, 1.0)
@@ -51,6 +62,12 @@ let mut progress = Gauge::new(0.6, 0.0, 1.0)
     .fill(Color::from_rgb8(0x34, 0xc7, 0x59));
 progress.set_theme(accent, true);
 progress.set_value(0.8);
+
+let mut temperature = Gauge::new(72.0, 0.0, 100.0)
+    .title("Temperature")
+    .min_label("0°")
+    .max_label("100°")
+    .value_text(|v| format!("{v:.0}°"));
 ```
 
 ## Cross References

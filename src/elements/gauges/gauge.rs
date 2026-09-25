@@ -19,6 +19,14 @@ pub const GAUGE_RADIUS: f32 = 6.0;
 pub const GAUGE_TITLE_SIZE: f32 = 13.0;
 /// Gap between title and bar in logical px.
 pub const GAUGE_TITLE_GAP: f32 = 8.0;
+/// Side label size in logical px.
+pub const GAUGE_SIDE_SIZE: f32 = 11.0;
+/// Gap between side labels and bar in logical px.
+pub const GAUGE_SIDE_GAP: f32 = 8.0;
+/// Value caption size in logical px.
+pub const GAUGE_VALUE_SIZE: f32 = 13.0;
+/// Gap between bar and value caption in logical px.
+pub const GAUGE_VALUE_GAP: f32 = 8.0;
 /// Fill change animation time in seconds.
 pub const GAUGE_ANIM_SECONDS: f32 = 0.25;
 /// Track fill for light mode.
@@ -37,6 +45,9 @@ pub struct Gauge {
     value: f64,
     shown: f64,
     title: Option<String>,
+    min_label: Option<String>,
+    max_label: Option<String>,
+    value_text: Option<Box<dyn Fn(f64) -> String>>,
     fill: Color,
     fill_manual: bool,
     track: Color,
@@ -51,6 +62,9 @@ pub struct Gauge {
     y: f32,
     width: f32,
     height: f32,
+    tx0: f32,
+    tx1: f32,
+    ty: f32,
 }
 
 impl Gauge {
@@ -64,6 +78,9 @@ impl Gauge {
             value,
             shown: value,
             title: None,
+            min_label: None,
+            max_label: None,
+            value_text: None,
             fill: GAUGE_FILL,
             fill_manual: false,
             track: GAUGE_TRACK_DARK,
@@ -78,11 +95,30 @@ impl Gauge {
             y: 0.0,
             width: 0.0,
             height: 0.0,
+            tx0: 0.0,
+            tx1: 0.0,
+            ty: 0.0,
         }
     }
 
     pub fn title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
+        self
+    }
+
+    pub fn min_label(mut self, label: impl Into<String>) -> Self {
+        self.min_label = Some(label.into());
+        self
+    }
+
+    pub fn max_label(mut self, label: impl Into<String>) -> Self {
+        self.max_label = Some(label.into());
+        self
+    }
+
+    /// Centered caption under the bar, rebuilt live (e.g. `|v| format!("{v:.0}°")`).
+    pub fn value_text(mut self, f: impl Fn(f64) -> String + 'static) -> Self {
+        self.value_text = Some(Box::new(f));
         self
     }
 
@@ -182,23 +218,56 @@ impl Gauge {
             desaturate(color)
         }
     }
-}
 
-impl View for Gauge {
-    fn measure(&mut self, _fonts: &mut FontSystem) -> (f32, f32) {
-        let header = if self.title.is_some() {
+    fn label_w(fonts: &mut FontSystem, text: &str, size: f32) -> f32 {
+        let layout = fonts.layout_text(text, size, Color::WHITE, None);
+        FontSystem::layout_size(&layout).0 / fonts.scale
+    }
+
+    fn side_w(&self, fonts: &mut FontSystem, label: &Option<String>) -> f32 {
+        match label {
+            Some(text) => Self::label_w(fonts, text, GAUGE_SIDE_SIZE) + GAUGE_SIDE_GAP,
+            None => 0.0,
+        }
+    }
+
+    fn header_h(&self) -> f32 {
+        if self.title.is_some() {
             GAUGE_TITLE_SIZE + GAUGE_TITLE_GAP
         } else {
             0.0
-        };
-        (160.0, header + GAUGE_TRACK_H)
+        }
     }
 
-    fn place(&mut self, _fonts: &mut FontSystem, x: f32, y: f32, w: f32, h: f32) {
+    fn footer_h(&self) -> f32 {
+        if self.value_text.is_some() {
+            GAUGE_VALUE_SIZE + GAUGE_VALUE_GAP
+        } else {
+            0.0
+        }
+    }
+}
+
+impl View for Gauge {
+    fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
+        let left = self.side_w(fonts, &self.min_label);
+        let right = self.side_w(fonts, &self.max_label);
+        (
+            left + 160.0 + right,
+            self.header_h() + GAUGE_TRACK_H + self.footer_h(),
+        )
+    }
+
+    fn place(&mut self, fonts: &mut FontSystem, x: f32, y: f32, w: f32, h: f32) {
         self.x = x;
         self.y = y;
         self.width = w;
         self.height = h;
+        let left = self.side_w(fonts, &self.min_label);
+        let right = self.side_w(fonts, &self.max_label);
+        self.tx0 = x + left;
+        self.tx1 = (x + w - right).max(self.tx0);
+        self.ty = y + self.header_h();
     }
 
     fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, _images: &mut ImageLoader<'_>) {
@@ -224,16 +293,30 @@ impl View for Gauge {
             );
         }
 
-        let header = if self.title.is_some() {
-            GAUGE_TITLE_SIZE + GAUGE_TITLE_GAP
-        } else {
-            0.0
-        };
-        let by = self.y + header;
+        let by = self.ty;
+        // Side labels, vertically centered on the bar.
+        if let Some(min) = self.min_label.clone() {
+            let layout =
+                fonts.layout_text(&min, GAUGE_SIDE_SIZE, self.eff(self.text_color), None);
+            let (_, th) = FontSystem::layout_size(&layout);
+            draw_layout(scene, &layout, self.x, by + (GAUGE_TRACK_H - th / fonts.scale) / 2.0, fonts.scale);
+        }
+        if let Some(max) = self.max_label.clone() {
+            let layout =
+                fonts.layout_text(&max, GAUGE_SIDE_SIZE, self.eff(self.text_color), None);
+            let (tw, th) = FontSystem::layout_size(&layout);
+            draw_layout(
+                scene,
+                &layout,
+                self.x + self.width - tw / fonts.scale,
+                by + (GAUGE_TRACK_H - th / fonts.scale) / 2.0,
+                fonts.scale,
+            );
+        }
         let track = RoundedRect::new(
-            px(self.x),
+            px(self.tx0),
             px(by),
-            px(self.x + self.width),
+            px(self.tx1),
             px(by + GAUGE_TRACK_H),
             px(GAUGE_RADIUS),
         );
@@ -244,10 +327,10 @@ impl View for Gauge {
             None,
             &track,
         );
-        let fx = self.x + self.shown_fraction().clamp(0.0, 1.0) * self.width;
-        if fx > self.x {
+        let fx = self.tx0 + self.shown_fraction().clamp(0.0, 1.0) * (self.tx1 - self.tx0);
+        if fx > self.tx0 {
             let filled = RoundedRect::new(
-                px(self.x),
+                px(self.tx0),
                 px(by),
                 px(fx),
                 px(by + GAUGE_TRACK_H),
@@ -259,6 +342,26 @@ impl View for Gauge {
                 &Brush::Solid(self.eff(self.fill)),
                 None,
                 &filled,
+            );
+        }
+        // Value caption centered under the bar.
+        if let Some(f) = self.value_text.as_ref() {
+            let caption = f(self.value);
+            let layout = fonts.layout_text_weighted(
+                &caption,
+                GAUGE_VALUE_SIZE,
+                self.eff(self.text_color),
+                400.0,
+                None,
+            );
+            let (tw, th) = FontSystem::layout_size(&layout);
+            draw_layout(
+                scene,
+                &layout,
+                self.x + (self.width - tw / fonts.scale) / 2.0,
+                by + GAUGE_TRACK_H + GAUGE_VALUE_GAP
+                    + (GAUGE_VALUE_SIZE - th / fonts.scale) / 2.0,
+                fonts.scale,
             );
         }
     }
@@ -319,5 +422,29 @@ mod tests {
         let (_, titled_h) = titled.measure(&mut fonts);
         assert_eq!(plain_h, GAUGE_TRACK_H);
         assert_eq!(titled_h, GAUGE_TRACK_H + GAUGE_TITLE_SIZE + GAUGE_TITLE_GAP);
+    }
+
+    #[test]
+    fn labels_widen_and_add_caption() {
+        let mut plain = Gauge::new(72.0, 0.0, 100.0);
+        let mut labeled = Gauge::new(72.0, 0.0, 100.0)
+            .title("Temperature")
+            .min_label("0°")
+            .max_label("100°")
+            .value_text(|v| format!("{v:.0}°"));
+        let mut fonts = FontSystem::new();
+        let (plain_w, plain_h) = plain.measure(&mut fonts);
+        let (labeled_w, labeled_h) = labeled.measure(&mut fonts);
+        assert_eq!(plain_w, 160.0);
+        assert!(labeled_w > plain_w);
+        assert_eq!(
+            labeled_h,
+            GAUGE_TITLE_SIZE + GAUGE_TITLE_GAP + GAUGE_TRACK_H + GAUGE_VALUE_SIZE + GAUGE_VALUE_GAP
+        );
+        // Track sits between the side labels.
+        labeled.place(&mut fonts, 0.0, 0.0, labeled_w, labeled_h);
+        assert!(labeled.tx0 > 0.0);
+        assert!(labeled.tx1 < labeled_w);
+        assert!(labeled.tx1 > labeled.tx0);
     }
 }
