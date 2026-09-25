@@ -190,6 +190,11 @@ impl Button {
         }
     }
 
+    /// Placed rect (x, y, width, height) in logical px.
+    pub fn rect(&self) -> (f32, f32, f32, f32) {
+        (self.x, self.y, self.width, self.height)
+    }
+
     fn hit(&self, x: f32, y: f32) -> bool {
         x >= self.x && x <= self.x + self.width && y >= self.y && y <= self.y + self.height
     }

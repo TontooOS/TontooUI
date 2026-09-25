@@ -4,6 +4,7 @@ pub mod animation;
 pub mod alerts;
 pub mod gestures;
 pub mod sheets;
+pub mod unavailable;
 pub mod gauges;
 pub mod glass;
 pub mod images;
@@ -32,6 +33,11 @@ pub use animation::{
 pub use gestures::{
     GestureArea, GESTURE_LONG_PRESS_SECONDS, GESTURE_MAGNIFY_MAX,
     GESTURE_MAGNIFY_MIN, GESTURE_MAGNIFY_STEP, GESTURE_MOVE_SLOP,
+};
+pub use unavailable::{
+    ContentUnavailable, UNAVAILABLE_BUTTON_GAP, UNAVAILABLE_ICON_GAP,
+    UNAVAILABLE_ICON_GRAY, UNAVAILABLE_ICON_SIZE, UNAVAILABLE_TITLE_GAP,
+    UNAVAILABLE_WRAP_WIDTH,
 };
 pub use sheets::{
     BasicSheet, SheetSize, SHEET_BG_DARK, SHEET_BG_LIGHT, SHEET_BORDER_DARK,

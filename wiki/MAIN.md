@@ -16,6 +16,7 @@ theme, animation and a Vello/WGPU renderer.
 | Animation | [Animation.md](Animation.md) | Frame clock, tweens, springs, decay |
 | Alerts | [Alerts.md](Alerts.md) | Modal frosted alert with OK/Cancel actions |
 | Button | [Button.md](Button.md) | Standard button with CoreIcon SF Symbols |
+| ContentUnavailable | [ContentUnavailable.md](ContentUnavailable.md) | Empty-state placeholder with refresh |
 | Divider | [Divider.md](Divider.md) | Full-bleed horizontal and vertical dividers |
 | Gauge | [Gauge.md](Gauge.md) | Basic, linear, circular and capacity gauges |
 | Glass | [Glass.md](Glass.md) | Liquid glass container and backdrop blur |
