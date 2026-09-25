@@ -2,8 +2,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use tontooui::elements::{
-    Align, BasicSheet, BasicText, Button, ButtonStyle, SheetSize, Titlebar,
-    TrafficAction, View, VStack,
+    Align, BasicSheet, BasicText, Button, ButtonStyle, SheetSize,
+    SHEET_BUTTON_BG_DARK, Titlebar, TrafficAction, View, VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
@@ -118,6 +118,10 @@ impl App for SheetDemo {
         if let Some(button) = self.sheet.child_mut().child_mut::<Button>(1) {
             button.set_theme(palette.accent, dark);
             button.set_focused(focused);
+            // Darker than the card so it never melts into the sheet.
+            if dark {
+                button.set_palette(SHEET_BUTTON_BG_DARK, Color::WHITE);
+            }
         }
 
         self.bar.set_palette(

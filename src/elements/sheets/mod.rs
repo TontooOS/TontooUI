@@ -14,6 +14,9 @@ pub const SHEET_DIM_ALPHA: u8 = 77;
 pub const SHEET_BG_DARK: Color = Color::from_rgb8(0x2c, 0x2c, 0x2e);
 /// Default card fill (light mode).
 pub const SHEET_BG_LIGHT: Color = Color::from_rgb8(0xff, 0xff, 0xff);
+/// Bordered button fill on a dark card: darker than the card so
+/// buttons never melt into the sheet.
+pub const SHEET_BUTTON_BG_DARK: Color = Color::from_rgb8(0x1e, 0x20, 0x22);
 /// Card border (dark mode).
 pub const SHEET_BORDER_DARK: Color = Color::from_rgba8(255, 255, 255, 36);
 /// Card border (light mode).

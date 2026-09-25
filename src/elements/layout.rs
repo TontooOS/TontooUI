@@ -294,6 +294,18 @@ impl View for VStack {
         }
     }
 
+    fn mouse_down(&mut self, x: f64, y: f64) {
+        for child in self.children.iter_mut() {
+            child.mouse_down(x, y);
+        }
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        for child in self.children.iter_mut() {
+            child.mouse_up(x, y);
+        }
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -357,6 +369,18 @@ impl View for HStack {
     ) {
         for child in self.children.iter_mut() {
             child.draw(scene, fonts, images);
+        }
+    }
+
+    fn mouse_down(&mut self, x: f64, y: f64) {
+        for child in self.children.iter_mut() {
+            child.mouse_down(x, y);
+        }
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        for child in self.children.iter_mut() {
+            child.mouse_up(x, y);
         }
     }
 
@@ -458,6 +482,14 @@ impl View for Padding {
         self.child.draw(scene, fonts, images);
     }
 
+    fn mouse_down(&mut self, x: f64, y: f64) {
+        self.child.mouse_down(x, y);
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        self.child.mouse_up(x, y);
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -498,6 +530,14 @@ impl View for Background {
         self.child.draw(scene, fonts, images);
     }
 
+    fn mouse_down(&mut self, x: f64, y: f64) {
+        self.child.mouse_down(x, y);
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        self.child.mouse_up(x, y);
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -520,6 +560,14 @@ impl View for Frame {
         images: &mut ImageLoader<'_>,
     ) {
         self.child.draw(scene, fonts, images);
+    }
+
+    fn mouse_down(&mut self, x: f64, y: f64) {
+        self.child.mouse_down(x, y);
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        self.child.mouse_up(x, y);
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -569,6 +617,18 @@ impl View for ZStack {
         }
     }
 
+    fn mouse_down(&mut self, x: f64, y: f64) {
+        for child in self.children.iter_mut() {
+            child.mouse_down(x, y);
+        }
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        for child in self.children.iter_mut() {
+            child.mouse_up(x, y);
+        }
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -608,5 +668,32 @@ mod tests {
             }
         }
         assert_eq!(seen, 1);
+    }
+
+    #[test]
+    fn stacks_forward_presses_to_nested_buttons() {
+        // Regression test: wrapper elements (sheets, gesture areas)
+        // forward presses through the `View` protocol, so a button
+        // nested in a stack fires without direct wiring (this broke
+        // the sheet Dismiss button).
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        use super::super::buttons::Button;
+
+        let fired: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
+        let flag = fired.clone();
+        let mut stack = VStack::new().spacing(0.0).child(
+            Button::new("Dismiss").on_press(move || {
+                *flag.borrow_mut() = true;
+            }),
+        );
+        let mut fonts = FontSystem::new();
+        let (w, h) = stack.measure(&mut fonts);
+        stack.place(&mut fonts, 10.0, 20.0, w, h);
+        let (cx, cy) = (10.0 + w / 2.0, 20.0 + h / 2.0);
+        stack.mouse_down(cx as f64, cy as f64);
+        stack.mouse_up(cx as f64, cy as f64);
+        assert!(*fired.borrow());
     }
 }

@@ -21,6 +21,7 @@ alerts they need no backdrop blur pass.
 | `SHEET_FADE_SECONDS` | 0.25 s engine fade in/out |
 | `SHEET_DIM_ALPHA` | 77 alpha black dim over the app behind the card |
 | `SHEET_BG_DARK` / `SHEET_BG_LIGHT` | `#2C2C2E` / `#FFFFFF` default card fill |
+| `SHEET_BUTTON_BG_DARK` | `#1E2022` bordered button fill on a dark card: darker than the card so buttons never melt into the sheet (light cards already contrast `#E9E9EB` buttons) |
 | `SHEET_BORDER_DARK` / `SHEET_BORDER_LIGHT` | White 36 alpha / black 31 alpha 1 px border |
 | `SHEET_SHADOW` / `SHEET_SHADOW_BLUR` / `SHEET_SHADOW_DY` | Black 64 alpha, 16 px blur, 4 px offset drop shadow |
 
@@ -89,6 +90,13 @@ fn mouse_down(&mut self, _x: f64, _y: f64) {}
   wrappers like sheets can forward presses to generic content.
   `Button` overrides it with its press tracking; other elements
   keep the noop.
+- Stacks (`VStack`, `HStack`, `ZStack`) and wrappers (`Padding`,
+  `Background`, `Frame`) forward `mouse_down`/`mouse_up` to their
+  children, so nested buttons fire without direct wiring (this
+  fixed the sheet Dismiss button).
+- Content buttons on a dark card need `SHEET_BUTTON_BG_DARK` as
+  their fill (via `set_palette`): the default bordered gray matches
+  the card and would melt into it.
 
 ## Usage / Example
 
