@@ -51,6 +51,17 @@ impl BasicTextField {
         self.core.dirty = true;
     }
 
+    /// Borderless text (form rows): no fill, ring or border, text
+    /// plus caret and highlight only.
+    pub fn borderless(mut self, borderless: bool) -> Self {
+        self.core.borderless = borderless;
+        self
+    }
+
+    pub fn set_borderless(&mut self, borderless: bool) {
+        self.core.borderless = borderless;
+    }
+
     pub fn set_focused(&mut self, focused: bool) {
         self.core.focused = focused;
         self.core.dirty = true;

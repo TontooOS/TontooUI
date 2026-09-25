@@ -108,6 +108,7 @@ pub(crate) struct FieldCore {
     selected: bool,
     masked: bool,
     multiline: bool,
+    borderless: bool,
     accent: Color,
     dark: bool,
     focused: bool,
@@ -141,6 +142,7 @@ impl FieldCore {
             selected: false,
             masked: false,
             multiline: false,
+            borderless: false,
             accent: TEXTFIELD_ACCENT,
             dark: true,
             focused: true,
@@ -1193,30 +1195,34 @@ pub(crate) fn draw_field(
     let px = |v: f32| v as f64 * scale;
     let (fill, border, text) = field_colors(core);
     let body = RoundedRect::new(px(x), px(y), px(x + w), px(y + h), px(metrics.radius));
-    scene.fill(
-        Fill::NonZero,
-        Affine::IDENTITY,
-        &Brush::Solid(fill),
-        None,
-        &body,
-    );
-    // Accent ring while selected, subtle border otherwise.
-    if core.selected {
-        scene.stroke(
-            &Stroke::new(px(TEXTFIELD_RING_W)),
+    // Borderless fields (form rows) paint text only, no fill, ring
+    // or border.
+    if !core.borderless {
+        scene.fill(
+            Fill::NonZero,
             Affine::IDENTITY,
-            &Brush::Solid(accent_color(core)),
+            &Brush::Solid(fill),
             None,
             &body,
         );
-    } else {
-        scene.stroke(
-            &Stroke::new(1.0 * scale),
-            Affine::IDENTITY,
-            &Brush::Solid(border),
-            None,
-            &body,
-        );
+        // Accent ring while selected, subtle border otherwise.
+        if core.selected {
+            scene.stroke(
+                &Stroke::new(px(TEXTFIELD_RING_W)),
+                Affine::IDENTITY,
+                &Brush::Solid(accent_color(core)),
+                None,
+                &body,
+            );
+        } else {
+            scene.stroke(
+                &Stroke::new(1.0 * scale),
+                Affine::IDENTITY,
+                &Brush::Solid(border),
+                None,
+                &body,
+            );
+        }
     }
     // Text clipped to the padded box with caret tracking.
     let ix = x + metrics.pad_x;

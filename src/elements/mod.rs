@@ -22,6 +22,7 @@ pub mod progress;
 pub mod scrollbar;
 pub mod scrollview;
 pub mod shapes;
+pub mod forms;
 pub mod sliders;
 pub mod steppers;
 pub mod tables;
@@ -137,6 +138,12 @@ pub use gauges::{
     GAUGE_SIDE_SIZE, GAUGE_TITLE_GAP, GAUGE_TITLE_SIZE, GAUGE_TRACK_DARK, GAUGE_TRACK_H,
     GAUGE_TRACK_LIGHT, GAUGE_VALUE_GAP, GAUGE_VALUE_SIZE, LINEAR_DOT_R, LINEAR_KNOB_R,
     LINEAR_RING_R, LINEAR_TRACK_H, LINEAR_VALUE_GAP, LINEAR_VALUE_SIZE,
+};
+pub use forms::{
+    Form, FormRow, FormRowKind, FormSection, FORM_BUTTON_GAP, FORM_ICON_GAP,
+    FORM_ICON_SIZE, FORM_LABEL_GAP, FORM_LABEL_SIZE, FORM_MIN_W, FORM_NOTE_GAP,
+    FORM_NOTE_H, FORM_NOTE_SIZE, FORM_PAD, FORM_ROW_H, FORM_SECTION_GAP,
+    FORM_TITLE_GAP, FORM_TITLE_H, FORM_TITLE_SIZE,
 };
 pub use sliders::Slider;
 pub use steppers::{

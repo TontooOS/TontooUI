@@ -39,6 +39,7 @@ theme, animation and a Vello/WGPU renderer.
 | Shapes | [Shapes.md](Shapes.md) | Rectangle, circle, rounded, capsule and custom shapes |
 | Slider | [Slider.md](Slider.md) | Slider with steps, labels, ticks, glass |
 | Stepper | [Stepper.md](Stepper.md) | Basic stepper with step size, range and limit dimming |
+| Form | [Form.md](Form.md) | Settings form with sections, text, toggle, picker and button rows |
 | Table | [Table.md](Table.md) | Basic table with sort, scroll, select and inline edit |
 | Theme | [Theme.md](Theme.md) | Live dark/light, accent, glass stage |
 | Text | [Text.md](Text.md) | Basic text with styles and foregrounds |

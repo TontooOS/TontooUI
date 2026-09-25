@@ -116,8 +116,13 @@ pub fn type_text(&mut self, content: &str)
 pub fn key(&mut self, key: Key) -> bool
 pub fn mouse_down(&mut self, x: f64, y: f64)
 pub fn rect(&self) -> (f32, f32, f32, f32)
+pub fn borderless(self, borderless: bool) -> Self
+pub fn set_borderless(&mut self, borderless: bool)
 ```
 
+- `borderless` paints text, caret and highlight only (no fill,
+  ring or border) for inputs embedded in form rows (see
+  [Form.md](Form.md)).
 - `type_text` inserts at the caret while selected (the app forwards
   its `text` here); programmatic `set_text` moves the caret to the
   end without firing `on_change`, which fires with the full text on
