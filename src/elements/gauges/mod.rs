@@ -1,5 +1,11 @@
+pub mod circular;
 pub mod gauge;
 pub mod linear;
+
+pub use circular::{
+    CircularGauge, CIRC_DOT_R, CIRC_FILL, CIRC_KNOB_R, CIRC_KNOB_RING_R, CIRC_LABEL_SIZE,
+    CIRC_RING_R, CIRC_START, CIRC_SWEEP, CIRC_TRACK_W, CIRC_VALUE_SIZE,
+};
 
 pub use linear::{
     LinearGauge, LINEAR_DOT_R, LINEAR_KNOB_R, LINEAR_RING_R, LINEAR_TRACK_H,

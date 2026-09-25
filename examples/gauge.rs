@@ -1,4 +1,4 @@
-use tontooui::elements::{Gauge, LinearGauge, Titlebar, TrafficAction, View, VStack};
+use tontooui::elements::{CircularGauge, Gauge, LinearGauge, Titlebar, TrafficAction, View, VStack};
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
@@ -10,6 +10,7 @@ struct GaugeDemo {
     bar: Titlebar,
     stack: VStack,
     linear: LinearGauge,
+    circular: CircularGauge,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -43,6 +44,9 @@ impl GaugeDemo {
             bar: Titlebar::new("Gauge"),
             stack,
             linear: LinearGauge::new(60.0, 0.0, 100.0).value_text(|v| format!("{v:.0}%")),
+            circular: CircularGauge::new(70.0, 0.0, 100.0)
+                .label("Battery")
+                .value_text(|v| format!("{v:.0}%")),
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -85,6 +89,8 @@ impl App for GaugeDemo {
         });
         self.linear.set_theme(palette.accent, dark);
         self.linear.set_focused(focused);
+        self.circular.set_theme(palette.accent, dark);
+        self.circular.set_focused(focused);
 
         self.bar.set_palette(
             palette.titlebar_bg,
@@ -112,6 +118,14 @@ impl App for GaugeDemo {
             40.0,
         );
         self.linear.draw(scene, fonts, images);
+        self.circular.place(
+            fonts,
+            viewport.x + (viewport.width - 160.0) / 2.0,
+            top + 16.0 + stack_h + 24.0 + 40.0 + 24.0,
+            160.0,
+            160.0,
+        );
+        self.circular.draw(scene, fonts, images);
     }
 
     fn background(&self) -> Color {
@@ -146,11 +160,12 @@ impl App for GaugeDemo {
         self.bar.set_focused(focused);
         self.each_gauge(|gauge| gauge.set_focused(focused));
         self.linear.set_focused(focused);
+        self.circular.set_focused(focused);
     }
 }
 
 fn main() {
-    if let Err(err) = run("Gauge", 900, 420, GaugeDemo::new()) {
+    if let Err(err) = run("Gauge", 900, 600, GaugeDemo::new()) {
         eprintln!("error: {err}");
         std::process::exit(1);
     }

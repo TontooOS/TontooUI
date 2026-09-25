@@ -83,11 +83,48 @@ pub fn set_focused(&mut self, focused: bool)
 - Unfocused windows desaturate the gauge like the rest of the
   palette. No mouse methods: forward nothing.
 
+## CircularGauge
+
+```rust
+pub fn new(value: f64, min: f64, max: f64) -> Self
+pub fn label(self, label: impl Into<String>) -> Self
+pub fn value_text(self, f: impl Fn(f64) -> String + 'static) -> Self
+pub fn fill(self, color: Color) -> Self
+pub fn value(&self) -> f64
+pub fn fraction(&self) -> f32
+pub fn set_value(&mut self, value: f64)
+pub fn set_theme(&mut self, accent: Color, dark: bool)
+pub fn set_focused(&mut self, focused: bool)
+```
+
+| Token | Value |
+|---|---|
+| `CIRC_RING_R` / `CIRC_TRACK_W` | 70 px ring radius / 12 px stroke |
+| `CIRC_START` / `CIRC_SWEEP` | 135 deg start / 270 deg sweep (gap at bottom) |
+| `CIRC_VALUE_SIZE` / `CIRC_LABEL_SIZE` | 34 px value / 15 px caption |
+| `CIRC_KNOB_R` / `CIRC_KNOB_RING_R` / `CIRC_DOT_R` | 8 / 5.5 / 2.5 px fixed knob |
+| `CIRC_FILL` | `#007AFF` manual ring fill |
+
+- The dial is a fixed 160 px square: full 270-degree arc (no gray
+  track, like the reference) with round caps, a knob marker at the
+  value angle, centered value text and the caption below it inside
+  the bottom gap.
+- `set_value` clamps and tweens the knob along the arc with a
+  0.25 s `CubicOut` tween (driven by real frame deltas, so
+  Hz-independent).
+- Ring and knob default to the label color (black in light mode,
+  like the reference); `fill` wins over it. `set_theme` takes the
+  accent for API parity but the dial stays monochrome unless filled
+  by hand.
+- Unfocused windows desaturate the dial like the rest of the
+  palette. No mouse methods: forward nothing.
+
 ## Usage / Example
 
 Run `cargo run --example gauge`: green `Progress`, theme-accent,
 red `Storage` and labeled green `Temperature` (`0°`/`100°`,
-`72°`) gauges in a `VStack`, plus a `60%` linear gauge below.
+`72°`) gauges in a `VStack`, a `60%` linear gauge and a `70%`
+`Battery` dial below.
 
 ```rust
 let mut progress = Gauge::new(0.6, 0.0, 1.0)
@@ -105,6 +142,11 @@ let mut temperature = Gauge::new(72.0, 0.0, 100.0)
 let mut level = LinearGauge::new(60.0, 0.0, 100.0).value_text(|v| format!("{v:.0}%"));
 level.set_theme(accent, true);
 level.set_value(80.0);
+
+let mut battery = CircularGauge::new(70.0, 0.0, 100.0)
+    .label("Battery")
+    .value_text(|v| format!("{v:.0}%"));
+battery.set_theme(accent, false);
 ```
 
 ## Cross References
