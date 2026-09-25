@@ -15,6 +15,7 @@ theme, animation and a Vello/WGPU renderer.
 | Rules | [RULE.md](RULE.md) | Development and usage rules |
 | Animation | [Animation.md](Animation.md) | Frame clock, tweens, springs, decay |
 | Button | [Button.md](Button.md) | Standard button with CoreIcon SF Symbols |
+| Divider | [Divider.md](Divider.md) | Full-bleed horizontal and vertical dividers |
 | Gauge | [Gauge.md](Gauge.md) | Basic, linear, circular and capacity gauges |
 | Glass | [Glass.md](Glass.md) | Liquid glass container and backdrop blur |
 | Layout | [Layout.md](Layout.md) | VStack, HStack, ZStack, modifiers, `View` |

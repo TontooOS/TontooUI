@@ -1,4 +1,5 @@
 pub mod buttons;
+pub mod dividers;
 pub mod gauges;
 pub mod glass;
 pub mod layout;
@@ -59,6 +60,11 @@ pub use gauges::{
     LINEAR_RING_R, LINEAR_TRACK_H, LINEAR_VALUE_GAP, LINEAR_VALUE_SIZE,
 };
 pub use sliders::Slider;
+pub use dividers::{
+    DividerStyle, HorizontalDivider, VerticalDivider, DIVIDER_BLUE, DIVIDER_DARK,
+    DIVIDER_FILL, DIVIDER_LIGHT, DIVIDER_PADDED_INSET, DIVIDER_RED, DIVIDER_THICK,
+    DIVIDER_THIN,
+};
 pub use scrollbar::{
     Scrollbar, SCROLLBAR_ALPHA, SCROLLBAR_DEFAULT_ACCENT, SCROLLBAR_FADE_SECONDS,
     SCROLLBAR_GRAY, SCROLLBAR_HIDE_DELAY, SCROLLBAR_HIT_W, SCROLLBAR_HOVER_LIGHTEN,
