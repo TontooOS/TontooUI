@@ -26,3 +26,18 @@ Text: R: 216, G: 217, B: 217
 
 THIS COLORS ARE FROM MACOS 27 NEWEST VERSION,
 The Colors are for Default Text / App Backgrounds 
+
+## Crisp Text Rules
+
+- Draw text only via `draw_layout` (solid) or `draw_with_brush`
+  (gradient) from `src/renderer/text.rs`. Never hand-roll a
+  `Scene::draw_glyphs` loop: snapping + hinting live there.
+- Build layouts with logical px (`size`, `max_width`); `FontSystem`
+  applies the display scale internally. `layout_size()` returns
+  physical px, so divide by `fonts.scale` for logical units.
+- Any element caching an `Option<Layout>` must store `layout_scale: f32`
+  (init `0.0`), rebuild when `layout_scale != fonts.scale`, and store
+  `fonts.scale` after building. Otherwise text goes stale/blurry on
+  DPI or monitor changes.
+- Never pre-multiply draw positions by scale; pass logical coordinates
+  and let the draw helpers snap to physical pixels.

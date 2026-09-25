@@ -1,0 +1,1 @@
+1. Glass effekt with blur should work through the app if the window cant move via making a screenshot then showing it behind the app like there would be no screenshot
