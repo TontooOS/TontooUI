@@ -9,6 +9,7 @@ pub mod material;
 pub mod link;
 pub mod label;
 pub mod sheets;
+pub mod textfield;
 pub mod unavailable;
 pub mod gauges;
 pub mod glass;
@@ -53,6 +54,15 @@ pub use link::{BasicLink, LinkStyle, LinkWithImage, StyledLink, LINK_BLUE, LINK_
 pub use label::{
     BasicLabel, IconLabel, ImageLabel, LabelStyle, StyledLabel, LABEL_DOT,
     LABEL_GAP, LABEL_ICON_GRAY, LABEL_ICON_SIZE, LABEL_IMAGE_SIZE,
+};
+pub use textfield::{
+    BasicTextField, LargeTextField, LARGE_FIELD_FONT_SIZE,
+    LARGE_FIELD_PAD_X, LARGE_FIELD_PAD_Y, LARGE_FIELD_RADIUS,
+    TEXTFIELD_ACCENT, TEXTFIELD_BG_DARK, TEXTFIELD_BG_LIGHT,
+    TEXTFIELD_BLINK_SECONDS, TEXTFIELD_BORDER_DARK, TEXTFIELD_BORDER_LIGHT,
+    TEXTFIELD_CARET_W, TEXTFIELD_FONT_SIZE, TEXTFIELD_PAD_X, TEXTFIELD_PAD_Y,
+    TEXTFIELD_PLACEHOLDER_DARK, TEXTFIELD_PLACEHOLDER_LIGHT, TEXTFIELD_RADIUS,
+    TEXTFIELD_RING_W,
 };
 pub use groupbox::{
     BasicGroupBox, StyledGroupBox, GROUP_BG_DARK, GROUP_BG_LIGHT, GROUP_PAD,

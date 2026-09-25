@@ -1,0 +1,149 @@
+use tontooui::elements::{
+    BasicText, BasicTextField, LargeTextField, Titlebar, TrafficAction,
+    View,
+};
+use tontooui::renderer::FontSystem;
+use tontooui::renderer::ImageLoader;
+use tontooui::renderer::window::{App, Key, Viewport, WindowCommand, run};
+use tontooui::theme::{ThemeMode, ThemeWatcher};
+use vello::Scene;
+use vello::peniko::Color;
+
+struct TextFieldDemo {
+    bar: Titlebar,
+    basic: BasicTextField,
+    large: LargeTextField,
+    status: BasicText,
+    watcher: ThemeWatcher,
+    focused: bool,
+    bg: Color,
+    command: Option<WindowCommand>,
+}
+
+impl TextFieldDemo {
+    fn new() -> Self {
+        Self {
+            bar: Titlebar::new("TextField"),
+            basic: BasicTextField::new("Enter text here"),
+            large: LargeTextField::new("Placeholder"),
+            status: BasicText::new("Click a field, type, ESC or outside click deselects."),
+            watcher: ThemeWatcher::new(),
+            focused: true,
+            bg: tontooui::renderer::window::BACKGROUND,
+            command: None,
+        }
+    }
+}
+
+impl App for TextFieldDemo {
+    fn draw(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+        viewport: Viewport,
+        time_secs: f64,
+    ) {
+        self.watcher.poll(time_secs);
+        self.watcher.set_focused(self.focused, time_secs);
+        let palette = self.watcher.palette(time_secs);
+        self.bg = palette.bg;
+        let theme = self.watcher.theme();
+        let dark = theme.mode == ThemeMode::Dark;
+        let focused = self.focused;
+        self.basic.set_theme(palette.accent, dark);
+        self.basic.set_focused(focused);
+        self.large.set_theme(palette.accent, dark);
+        self.large.set_focused(focused);
+        self.status.set_theme(theme.mode);
+        self.status.set_focused(focused);
+        self.status.set_text(format!(
+            "basic: \"{}\"   large: \"{}\"",
+            self.basic.text_value(),
+            self.large.text_value()
+        ));
+
+        self.bar.set_palette(
+            palette.titlebar_bg,
+            palette.titlebar_text,
+            palette.divider,
+        );
+        self.bar.set_rect(viewport.x, viewport.y, viewport.width);
+        self.bar.draw(scene, fonts);
+
+        // Both variants full-bleed like the reference rows.
+        let top = viewport.y + 31.0;
+        let content_w = viewport.width - 48.0;
+        let cx = viewport.x + 24.0;
+        let mut y = top + 24.0;
+        let (sw, sh) = self.status.measure(fonts);
+        self.status.place(fonts, cx, y, sw, sh);
+        self.status.draw(scene, fonts, images);
+        y += sh + 20.0;
+        let (_, bh) = self.basic.measure(fonts);
+        self.basic.place(fonts, cx, y, content_w, bh);
+        self.basic.draw(scene, fonts, images);
+        y += bh + 20.0;
+        let (_, lh) = self.large.measure(fonts);
+        self.large.place(fonts, cx, y, content_w, lh);
+        self.large.draw(scene, fonts, images);
+    }
+
+    fn background(&self) -> Color {
+        self.bg
+    }
+
+    fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
+        Some(self.bar.drag_rect())
+    }
+
+    fn poll_window_command(&mut self) -> Option<WindowCommand> {
+        self.command.take()
+    }
+
+    fn mouse_down(&mut self, x: f64, y: f64) {
+        match self.bar.press(x as f32, y as f32) {
+            Some(TrafficAction::Close) => self.command = Some(WindowCommand::Close),
+            Some(TrafficAction::Minimize) => {
+                self.command = Some(WindowCommand::Minimize)
+            }
+            Some(TrafficAction::Maximize) => {
+                self.command = Some(WindowCommand::ToggleMaximize)
+            }
+            // Every press reaches both fields: inside selects,
+            // anywhere else deselects.
+            None => {
+                self.basic.mouse_down(x, y);
+                self.large.mouse_down(x, y);
+            }
+        }
+    }
+
+    fn text(&mut self, text: &str) {
+        self.basic.type_text(text);
+        self.large.type_text(text);
+    }
+
+    fn key(&mut self, key: Key) {
+        // ESC, Backspace and caret keys go to the selected field.
+        if !self.basic.key(key) {
+            self.large.key(key);
+        }
+    }
+
+    fn mouse_move(&mut self, x: f64, y: f64) {
+        self.bar.set_hover(x as f32, y as f32);
+    }
+
+    fn set_focused(&mut self, focused: bool) {
+        self.focused = focused;
+        self.bar.set_focused(focused);
+    }
+}
+
+fn main() {
+    if let Err(err) = run("TextField", 900, 480, TextFieldDemo::new()) {
+        eprintln!("error: {err}");
+        std::process::exit(1);
+    }
+}
