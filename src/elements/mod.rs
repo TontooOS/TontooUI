@@ -2,6 +2,7 @@ pub mod buttons;
 pub mod dividers;
 pub mod gauges;
 pub mod glass;
+pub mod images;
 pub mod layout;
 pub mod list;
 pub mod menu;
@@ -96,6 +97,11 @@ pub use toggles::{
     TOGGLE_SWITCH_W,
 };
 pub use glass::{GlassContainer, GlassType};
+pub use images::{
+    AppImage, ImageFit, ImageOverlay, OverlaySource, SFSymbolImage, UrlImage,
+    IMAGE_BADGE_SIZE, IMAGE_PLACEHOLDER_DARK, IMAGE_PLACEHOLDER_LIGHT,
+    IMAGE_RADIUS, IMAGE_SYMBOL_SIZE, IMAGE_TEXT_SIZE,
+};
 pub use text::{
     BasicText, FormattedText, LabeledText, ResolvedForeground, Span, TextAlignment,
     TextForeground, TextStyle, LABELED_GAP, TEXT_TERTIARY_DARK, TEXT_TERTIARY_LIGHT,

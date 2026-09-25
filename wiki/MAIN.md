@@ -18,6 +18,7 @@ theme, animation and a Vello/WGPU renderer.
 | Divider | [Divider.md](Divider.md) | Full-bleed horizontal and vertical dividers |
 | Gauge | [Gauge.md](Gauge.md) | Basic, linear, circular and capacity gauges |
 | Glass | [Glass.md](Glass.md) | Liquid glass container and backdrop blur |
+| Images | [Images.md](Images.md) | SF Symbol, app resource, URL and overlay card |
 | Layout | [Layout.md](Layout.md) | VStack, HStack, ZStack, modifiers, `View` |
 | List | [List.md](List.md) | Static text list with row dividers |
 | Menu | [Menu.md](Menu.md) | Simple dropdown with action rows, picker base |

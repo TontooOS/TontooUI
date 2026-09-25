@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs::File;
+use std::path::Path;
 
 use vello::Renderer;
 use vello::peniko::{Color, ImageData};
@@ -121,6 +122,61 @@ impl<'a> ImageLoader<'a> {
         Some((image, width, height))
     }
 
+    /// Get `(image, width, height)` for raw raster bytes (PNG, JPEG,
+    /// ...) under `key`, decoded without tinting (photos stay as-is)
+    /// and downscaled with a high-quality filter to `target_px` (max
+    /// dimension in physical px, pass ~2x the display size for crisp
+    /// supersampling). Uploaded once per key; later frames hit the
+    /// cache. Returns `None` when the bytes are undecodable.
+    pub fn raster(
+        &mut self,
+        key: &str,
+        bytes: &[u8],
+        target_px: u32,
+    ) -> Option<(ImageData, u32, u32)> {
+        if let Some(cached) = self.cache.map.get(key) {
+            return Some((cached.image.clone(), cached.width, cached.height));
+        }
+        let (pixels, width, height) = decode_raster(bytes, target_px.max(1))?;
+        let image = self.upload_texture(&pixels, width, height);
+        self.cache.map.insert(
+            key.to_string(),
+            CachedImage {
+                image: image.clone(),
+                width,
+                height,
+            },
+        );
+        Some((image, width, height))
+    }
+
+    /// Get `(image, width, height)` for a raster file on disk (app
+    /// resources, user files). Cached by path like `raster`. Returns
+    /// `None` when the file is missing or undecodable; callers fall
+    /// back to a placeholder.
+    pub fn raster_file(
+        &mut self,
+        path: &Path,
+        target_px: u32,
+    ) -> Option<(ImageData, u32, u32)> {
+        let key = format!("file:{}", path.to_string_lossy());
+        if let Some(cached) = self.cache.map.get(&key) {
+            return Some((cached.image.clone(), cached.width, cached.height));
+        }
+        let bytes = std::fs::read(path).ok()?;
+        let (pixels, width, height) = decode_raster(&bytes, target_px.max(1))?;
+        let image = self.upload_texture(&pixels, width, height);
+        self.cache.map.insert(
+            key,
+            CachedImage {
+                image: image.clone(),
+                width,
+                height,
+            },
+        );
+        Some((image, width, height))
+    }
+
     fn upload(
         &mut self,
         name: &str,
@@ -177,6 +233,12 @@ impl<'a> ImageLoader<'a> {
             .flat_map(|px| [rgba.r, rgba.g, rgba.b, px[3]])
             .collect();
 
+        let image = self.upload_texture(&pixels, width, height);
+        Some((image, width, height))
+    }
+
+    /// Upload RGBA8 pixels as a GPU texture.
+    fn upload_texture(&mut self, pixels: &[u8], width: u32, height: u32) -> ImageData {
         let size = wgpu::Extent3d {
             width,
             height,
@@ -218,6 +280,29 @@ impl<'a> ImageLoader<'a> {
             size,
         );
         let image = self.renderer.register_texture(texture);
-        Some((image, width, height))
+        image
+    }
+}
+
+/// Decode raw raster bytes (PNG, JPEG, ...) to RGBA8 without tinting,
+/// downscaled once with Lanczos3 to `target_px` (max dimension in
+/// physical px) so minified photos stay crisp. Returns the pixels plus
+/// natural size, or `None` when the bytes are undecodable.
+fn decode_raster(bytes: &[u8], target_px: u32) -> Option<(Vec<u8>, u32, u32)> {
+    let decoded = image::load_from_memory(bytes).ok()?.to_rgba8();
+    let (width, height) = decoded.dimensions();
+    if width == 0 || height == 0 {
+        return None;
+    }
+    let long_side = width.max(height);
+    if long_side > target_px {
+        let scale = target_px as f32 / long_side as f32;
+        let nw = ((width as f32 * scale).round() as u32).max(1);
+        let nh = ((height as f32 * scale).round() as u32).max(1);
+        let small =
+            image::imageops::resize(&decoded, nw, nh, image::imageops::FilterType::Lanczos3);
+        Some((small.into_raw(), nw, nh))
+    } else {
+        Some((decoded.into_raw(), width, height))
     }
 }
