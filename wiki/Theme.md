@@ -74,9 +74,9 @@ pub struct Palette {
 pub fn palette(&self) -> Palette
 ```
 
-Resolved per mode on `Theme`. Dark body is `#1d1d1d`, light body
-`#ececec`; the titlebar sits slightly off the body (lighter in dark,
-darker in light).
+Resolved per mode on `Theme`. Dark body is `#1B2022`, light body
+`#FFFFFF`; the titlebar sits slightly off the body (lighter in dark,
+darker in light). Dark text is `#D8D9D9`, light text `#272727`.
 
 ## Watcher
 

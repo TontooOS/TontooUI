@@ -11,12 +11,12 @@ use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
 use crate::renderer::window::WINDOW_CORNER_RADIUS;
 
 /// Opaque titlebar background, dark / light. Dark is lighter than the
-/// `#1d1d1d` window body, light is darker than the `#ececec` body.
+/// `#1B2022` window body, light is darker than the `#FFFFFF` body.
 pub const TITLEBAR_BG_DARK: Color = Color::from_rgb8(0x2c, 0x2c, 0x2e);
 pub const TITLEBAR_BG_LIGHT: Color = Color::from_rgb8(0xde, 0xde, 0xe1);
 /// Title text, dark / light.
-pub const TITLEBAR_TEXT_DARK: Color = Color::from_rgb8(0xf5, 0xf5, 0xf7);
-pub const TITLEBAR_TEXT_LIGHT: Color = Color::from_rgb8(0x1e, 0x1e, 0x1e);
+pub const TITLEBAR_TEXT_DARK: Color = Color::from_rgb8(0xd8, 0xd9, 0xd9);
+pub const TITLEBAR_TEXT_LIGHT: Color = Color::from_rgb8(0x27, 0x27, 0x27);
 /// Bottom divider, dark / light.
 pub const TITLEBAR_DIVIDER_DARK: Color = Color::from_rgba8(255, 255, 255, 36);
 pub const TITLEBAR_DIVIDER_LIGHT: Color = Color::from_rgba8(0, 0, 0, 31);

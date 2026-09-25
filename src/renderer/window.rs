@@ -18,7 +18,7 @@ use super::images::{ImageCache, ImageLoader};
 use super::text::FontSystem;
 
 /// Window background. Dark mode base color per TontooOS convention.
-pub const BACKGROUND: Color = Color::from_rgb8(0x1d, 0x1d, 0x1d);
+pub const BACKGROUND: Color = Color::from_rgb8(0x1b, 0x20, 0x22);
 
 /// Standard window corner radius in logical px. Follows the macOS 27 Golden
 /// Gate direction: one fixed radius for all windows, tighter than Tahoe.

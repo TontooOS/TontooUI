@@ -11,7 +11,7 @@ pub const TEXT_TERTIARY_LIGHT: Color = Color::from_rgba8(0, 0, 0, 77);
 /// a fixed color or a horizontal gradient across the text bounds.
 #[derive(Clone, Debug, PartialEq)]
 pub enum TextForeground {
-    /// Theme text color (`#F5F5F7` dark, `#1E1E1E` light).
+    /// Theme text color (`#D8D9D9` dark, `#272727` light).
     Primary,
     /// Theme dim text (`text_dim` from the palette).
     Secondary,

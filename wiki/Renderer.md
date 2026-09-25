@@ -20,7 +20,7 @@ result to the winit surface. There is no UIKit layer and no GTK dependency.
 pub const BACKGROUND: Color;
 ```
 
-Window background color. Currently `#1d1d1d` (dark mode base).
+Window background color. Currently `#1B2022` (dark mode base).
 
 ```rust
 pub const WINDOW_CORNER_RADIUS: f32;

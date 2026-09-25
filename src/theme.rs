@@ -150,7 +150,7 @@ impl Default for Theme {
     }
 }
 
-/// Resolved colors for a theme. Dark body `#1d1d1d`, light body `#ececec`.
+/// Resolved colors for a theme. Dark body `#1B2022`, light body `#FFFFFF`.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Palette {
     pub bg: Color,
@@ -167,20 +167,20 @@ impl Theme {
         let accent = self.accent.color();
         match self.mode {
             ThemeMode::Dark => Palette {
-                bg: Color::from_rgb8(0x1d, 0x1d, 0x1d),
-                text: Color::from_rgb8(0xf5, 0xf5, 0xf7),
+                bg: Color::from_rgb8(0x1b, 0x20, 0x22),
+                text: Color::from_rgb8(0xd8, 0xd9, 0xd9),
                 text_dim: Color::from_rgb8(0x9a, 0x9a, 0x9e),
                 titlebar_bg: Color::from_rgb8(0x2c, 0x2c, 0x2e),
-                titlebar_text: Color::from_rgb8(0xf5, 0xf5, 0xf7),
+                titlebar_text: Color::from_rgb8(0xd8, 0xd9, 0xd9),
                 divider: Color::from_rgba8(255, 255, 255, 36),
                 accent,
             },
             ThemeMode::Light => Palette {
-                bg: Color::from_rgb8(0xec, 0xec, 0xec),
-                text: Color::from_rgb8(0x1e, 0x1e, 0x1e),
+                bg: Color::from_rgb8(0xff, 0xff, 0xff),
+                text: Color::from_rgb8(0x27, 0x27, 0x27),
                 text_dim: Color::from_rgb8(0x6e, 0x6e, 0x72),
                 titlebar_bg: Color::from_rgb8(0xde, 0xde, 0xe1),
-                titlebar_text: Color::from_rgb8(0x1e, 0x1e, 0x1e),
+                titlebar_text: Color::from_rgb8(0x27, 0x27, 0x27),
                 divider: Color::from_rgba8(0, 0, 0, 31),
                 accent,
             },
@@ -359,7 +359,8 @@ mod tests {
     #[test]
     fn dark_palette_matches_conventions() {
         let palette = Theme::default().palette();
-        assert_eq!(palette.bg, Color::from_rgb8(0x1d, 0x1d, 0x1d));
+        assert_eq!(palette.bg, Color::from_rgb8(0x1b, 0x20, 0x22));
+        assert_eq!(palette.text, Color::from_rgb8(0xd8, 0xd9, 0xd9));
         assert_eq!(palette.accent, Color::from_rgb8(0x00, 0x7a, 0xff));
     }
 

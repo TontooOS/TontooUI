@@ -11,7 +11,7 @@ Dark colors are active; light constants exist for later.
 | Token | Dark | Light |
 |---|---|---|
 | `TITLEBAR_BG_*` | `#2C2C2E` (lighter than body) | `#DEDEE1` (darker than body) |
-| `TITLEBAR_TEXT_*` | `#F5F5F7` | `#1E1E1E` |
+| `TITLEBAR_TEXT_*` | `#D8D9D9` | `#272727` |
 | `TITLEBAR_DIVIDER_*` | white 14% | black 12% |
 
 ```rust

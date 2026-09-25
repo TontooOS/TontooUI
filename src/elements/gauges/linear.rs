@@ -66,7 +66,7 @@ impl LinearGauge {
             title: None,
             value_text: None,
             text_color: Color::WHITE,
-            bg: Color::from_rgb8(0x1d, 0x1d, 0x1d),
+            bg: Color::from_rgb8(0x1b, 0x20, 0x22),
             dark: true,
             focused: true,
             anim: None,
@@ -100,10 +100,10 @@ impl LinearGauge {
         self.dark = dark;
         if dark {
             self.text_color = Color::WHITE;
-            self.bg = Color::from_rgb8(0x1d, 0x1d, 0x1d);
+            self.bg = Color::from_rgb8(0x1b, 0x20, 0x22);
         } else {
             self.text_color = Color::BLACK;
-            self.bg = Color::from_rgb8(0xec, 0xec, 0xec);
+            self.bg = Color::from_rgb8(0xff, 0xff, 0xff);
         }
     }
 
@@ -341,6 +341,6 @@ mod tests {
         let mut gauge = LinearGauge::new(60.0, 0.0, 100.0);
         gauge.set_theme(Color::from_rgb8(0xff, 0x2d, 0x55), false);
         assert_eq!(gauge.text_color, Color::BLACK);
-        assert_eq!(gauge.bg, Color::from_rgb8(0xec, 0xec, 0xec));
+        assert_eq!(gauge.bg, Color::from_rgb8(0xff, 0xff, 0xff));
     }
 }

@@ -28,9 +28,9 @@ pub const TOOLBAR_DIVIDER_W: f32 = 9.0;
 /// Divider line height in logical px, centered in the pill.
 pub const TOOLBAR_DIVIDER_H: f32 = 20.0;
 /// Icon color in dark mode.
-pub const TOOLBAR_ICON_DARK: Color = Color::from_rgb8(0xf5, 0xf5, 0xf7);
+pub const TOOLBAR_ICON_DARK: Color = Color::from_rgb8(0xd8, 0xd9, 0xd9);
 /// Icon color in light mode.
-pub const TOOLBAR_ICON_LIGHT: Color = Color::from_rgb8(0x1e, 0x1e, 0x1e);
+pub const TOOLBAR_ICON_LIGHT: Color = Color::from_rgb8(0x27, 0x27, 0x27);
 
 /// Placement of the icons inside the toolbar rect.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
