@@ -80,7 +80,30 @@ empty.draw(scene, fonts, images);
 ```
 
 See `examples/unavailable.rs` for the full demo (refresh variant
-with a counter plus a button-less variant).
+with a counter, button-less variant and search variant).
+
+## SearchEmpty
+
+```rust
+pub fn new(icon: impl Into<String>, title: impl Into<String>, message: impl Into<String>) -> Self
+pub fn icon(self, name: impl Into<String>) -> Self
+pub fn icon_color(self, color: Color) -> Self
+pub fn title(self, title: impl Into<String>) -> Self
+pub fn message(self, message: impl Into<String>) -> Self
+pub fn set_theme(&mut self, mode: ThemeMode)
+pub fn set_focused(&mut self, focused: bool)
+pub fn set_title(&mut self, title: impl Into<String>)
+pub fn set_message(&mut self, message: impl Into<String>)
+pub fn icon_value(&self) -> &str
+pub fn rect(&self) -> (f32, f32, f32, f32)
+```
+
+- Search empty state: icon, title and message with no refresh
+  button (like the reference rows: magnifier, "No Results", "Check
+  the spelling or try a new search."). Thin wrapper over the
+  `ContentUnavailable` composition, so layout always matches.
+- `set_theme` takes only the mode (no button, so no accent); all
+  setters rebuild on change only, like the sibling.
 
 ## Cross References
 

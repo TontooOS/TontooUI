@@ -1,5 +1,6 @@
 use tontooui::elements::{
-    BasicText, ContentUnavailable, Titlebar, TrafficAction, View,
+    BasicText, ContentUnavailable, SearchEmpty, Titlebar, TrafficAction,
+    View,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
@@ -13,6 +14,7 @@ struct UnavailableDemo {
     status: BasicText,
     empty: ContentUnavailable,
     plain: ContentUnavailable,
+    search: SearchEmpty,
     refreshes: u32,
     watcher: ThemeWatcher,
     focused: bool,
@@ -36,6 +38,11 @@ impl UnavailableDemo {
                 "Stars you tap will show up here.",
             )
             .refresh(false),
+            search: SearchEmpty::new(
+                "magnifyingglass",
+                "No Results",
+                "Check the spelling or try a new search.",
+            ),
             refreshes: 0,
             watcher: ThemeWatcher::new(),
             focused: true,
@@ -69,6 +76,8 @@ impl App for UnavailableDemo {
         self.empty.set_focused(focused);
         self.plain.set_theme(theme.mode, palette.accent);
         self.plain.set_focused(focused);
+        self.search.set_theme(theme.mode);
+        self.search.set_focused(focused);
         self.status
             .set_text(format!("refreshes: {}", self.refreshes));
         self.status.set_theme(theme.mode);
@@ -96,15 +105,19 @@ impl App for UnavailableDemo {
 
         let (ew, eh) = self.empty.measure(fonts);
         let (pw, ph) = self.plain.measure(fonts);
-        let col_w = ew.max(pw);
+        let (qw, qh) = self.search.measure(fonts);
+        let col_w = ew.max(pw).max(qw);
         let cx = viewport.x + ((viewport.width - col_w) / 2.0).max(0.0);
         let mut y = top + 12.0 + sh + 24.0;
-        // Refresh variant first, plain variant below.
+        // Refresh variant, plain variant, search variant below.
         self.empty.place(fonts, cx, y, col_w, eh);
         self.empty.draw(scene, fonts, images);
-        y += eh + 48.0;
+        y += eh + 40.0;
         self.plain.place(fonts, cx, y, col_w, ph);
         self.plain.draw(scene, fonts, images);
+        y += ph + 40.0;
+        self.search.place(fonts, cx, y, col_w, qh);
+        self.search.draw(scene, fonts, images);
     }
 
     fn background(&self) -> Color {

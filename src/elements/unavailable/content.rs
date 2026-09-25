@@ -137,13 +137,34 @@ impl ContentUnavailable {
     }
 
     pub fn set_title(&mut self, title: impl Into<String>) {
-        self.title = title.into();
-        self.rebuild();
+        let title = title.into();
+        if title != self.title {
+            self.title = title;
+            self.rebuild();
+        }
     }
 
     pub fn set_message(&mut self, message: impl Into<String>) {
-        self.message = message.into();
-        self.rebuild();
+        let message = message.into();
+        if message != self.message {
+            self.message = message;
+            self.rebuild();
+        }
+    }
+
+    pub fn set_icon(&mut self, name: impl Into<String>) {
+        let name = name.into();
+        if name != self.icon {
+            self.icon = name;
+            self.rebuild();
+        }
+    }
+
+    pub fn set_icon_color(&mut self, color: Option<Color>) {
+        if color != self.icon_color {
+            self.icon_color = color;
+            self.rebuild();
+        }
     }
 
     pub fn set_refresh(&mut self, enabled: bool) {

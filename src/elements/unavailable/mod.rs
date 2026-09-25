@@ -1,6 +1,8 @@
 pub mod content;
+pub mod search;
 
 pub use content::ContentUnavailable;
+pub use search::SearchEmpty;
 
 use vello::peniko::Color;
 
