@@ -6,7 +6,7 @@ use tontooui::elements::{
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
-use tontooui::renderer::window::{App, Key, Viewport, WindowCommand, run};
+use tontooui::renderer::window::{App, CursorKind, Key, Viewport, WindowCommand, run};
 use tontooui::theme::{ThemeMode, ThemeWatcher};
 use vello::Scene;
 use vello::peniko::Color;
@@ -170,6 +170,14 @@ impl App for TableDemo {
 
     fn wants_backdrop(&self) -> bool {
         self.menu.is_open()
+    }
+
+    fn cursor(&self, _x: f64, _y: f64) -> CursorKind {
+        if self.table.borrow().wants_text_cursor() {
+            CursorKind::Text
+        } else {
+            CursorKind::Default
+        }
     }
 
     fn mouse_down(&mut self, x: f64, y: f64) {

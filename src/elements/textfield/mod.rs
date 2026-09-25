@@ -1,4 +1,5 @@
 pub mod basic;
+pub(crate) mod clipboard;
 pub mod editor;
 pub mod large;
 pub mod large_editor;
@@ -27,14 +28,16 @@ pub use search::{
 };
 pub use secure::SecureField;
 
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use parley::Layout;
 use vello::Scene;
 use vello::kurbo::{Affine, Rect, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, Fill};
 
+use crate::elements::gestures::GESTURE_DOUBLE_TAP_SECONDS;
 use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
+use crate::renderer::window::Key;
 use crate::theme::desaturate;
 
 /// Field fill in dark mode.
@@ -57,15 +60,36 @@ pub const TEXTFIELD_PLACEHOLDER_LIGHT: Color = Color::from_rgb8(0x6e, 0x6e, 0x72
 pub const TEXTFIELD_CARET_W: f32 = 2.0;
 /// Caret blink period in seconds (macOS-like).
 pub const TEXTFIELD_BLINK_SECONDS: f64 = 1.06;
+/// Undo/redo depth per field.
+pub const TEXTFIELD_UNDO_LIMIT: usize = 100;
+/// Selection highlight alpha (0-1 of the accent).
+pub const TEXTFIELD_SELECTION_ALPHA: f32 = 0.3;
+
+#[derive(Clone)]
+struct UndoState {
+    text: String,
+    caret: usize,
+    anchor: usize,
+    sel: bool,
+}
 
 /// Shared single-line editing core behind the field variants:
 /// text plus caret (always a char boundary), placeholder, selection
 /// and accent. `masked` echoes bullets (secure fields), `multiline`
 /// keeps newlines (editor). Layouts cache per content, color, size,
 /// wrap and scale per the crisp text rules.
+///
+/// Text selection is a fixed `anchor` plus the moving `caret`,
+/// visible while `sel` holds and both ends differ. Clicks and drags
+/// record points (`press`/`drag`) that the variant resolves to carets
+/// in `draw` (caret mapping needs fonts); `hovered` drives the
+/// I-beam cursor. Every mutation pushes undo (capped); undo/redo
+/// restore text plus caret and fire `on_change`.
 pub(crate) struct FieldCore {
     text: String,
     caret: usize,
+    anchor: usize,
+    sel: bool,
     placeholder: String,
     selected: bool,
     masked: bool,
@@ -74,6 +98,13 @@ pub(crate) struct FieldCore {
     dark: bool,
     focused: bool,
     scroll: f32,
+    pressing: bool,
+    hovered: bool,
+    press: Option<(f32, f32)>,
+    drag: Option<(f32, f32)>,
+    press_time: Option<Instant>,
+    undo: Vec<UndoState>,
+    redo: Vec<UndoState>,
     on_change: Option<Box<dyn FnMut(&str)>>,
     layout: Option<Layout<SolidBrush>>,
     layout_text: String,
@@ -89,6 +120,8 @@ impl FieldCore {
         Self {
             text: String::new(),
             caret: 0,
+            anchor: 0,
+            sel: false,
             placeholder,
             selected: false,
             masked: false,
@@ -97,6 +130,13 @@ impl FieldCore {
             dark: true,
             focused: true,
             scroll: 0.0,
+            pressing: false,
+            hovered: false,
+            press: None,
+            drag: None,
+            press_time: None,
+            undo: Vec::new(),
+            redo: Vec::new(),
             on_change: None,
             layout: None,
             layout_text: String::new(),
@@ -108,8 +148,112 @@ impl FieldCore {
         }
     }
 
-    /// Insert text at the caret. Single line skips control chars and
-    /// newlines; multiline keeps `\n`. Fires `on_change`.
+    /// Visible selection as a sorted byte range, or `None` when
+    /// collapsed or hidden.
+    pub(crate) fn selection_range(&self) -> Option<(usize, usize)> {
+        if self.sel && self.anchor != self.caret {
+            let a = self.anchor.min(self.text.len());
+            let b = self.caret.min(self.text.len());
+            Some((a.min(b), a.max(b)))
+        } else {
+            None
+        }
+    }
+
+    /// Currently highlighted text (empty when nothing is selected).
+    pub(crate) fn selected_text(&self) -> String {
+        match self.selection_range() {
+            Some((a, b)) => self.text[a..b].to_string(),
+            None => String::new(),
+        }
+    }
+
+    fn snapshot(&self) -> UndoState {
+        UndoState {
+            text: self.text.clone(),
+            caret: self.caret,
+            anchor: self.anchor,
+            sel: self.sel,
+        }
+    }
+
+    fn push_undo(&mut self) {
+        let state = self.snapshot();
+        if self
+            .undo
+            .last()
+            .is_none_or(|top| top.text != state.text || top.caret != state.caret)
+        {
+            self.undo.push(state);
+            if self.undo.len() > TEXTFIELD_UNDO_LIMIT {
+                self.undo.remove(0);
+            }
+        }
+        self.redo.clear();
+    }
+
+    fn restore(&mut self, state: UndoState) {
+        self.text = state.text;
+        self.caret = state.caret.min(self.text.len());
+        self.anchor = state.anchor.min(self.text.len());
+        self.sel = state.sel && self.anchor != self.caret;
+        self.scroll = 0.0;
+        self.dirty = true;
+        self.notify();
+    }
+
+    /// Undo the last mutation. Returns false when the stack is empty.
+    pub(crate) fn undo(&mut self) -> bool {
+        let Some(top) = self.undo.pop() else {
+            return false;
+        };
+        self.redo.push(self.snapshot());
+        self.restore(top);
+        true
+    }
+
+    /// Redo the last undone mutation. Returns false when empty.
+    pub(crate) fn redo(&mut self) -> bool {
+        let Some(top) = self.redo.pop() else {
+            return false;
+        };
+        self.undo.push(self.snapshot());
+        self.restore(top);
+        true
+    }
+
+    /// Highlight everything.
+    pub(crate) fn select_all(&mut self) {
+        self.anchor = 0;
+        self.caret = self.text.len();
+        self.sel = !self.text.is_empty();
+    }
+
+    /// Collapse the selection, keeping the caret where it is.
+    pub(crate) fn collapse(&mut self) {
+        self.anchor = self.caret;
+        self.sel = false;
+    }
+
+    /// Delete the highlighted range. Returns false when nothing is
+    /// selected. Fires `on_change` on delete.
+    pub(crate) fn delete_selection(&mut self) -> bool {
+        let Some((a, b)) = self.selection_range() else {
+            return false;
+        };
+        self.push_undo();
+        self.text.replace_range(a..b, "");
+        self.caret = a;
+        self.anchor = a;
+        self.sel = false;
+        self.dirty = true;
+        self.notify();
+        true
+    }
+
+    /// Insert text at the caret, replacing the highlight first (one
+    /// undo step). Single line skips control chars and newlines;
+    /// multiline keeps `\n`. Fires `on_change`.
     pub(crate) fn insert(&mut self, content: &str) {
         let clean: String = content
             .chars()
@@ -118,18 +262,30 @@ impl FieldCore {
         if clean.is_empty() {
             return;
         }
+        self.push_undo();
+        if let Some((a, b)) = self.selection_range() {
+            self.text.replace_range(a..b, "");
+            self.caret = a;
+        }
+        self.caret = self.caret.min(self.text.len());
         self.text.insert_str(self.caret, &clean);
         self.caret += clean.len();
+        self.anchor = self.caret;
+        self.sel = false;
         self.dirty = true;
         self.notify();
     }
 
-    /// Delete the char before the caret (UTF-8 safe). Fires
-    /// `on_change` when something vanished.
+    /// Delete the highlight, else the char before the caret (UTF-8
+    /// safe). Fires `on_change` when something vanished.
     pub(crate) fn backspace(&mut self) {
+        if self.delete_selection() {
+            return;
+        }
         if self.caret == 0 {
             return;
         }
+        self.push_undo();
         let prev = self.text[..self.caret]
             .char_indices()
             .last()
@@ -137,11 +293,12 @@ impl FieldCore {
             .unwrap_or(0);
         self.text.remove(prev);
         self.caret = prev;
+        self.anchor = prev;
         self.dirty = true;
         self.notify();
     }
 
-    pub(crate) fn move_left(&mut self) {
+    fn step_left(&mut self) {
         if self.caret > 0 {
             self.caret = self.text[..self.caret]
                 .char_indices()
@@ -151,7 +308,7 @@ impl FieldCore {
         }
     }
 
-    pub(crate) fn move_right(&mut self) {
+    fn step_right(&mut self) {
         if self.caret < self.text.len() {
             let rest = &self.text[self.caret..];
             let next = rest
@@ -163,20 +320,182 @@ impl FieldCore {
         }
     }
 
-    pub(crate) fn select(&mut self) {
+    pub(crate) fn move_left(&mut self, extend: bool) {
+        if !extend {
+            if let Some((a, _)) = self.selection_range() {
+                self.caret = a;
+                self.collapse();
+                return;
+            }
+            self.step_left();
+            self.collapse();
+            return;
+        }
+        if !self.sel {
+            self.anchor = self.caret;
+        }
+        self.step_left();
+        self.sel = self.anchor != self.caret;
+    }
+
+    pub(crate) fn move_right(&mut self, extend: bool) {
+        if !extend {
+            if let Some((_, b)) = self.selection_range() {
+                self.caret = b;
+                self.collapse();
+                return;
+            }
+            self.step_right();
+            self.collapse();
+            return;
+        }
+        if !self.sel {
+            self.anchor = self.caret;
+        }
+        self.step_right();
+        self.sel = self.anchor != self.caret;
+    }
+
+    /// Copy the highlight to the clipboard. Returns false when
+    /// nothing is selected.
+    pub(crate) fn copy(&mut self) -> bool {
+        let selected = self.selected_text();
+        if selected.is_empty() {
+            return false;
+        }
+        clipboard::set(&selected);
+        true
+    }
+
+    /// Cut the highlight to the clipboard. Returns false when
+    /// nothing is selected. Fires `on_change` on cut.
+    pub(crate) fn cut(&mut self) -> bool {
+        if !self.copy() {
+            return false;
+        }
+        self.delete_selection()
+    }
+
+    /// Paste clipboard text at the caret (replaces the highlight).
+    /// Fires `on_change` on paste.
+    pub(crate) fn paste(&mut self) {
+        if let Some(text) = clipboard::get() {
+            self.insert(&text);
+        }
+    }
+
+    /// Shared single-line key handling: Backspace, caret motion and
+    /// the Ctrl shortcuts (select all, clipboard, undo/redo).
+    /// Returns true when consumed. Multiline editors route Up/Down
+    /// and Enter through their own arms first.
+    pub(crate) fn handle_key(&mut self, key: Key) -> bool {
+        if !self.selected {
+            return false;
+        }
+        match key {
+            Key::Backspace => self.backspace(),
+            Key::Left => self.move_left(false),
+            Key::Right => self.move_right(false),
+            Key::SelectLeft => self.move_left(true),
+            Key::SelectRight => self.move_right(true),
+            Key::SelectAll => self.select_all(),
+            Key::Copy => {
+                self.copy();
+            }
+            Key::Cut => {
+                self.cut();
+            }
+            Key::Paste => self.paste(),
+            Key::Undo => {
+                self.undo();
+            }
+            Key::Redo => {
+                self.redo();
+            }
+            Key::Escape => self.deselect(),
+            _ => return false,
+        }
+        true
+    }
+
+    /// Record a press inside the field (field coords). Caret mapping
+    /// needs fonts, so `draw` finishes it via `take_press` plus a
+    /// variant caret lookup and `finish_press`.
+    pub(crate) fn press(&mut self, x: f32, y: f32) {
         self.selected = true;
-        self.caret = self.text.len();
+        self.pressing = true;
+        self.press = Some((x, y));
+        self.drag = None;
+    }
+
+    /// Extend the highlight toward a drag point while held (resolved
+    /// in `draw` via `take_drag` plus `finish_drag`).
+    pub(crate) fn drag_to_point(&mut self, x: f32, y: f32) {
+        if self.pressing && self.selected {
+            self.drag = Some((x, y));
+        }
+    }
+
+    /// Release a hold (mouse up).
+    pub(crate) fn release(&mut self) {
+        self.pressing = false;
+        self.press = None;
+        self.drag = None;
+    }
+
+    pub(crate) fn take_press(&mut self) -> Option<(f32, f32)> {
+        self.press.take()
+    }
+
+    pub(crate) fn take_drag(&mut self) -> Option<(f32, f32)> {
+        self.drag.take()
+    }
+
+    /// Finish a press at a resolved caret: double-click highlights
+    /// the word, single click collapses there.
+    pub(crate) fn finish_press(&mut self, caret: usize, now: Instant) {
+        let caret = caret.min(self.text.len());
+        let double = matches!(self.press_time, Some(t)
+            if now.duration_since(t).as_secs_f64() < GESTURE_DOUBLE_TAP_SECONDS);
+        if double {
+            let (a, b) = word_range(&self.text, caret);
+            self.press_time = None;
+            if a != b {
+                self.anchor = a;
+                self.caret = b;
+                self.sel = true;
+                return;
+            }
+        } else {
+            self.press_time = Some(now);
+        }
+        self.caret = caret;
+        self.anchor = caret;
+        self.sel = false;
+    }
+
+    /// Finish a drag at a resolved caret: the anchor stays where the
+    /// press landed, the caret follows the pointer.
+    pub(crate) fn finish_drag(&mut self, caret: usize) {
+        self.caret = caret.min(self.text.len());
+        self.sel = self.anchor != self.caret;
     }
 
     pub(crate) fn deselect(&mut self) {
         self.selected = false;
+        self.sel = false;
+        self.release();
     }
 
     pub(crate) fn set_text(&mut self, text: String) {
         if text != self.text {
             self.text = text;
             self.caret = self.text.len();
+            self.anchor = self.caret;
+            self.sel = false;
             self.scroll = 0.0;
+            self.undo.clear();
+            self.redo.clear();
             self.dirty = true;
         }
     }
@@ -237,11 +556,24 @@ impl FieldCore {
 
     /// Caret x in logical px (advance of the echo before the caret).
     pub(crate) fn caret_x(&self, fonts: &mut FontSystem, size: f32, color: Color) -> f32 {
-        let prefix_chars = self.text[..self.caret.min(self.text.len())].chars().count();
+        self.echo_advance(fonts, self.caret.min(self.text.len()), size, color)
+    }
+
+    /// Advance of the echo before byte `idx` in logical px
+    /// (bullets for masked fields).
+    pub(crate) fn echo_advance(
+        &self,
+        fonts: &mut FontSystem,
+        idx: usize,
+        size: f32,
+        color: Color,
+    ) -> f32 {
+        let idx = idx.min(self.text.len());
+        let prefix_chars = self.text[..idx].chars().count();
         let prefix = if self.masked {
             "•".repeat(prefix_chars)
         } else {
-            self.text[..self.caret.min(self.text.len())].to_string()
+            self.text[..idx].to_string()
         };
         let layout = fonts.layout_text(&prefix, size, color, None);
         FontSystem::layout_size(&layout).0 / fonts.scale
@@ -350,12 +682,89 @@ pub(crate) fn editor_lines(
 }
 
 /// Advance of `text` in logical px (single line probe).
-fn advance_of(fonts: &mut FontSystem, text: &str, size: f32, color: Color) -> f32 {
+pub(crate) fn advance_of(fonts: &mut FontSystem, text: &str, size: f32, color: Color) -> f32 {
     if text.is_empty() {
         return 0.0;
     }
     let probe = fonts.layout_text(text, size, color, None);
     FontSystem::layout_size(&probe).0 / fonts.scale
+}
+
+/// Word boundaries around a byte caret: alphanumeric plus `_`
+/// counts as word chars. Collapsed when the caret sits between
+/// words (double-click on a gap just places the caret).
+pub(crate) fn word_range(text: &str, caret: usize) -> (usize, usize) {
+    let caret = caret.min(text.len());
+    let is_word = |c: char| c.is_alphanumeric() || c == '_';
+    let mut a = caret;
+    while a > 0 {
+        match text[..a].chars().next_back() {
+            Some(c) if is_word(c) => a -= c.len_utf8(),
+            _ => break,
+        }
+    }
+    let mut b = caret;
+    while b < text.len() {
+        match text[b..].chars().next() {
+            Some(c) if is_word(c) => b += c.len_utf8(),
+            _ => break,
+        }
+    }
+    (a, b)
+}
+
+/// Byte index at `goal_x` (text-origin coords) in single-line
+/// `echo`: nearest advance boundary, clamped to both ends.
+pub(crate) fn single_line_caret(
+    fonts: &mut FontSystem,
+    echo: &str,
+    size: f32,
+    color: Color,
+    goal_x: f32,
+) -> usize {
+    if goal_x <= 0.0 || echo.is_empty() {
+        return 0;
+    }
+    let mut x = 0.0;
+    let mut at = 0;
+    for (i, ch) in echo.char_indices() {
+        let adv = advance_of(fonts, &echo[i..i + ch.len_utf8()], size, color);
+        if x + adv / 2.0 >= goal_x {
+            return i;
+        }
+        x += adv;
+        at = i + ch.len_utf8();
+    }
+    at
+}
+
+/// Resolve pending press/drag points of a single-line field.
+/// `origin_x` is the text-origin x (field x plus padding minus
+/// scroll); `echo` is the displayed content (bullets when masked).
+/// Drag extends from the press anchor; press collapses or
+/// word-selects on double-click.
+pub(crate) fn resolve_press_single(
+    core: &mut FieldCore,
+    fonts: &mut FontSystem,
+    echo: &str,
+    size: f32,
+    color: Color,
+    origin_x: f32,
+) {
+    if let Some((px, _)) = core.take_press() {
+        let caret = single_line_caret(fonts, echo, size, color, px - origin_x);
+        core.finish_press(caret, Instant::now());
+    }
+    if let Some((dx, _)) = core.take_drag() {
+        let caret = single_line_caret(fonts, echo, size, color, dx - origin_x);
+        core.finish_drag(caret);
+    }
+}
+
+/// Accent selection wash for highlighted text.
+pub(crate) fn selection_brush(core: &FieldCore) -> Color {
+    let c = accent_color(core).to_rgba8();
+    Color::from_rgba8(c.r, c.g, c.b, (c.a as f32 * TEXTFIELD_SELECTION_ALPHA).round() as u8)
 }
 
 /// Caret line index plus goal x in logical px. The caret belongs to
@@ -558,6 +967,39 @@ pub(crate) fn draw_editor_multiline(
         );
         draw_layout(scene, layout, ix, iy - scroll, fonts.scale);
     }
+    // Highlighted range wash, segmented per wrapped line.
+    if let Some((sa, sb)) = core.selection_range() {
+        let wash = selection_brush(core);
+        let mut ly = 0.0;
+        for (start, end, height) in &lines {
+            let h = *height / fonts.scale;
+            let end = (*end).min(content.len());
+            let start = (*start).min(end);
+            let lo = sa.max(start).min(end);
+            let hi = sb.max(start).min(end);
+            if lo < hi {
+                if let (Some(before), Some(within)) =
+                    (content.get(start..lo), content.get(start..hi))
+                {
+                    let x0 = advance_of(fonts, before, metrics.font_size, text);
+                    let x1 = advance_of(fonts, within, metrics.font_size, text);
+                    scene.fill(
+                        Fill::NonZero,
+                        Affine::IDENTITY,
+                        &Brush::Solid(wash),
+                        None,
+                        &Rect::new(
+                            px(ix + x0),
+                            px(iy + ly - scroll),
+                            px(ix + x1),
+                            px(iy + ly - scroll + h),
+                        ),
+                    );
+                }
+            }
+            ly += h;
+        }
+    }
     if core.selected && caret_blink() {
         scene.fill(
             Fill::NonZero,
@@ -659,6 +1101,18 @@ pub(crate) fn draw_field(
         let (layout, _) =
             core.ensure_layout(fonts, metrics.font_size, text, placeholder, None);
         draw_layout(scene, layout, ix - scroll, ty, fonts.scale);
+    }
+    // Highlighted range wash under the text.
+    if let Some((a, b)) = core.selection_range() {
+        let x0 = ix - scroll + core.echo_advance(fonts, a, metrics.font_size, text);
+        let x1 = ix - scroll + core.echo_advance(fonts, b, metrics.font_size, text);
+        scene.fill(
+            Fill::NonZero,
+            Affine::IDENTITY,
+            &Brush::Solid(selection_brush(core)),
+            None,
+            &Rect::new(px(x0), px(ty), px(x1), px(ty + th / fonts.scale)),
+        );
     }
     // Blinking caret while selected.
     if core.selected && caret_blink() {

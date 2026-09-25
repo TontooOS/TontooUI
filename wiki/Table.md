@@ -85,7 +85,10 @@ pub fn set_focused(&mut self, focused: bool)
 - Editing needs an editable column: double-click (when
   `edit_on_double_click`, default `true`) or manual `begin_edit`
   opens an inline `BasicTextField` over the cell. Enter commits
-  (`on_edit_commit`), Escape cancels, clicking outside commits.
+  (`on_edit_commit`), Escape cancels, clicking outside commits. The
+  inline editor supports the full textfield contract (highlight,
+  Ctrl shortcuts, undo, I-beam via `wants_text_cursor`, see
+  [Textfield.md](Textfield.md)).
 
 ## Hit Testing
 

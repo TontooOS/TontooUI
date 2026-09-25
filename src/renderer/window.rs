@@ -11,7 +11,7 @@ use winit::dpi::LogicalSize;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::{Window, WindowAttributes};
+use winit::window::{CursorIcon, Window, WindowAttributes};
 
 use super::backdrop::BackdropBlur;
 use super::images::{ImageCache, ImageLoader};
@@ -33,7 +33,11 @@ pub const MIN_WINDOW: u32 = 320;
 /// Physical pixels = value x window scale factor (20 pt is ~40 px at 2x).
 pub const WINDOW_CORNER_RADIUS: f32 = 20.0;
 
-/// Non-printable keys forwarded to the app.
+/// Non-printable keys forwarded to the app. The `Select*`, `Copy`,
+/// `Cut`, `Paste`, `Undo` and `Redo` variants arrive for Ctrl
+/// shortcuts (Ctrl+A/C/X/V/Z/Y and Ctrl+Shift+Z); text fields handle
+/// them as select all, clipboard, undo/redo and extending caret
+/// motion.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Key {
     Backspace,
@@ -43,6 +47,26 @@ pub enum Key {
     Down,
     Enter,
     Escape,
+    SelectAll,
+    Copy,
+    Cut,
+    Paste,
+    Undo,
+    Redo,
+    SelectLeft,
+    SelectRight,
+    SelectUp,
+    SelectDown,
+}
+
+/// Pointer shape requested by content. The shell sets the winit
+/// cursor from `App::cursor` after every move; `Text` is the I-beam
+/// over editable text.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CursorKind {
+    #[default]
+    Default,
+    Text,
 }
 
 /// Touch contact phases forwarded to the app.
@@ -90,6 +114,12 @@ pub trait App {
     /// range select). The shell calls this on modifier changes;
     /// default ignores. Tables read it through `set_modifiers`.
     fn set_modifiers(&mut self, _ctrl: bool, _shift: bool) {}
+    /// Pointer shape at the given logical position. Called after
+    /// every pointer move; default is the arrow. Text fields return
+    /// `Text` while hovered so the cursor turns into an I-beam.
+    fn cursor(&self, _x: f64, _y: f64) -> CursorKind {
+        CursorKind::Default
+    }
     /// Scroll wheel delta in logical px (right/down positive).
     fn mouse_wheel(&mut self, _dx: f64, _dy: f64) {}
     /// Right-click press in logical px (context menus).
@@ -151,6 +181,7 @@ struct Active {
     backdrop: BackdropBlur,
     scale: f64,
     cursor_pos: (f64, f64),
+    last_cursor: CursorKind,
     start: Instant,
 }
 
@@ -161,6 +192,8 @@ struct Shell<V: App> {
     app: V,
     context: Option<RenderContext>,
     active: Option<Active>,
+    ctrl: bool,
+    shift: bool,
 }
 
 impl<V: App> Shell<V> {
@@ -172,6 +205,8 @@ impl<V: App> Shell<V> {
             app,
             context: None,
             active: None,
+            ctrl: false,
+            shift: false,
         }
     }
 
@@ -450,6 +485,7 @@ impl<V: App> ApplicationHandler for Shell<V> {
             backdrop,
             scale,
             cursor_pos: (0.0, 0.0),
+            last_cursor: CursorKind::Default,
             start: Instant::now(),
         });
     }
@@ -483,7 +519,17 @@ impl<V: App> ApplicationHandler for Shell<V> {
             WindowEvent::CursorMoved { position, .. } => {
                 active.cursor_pos = (position.x, position.y);
                 let scale = active.scale;
-                self.app.mouse_move(position.x / scale, position.y / scale);
+                let x = position.x / scale;
+                let y = position.y / scale;
+                self.app.mouse_move(x, y);
+                let cursor = self.app.cursor(x, y);
+                if cursor != active.last_cursor {
+                    active.last_cursor = cursor;
+                    active.window.set_cursor(match cursor {
+                        CursorKind::Default => CursorIcon::Default,
+                        CursorKind::Text => CursorIcon::Text,
+                    });
+                }
             }
             WindowEvent::Focused(focused) => {
                 self.app.set_focused(focused);
@@ -535,6 +581,42 @@ impl<V: App> ApplicationHandler for Shell<V> {
                 if event.state != ElementState::Pressed {
                     return;
                 }
+                // Ctrl shortcuts translate to editing intents before
+                // the regular key/text handling below (which would
+                // otherwise see the bare letters).
+                if self.ctrl {
+                    let combo = match event.physical_key {
+                        PhysicalKey::Code(KeyCode::KeyA) => Some(Key::SelectAll),
+                        PhysicalKey::Code(KeyCode::KeyC) => Some(Key::Copy),
+                        PhysicalKey::Code(KeyCode::KeyX) => Some(Key::Cut),
+                        PhysicalKey::Code(KeyCode::KeyV) => Some(Key::Paste),
+                        PhysicalKey::Code(KeyCode::KeyZ) if self.shift => Some(Key::Redo),
+                        PhysicalKey::Code(KeyCode::KeyZ) => Some(Key::Undo),
+                        PhysicalKey::Code(KeyCode::KeyY) => Some(Key::Redo),
+                        _ => None,
+                    };
+                    if let Some(key) = combo {
+                        self.app.key(key);
+                        active.window.request_redraw();
+                        return;
+                    }
+                }
+                // Shift+arrows extend the text selection instead of
+                // moving the caret.
+                if self.shift && !self.ctrl {
+                    let extend = match event.physical_key {
+                        PhysicalKey::Code(KeyCode::ArrowLeft) => Some(Key::SelectLeft),
+                        PhysicalKey::Code(KeyCode::ArrowRight) => Some(Key::SelectRight),
+                        PhysicalKey::Code(KeyCode::ArrowUp) => Some(Key::SelectUp),
+                        PhysicalKey::Code(KeyCode::ArrowDown) => Some(Key::SelectDown),
+                        _ => None,
+                    };
+                    if let Some(key) = extend {
+                        self.app.key(key);
+                        active.window.request_redraw();
+                        return;
+                    }
+                }
                 let mut redraw = true;
                 match event.physical_key {
                     PhysicalKey::Code(KeyCode::Backspace) => self.app.key(Key::Backspace),
@@ -560,7 +642,9 @@ impl<V: App> ApplicationHandler for Shell<V> {
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 let state = modifiers.state();
-                self.app.set_modifiers(state.control_key(), state.shift_key());
+                self.ctrl = state.control_key();
+                self.shift = state.shift_key();
+                self.app.set_modifiers(self.ctrl, self.shift);
                 active.window.request_redraw();
             }
             WindowEvent::MouseWheel { delta, .. } => {

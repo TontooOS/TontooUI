@@ -9,6 +9,7 @@ keywords = ["tontoo", "ui", "swiftui", "declarative"]
 categories = ["gui"]
 
 [dependencies]
+arboard = "1"
 winit = "0.30"
 wgpu = "29"
 vello = "0.10"

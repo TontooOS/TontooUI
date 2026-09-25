@@ -3,7 +3,7 @@ use tontooui::elements::{
     SecureField, TextEditor, Titlebar, TrafficAction, View,
 };use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
-use tontooui::renderer::window::{App, Key, Viewport, WindowCommand, run};
+use tontooui::renderer::window::{App, CursorKind, Key, Viewport, WindowCommand, run};
 use tontooui::theme::{ThemeMode, ThemeWatcher};
 use vello::Scene;
 use vello::peniko::Color;
@@ -189,8 +189,37 @@ impl App for TextFieldDemo {
         self.pending.push(key);
     }
 
+    fn cursor(&self, _x: f64, _y: f64) -> CursorKind {
+        if self.basic.wants_text_cursor()
+            || self.large.wants_text_cursor()
+            || self.secure.wants_text_cursor()
+            || self.search.wants_text_cursor()
+            || self.editor.wants_text_cursor()
+            || self.large_editor.wants_text_cursor()
+        {
+            CursorKind::Text
+        } else {
+            CursorKind::Default
+        }
+    }
+
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
+        self.basic.set_hover(x as f32, y as f32);
+        self.large.set_hover(x as f32, y as f32);
+        self.secure.set_hover(x as f32, y as f32);
+        self.search.set_hover(x as f32, y as f32);
+        self.editor.set_hover(x as f32, y as f32);
+        self.large_editor.set_hover(x as f32, y as f32);
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        self.basic.mouse_up(x, y);
+        self.large.mouse_up(x, y);
+        self.secure.mouse_up(x, y);
+        self.search.mouse_up(x, y);
+        self.editor.mouse_up(x, y);
+        self.large_editor.mouse_up(x, y);
     }
 
     fn set_focused(&mut self, focused: bool) {

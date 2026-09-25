@@ -6,9 +6,9 @@ row), `LargeTextField` in `large.rs` the roomier single-line field
 (like the bottom row), `SecureField` in `secure.rs` masks secrets
 behind bullets, and `TextEditor` in `editor.rs` is the large
 multi-line editor. All share the `FieldCore` editing core in
-`mod.rs`. Click inside to select (caret to end); ESC or a click
-outside deselects. While selected the field shows an accent focus
-ring in the user's accent color (wired through
+`mod.rs`. Click inside to focus (the caret lands at the click);
+ESC or a click outside deselects. While selected the field shows an
+accent focus ring in the user's accent color (wired through
 `set_theme(accent, dark)` like a normal button), a blinking caret,
 placeholder, typing, Backspace and caret keys.
 
@@ -40,8 +40,65 @@ a char boundary, UTF-8 safe), placeholder, selection and accent.
 `\n` (editor, single line filters it). Layouts cache per content,
 color, size, wrap and scale per the crisp text rules.
 `insert` skips control chars and newlines; `backspace` deletes the
-char before the caret; `track_caret` scrolls long text so the caret
-stays visible.
+highlight, else the char before the caret; `track_caret` scrolls
+long text so the caret stays visible.
+
+## Selection
+
+The highlight is a fixed `anchor` plus the moving `caret`, visible
+while they differ. Click places the caret (resolved in `draw`,
+where fonts are available); double-click highlights the word;
+dragging extends from the press anchor (the app forwards
+`set_hover` and `mouse_up` for this). Shift+Left/Right/Up/Down
+extend per direction (see [Renderer.md](Renderer.md) for the shell
+mapping). The highlight paints as an accent wash under the text
+(per wrapped line in editors). Every variant exposes it:
+
+```rust
+pub fn select_all(&mut self)
+pub fn selected_text(&self) -> String
+pub fn selection_range(&self) -> Option<(usize, usize)>
+```
+
+## Shortcuts and Undo
+
+Ctrl shortcuts arrive as `Key` intents from the shell (Ctrl+A/C/X/
+V/Z/Y plus Ctrl+Shift+Z for redo, see [Renderer.md](Renderer.md))
+and work in every variant through the shared `handle_key`:
+
+| Shortcut | Action |
+|---|---|
+| Ctrl+A | Highlight everything |
+| Ctrl+C / Ctrl+X | Copy / cut the highlight to the clipboard |
+| Ctrl+V | Paste clipboard text at the caret (replaces the highlight) |
+| Ctrl+Z / Ctrl+Y | Undo / redo (100 steps, text plus caret) |
+
+Copy and paste use the system clipboard (`arboard`) with an
+in-process fallback where no display server answers, so shortcuts
+keep working headless. Typing or pasting over a highlight replaces
+it in a single undo step. Programmatic `set_text` clears the undo
+stacks. Direct stack access per variant:
+
+```rust
+pub fn undo(&mut self) -> bool
+pub fn redo(&mut self) -> bool
+pub fn copy_selection(&mut self) -> bool
+pub fn cut_selection(&mut self) -> bool
+pub fn paste_clipboard(&mut self)
+```
+
+## Text Cursor
+
+Hovering a field shows the I-beam pointer. The variant tracks the
+hover through `set_hover` and reports it:
+
+```rust
+pub fn wants_text_cursor(&self) -> bool
+```
+
+The app returns `CursorKind::Text` from `App::cursor` then (see
+[Renderer.md](Renderer.md)); the shell sets the winit cursor after
+every move. Tables forward this while their inline editor runs.
 
 ## BasicTextField / LargeTextField
 
@@ -65,10 +122,13 @@ pub fn rect(&self) -> (f32, f32, f32, f32)
   its `text` here); programmatic `set_text` moves the caret to the
   end without firing `on_change`, which fires with the full text on
   every user edit.
-- `key` handles Backspace, Left/Right and ESC while selected and
-  reports whether it consumed the key (the app forwards its `key`
-  here). `mouse_down` selects inside (caret to end) and deselects
-  anywhere else, so the app forwards every press here.
+- `key` handles Backspace, Left/Right (Shift extends), the Ctrl
+  shortcuts and ESC while selected and reports whether it consumed
+  the key (the app forwards its `key` here). `mouse_down` focuses
+  inside (caret lands at the click) and deselects anywhere else, so
+  the app forwards every press here; the app also forwards
+  `set_hover` (highlight drag plus I-beam tracking) and `mouse_up`
+  (ends the drag).
 - Draw paints the fill, the accent ring while selected (subtle
   border otherwise), and the text clipped to the padded box with
   caret tracking plus a blinking accent caret. Unfocused windows
@@ -105,9 +165,10 @@ pub fn rect(&self) -> (f32, f32, f32, f32)
 
 - Large multi-line editor: wrapped text, Enter breaks the line,
   Up/Down/Left/Right move the caret (Up/Down keep the column via
-  parley line ranges), vertical caret tracking with clipping.
-  Intrinsic measure wraps at `EDITOR_WRAP_W` with an `EDITOR_MIN_H`
-  floor; place generously (the demo uses a fixed tall box).
+  parley line ranges, Shift extends), vertical caret tracking with
+  clipping. Intrinsic measure wraps at `EDITOR_WRAP_W` with an
+  `EDITOR_MIN_H` floor; place generously (the demo uses a fixed
+  tall box).
 - `key` takes fonts for the multiline caret geometry (unlike the
   single-line fields); buffer keys to `draw` when the app has no
   fonts in its `key` handler (see the demo's `pending` queue).

@@ -9,7 +9,7 @@ use super::super::images::SFSymbolImage;
 use super::super::layout::View;
 use super::{
     FieldCore, TEXTFIELD_PLACEHOLDER_DARK, TEXTFIELD_PLACEHOLDER_LIGHT,
-    caret_blink,
+    caret_blink, resolve_press_single, selection_brush,
 };
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, draw_layout};
@@ -120,27 +120,72 @@ impl SearchField {
     }
 
     /// Key handling while selected: Backspace deletes, Left/Right
-    /// move the caret, ESC deselects. Returns true when consumed.
-    /// The app forwards its `key` here.
+    /// move the caret (Shift extends), Ctrl+A/C/X/V/Z/Y select,
+    /// copy, cut, paste, undo, redo, ESC deselects. Returns true
+    /// when consumed. The app forwards its `key` here.
     pub fn key(&mut self, key: Key) -> bool {
-        if !self.core.selected {
-            return false;
-        }
-        match key {
-            Key::Backspace => self.core.backspace(),
-            Key::Left => self.core.move_left(),
-            Key::Right => self.core.move_right(),
-            Key::Escape => self.core.deselect(),
-            _ => return false,
-        }
-        true
+        self.core.handle_key(key)
     }
 
-    /// Press handling: click inside selects (caret to end), anywhere
-    /// else deselects. The app forwards every press here.
+    /// Highlight everything (Ctrl+A equivalent).
+    pub fn select_all(&mut self) {
+        if self.core.selected {
+            self.core.select_all();
+        }
+    }
+
+    /// Currently highlighted text (empty when nothing is selected).
+    pub fn selected_text(&self) -> String {
+        self.core.selected_text()
+    }
+
+    /// Visible selection as a sorted byte range, if any.
+    pub fn selection_range(&self) -> Option<(usize, usize)> {
+        self.core.selection_range()
+    }
+
+    /// Undo the last edit. Returns false when the stack is empty.
+    pub fn undo(&mut self) -> bool {
+        self.core.undo()
+    }
+
+    /// Redo the last undone edit. Returns false when empty.
+    pub fn redo(&mut self) -> bool {
+        self.core.redo()
+    }
+
+    /// Copy the highlight to the clipboard. Returns false when
+    /// nothing is selected.
+    pub fn copy_selection(&mut self) -> bool {
+        self.core.copy()
+    }
+
+    /// Cut the highlight to the clipboard. Returns false when
+    /// nothing is selected.
+    pub fn cut_selection(&mut self) -> bool {
+        self.core.cut()
+    }
+
+    /// Paste clipboard text at the caret.
+    pub fn paste_clipboard(&mut self) {
+        if self.core.selected {
+            self.core.paste();
+        }
+    }
+
+    /// True while the pointer hovers the field: the app returns the
+    /// I-beam cursor from `App::cursor` then.
+    pub fn wants_text_cursor(&self) -> bool {
+        self.core.hovered
+    }
+
+    /// Press handling: click inside focuses (the caret lands at the
+    /// click in `draw`, double-click highlights the word, dragging
+    /// extends), anywhere else deselects. The app forwards every
+    /// press here.
     pub fn mouse_down(&mut self, x: f64, y: f64) {
         if self.hit(x as f32, y as f32) {
-            self.core.select();
+            self.core.press(x as f32, y as f32);
         } else {
             self.core.deselect();
         }
@@ -215,6 +260,19 @@ impl View for SearchField {
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
         let text = self.text_color();
+        let ix_probe = self.x + SEARCH_PAD_X + SEARCH_ICON_SIZE + SEARCH_GAP;
+        {
+            let echo = self.core.echo();
+            let origin_x = ix_probe - self.core.scroll;
+            resolve_press_single(
+                &mut self.core,
+                fonts,
+                &echo,
+                SEARCH_FONT_SIZE,
+                text,
+                origin_x,
+            );
+        }
         let placeholder = if self.dark {
             TEXTFIELD_PLACEHOLDER_DARK
         } else {
@@ -246,6 +304,17 @@ impl View for SearchField {
                     .ensure_layout(fonts, SEARCH_FONT_SIZE, text, placeholder, None);
             draw_layout(scene, layout, ix - scroll, ty, fonts.scale);
         }
+        if let Some((a, b)) = self.core.selection_range() {
+            let x0 = ix - scroll + self.core.echo_advance(fonts, a, SEARCH_FONT_SIZE, text);
+            let x1 = ix - scroll + self.core.echo_advance(fonts, b, SEARCH_FONT_SIZE, text);
+            scene.fill(
+                Fill::NonZero,
+                Affine::IDENTITY,
+                &Brush::Solid(selection_brush(&self.core)),
+                None,
+                &vello::kurbo::Rect::new(px(x0), px(ty), px(x1), px(ty + th / fonts.scale)),
+            );
+        }
         if self.core.selected && caret_blink() {
             let cx = ix - scroll + caret_x;
             let caret = if self.core.focused {
@@ -267,6 +336,17 @@ impl View for SearchField {
             );
         }
         scene.pop_layer();
+    }
+
+    fn mouse_up(&mut self, _x: f64, _y: f64) {
+        self.core.release();
+    }
+
+    fn set_hover(&mut self, x: f32, y: f32) {
+        self.core.hovered = self.hit(x, y);
+        if self.core.hovered || self.core.pressing {
+            self.core.drag_to_point(x, y);
+        }
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {

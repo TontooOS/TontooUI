@@ -5,7 +5,7 @@ use vello::peniko::Color;
 
 use super::super::layout::View;
 use super::{
-    FieldCore, FieldMetrics, draw_field, measure_field,
+    FieldCore, FieldMetrics, draw_field, field_colors, measure_field, resolve_press_single,
 };
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
@@ -96,27 +96,72 @@ impl BasicTextField {
     }
 
     /// Key handling while selected: Backspace deletes, Left/Right
-    /// move the caret, ESC deselects. Returns true when consumed.
-    /// The app forwards its `key` here.
+    /// move the caret (Shift extends), Ctrl+A/C/X/V/Z/Y select,
+    /// copy, cut, paste, undo, redo, ESC deselects. Returns true
+    /// when consumed. The app forwards its `key` here.
     pub fn key(&mut self, key: Key) -> bool {
-        if !self.core.selected {
-            return false;
-        }
-        match key {
-            Key::Backspace => self.core.backspace(),
-            Key::Left => self.core.move_left(),
-            Key::Right => self.core.move_right(),
-            Key::Escape => self.core.deselect(),
-            _ => return false,
-        }
-        true
+        self.core.handle_key(key)
     }
 
-    /// Press handling: click inside selects (caret to end), anywhere
-    /// else deselects. The app forwards every press here.
+    /// Highlight everything (Ctrl+A equivalent).
+    pub fn select_all(&mut self) {
+        if self.core.selected {
+            self.core.select_all();
+        }
+    }
+
+    /// Currently highlighted text (empty when nothing is selected).
+    pub fn selected_text(&self) -> String {
+        self.core.selected_text()
+    }
+
+    /// Visible selection as a sorted byte range, if any.
+    pub fn selection_range(&self) -> Option<(usize, usize)> {
+        self.core.selection_range()
+    }
+
+    /// Undo the last edit. Returns false when the stack is empty.
+    pub fn undo(&mut self) -> bool {
+        self.core.undo()
+    }
+
+    /// Redo the last undone edit. Returns false when empty.
+    pub fn redo(&mut self) -> bool {
+        self.core.redo()
+    }
+
+    /// Copy the highlight to the clipboard. Returns false when
+    /// nothing is selected.
+    pub fn copy_selection(&mut self) -> bool {
+        self.core.copy()
+    }
+
+    /// Cut the highlight to the clipboard. Returns false when
+    /// nothing is selected.
+    pub fn cut_selection(&mut self) -> bool {
+        self.core.cut()
+    }
+
+    /// Paste clipboard text at the caret.
+    pub fn paste_clipboard(&mut self) {
+        if self.core.selected {
+            self.core.paste();
+        }
+    }
+
+    /// True while the pointer hovers the field: the app returns the
+    /// I-beam cursor from `App::cursor` then.
+    pub fn wants_text_cursor(&self) -> bool {
+        self.core.hovered
+    }
+
+    /// Press handling: click inside focuses (the caret lands at the
+    /// click in `draw`, double-click highlights the word, dragging
+    /// extends), anywhere else deselects. The app forwards every
+    /// press here.
     pub fn mouse_down(&mut self, x: f64, y: f64) {
         if self.hit(x as f32, y as f32) {
-            self.core.select();
+            self.core.press(x as f32, y as f32);
         } else {
             self.core.deselect();
         }
@@ -158,6 +203,19 @@ impl View for BasicTextField {
         fonts: &mut FontSystem,
         _images: &mut ImageLoader<'_>,
     ) {
+        // Pending press/drag points resolve here: caret mapping
+        // needs fonts, which only `draw` has.
+        let echo = self.core.echo();
+        let (_, _, text) = field_colors(&self.core);
+        let origin_x = self.x + TEXTFIELD_PAD_X - self.core.scroll;
+        resolve_press_single(
+            &mut self.core,
+            fonts,
+            &echo,
+            TEXTFIELD_FONT_SIZE,
+            text,
+            origin_x,
+        );
         draw_field(
             scene,
             fonts,
@@ -168,6 +226,17 @@ impl View for BasicTextField {
             self.placed_h,
             &BASIC_METRICS,
         );
+    }
+
+    fn mouse_up(&mut self, _x: f64, _y: f64) {
+        self.core.release();
+    }
+
+    fn set_hover(&mut self, x: f32, y: f32) {
+        self.core.hovered = self.hit(x, y);
+        if self.core.hovered || self.core.pressing {
+            self.core.drag_to_point(x, y);
+        }
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -244,5 +313,107 @@ mod tests {
         let pink = Color::from_rgb8(0xff, 0x2d, 0x55);
         field.set_theme(pink, true);
         assert_eq!(field.core.accent, pink);
+    }
+
+    fn typed(text: &str) -> (BasicTextField, FontSystem) {
+        let mut field = field();
+        let mut fonts = FontSystem::new();
+        let (_, h) = field.measure(&mut fonts);
+        field.place(&mut fonts, 0.0, 0.0, 400.0, h.max(28.0));
+        field.mouse_down(300.0, 10.0);
+        field.type_text(text);
+        (field, fonts)
+    }
+
+    #[test]
+    fn select_all_shortcut_highlights_everything() {
+        let (mut field, _) = typed("hello");
+        assert!(field.key(Key::SelectAll));
+        assert_eq!(field.selection_range(), Some((0, 5)));
+        assert_eq!(field.selected_text(), "hello");
+    }
+
+    #[test]
+    fn shift_arrows_extend_and_plain_collapses() {
+        let (mut field, _) = typed("hello");
+        field.key(Key::SelectLeft);
+        field.key(Key::SelectLeft);
+        assert_eq!(field.selection_range(), Some((3, 5)));
+        assert_eq!(field.selected_text(), "lo");
+        field.key(Key::Left);
+        assert_eq!(field.selection_range(), None);
+        field.type_text("X");
+        assert_eq!(field.text_value(), "helXlo");
+    }
+
+    #[test]
+    fn backspace_deletes_selection_and_undo_restores() {
+        let (mut field, _) = typed("hello");
+        field.key(Key::SelectAll);
+        field.key(Key::Backspace);
+        assert_eq!(field.text_value(), "");
+        assert!(field.key(Key::Undo));
+        assert_eq!(field.text_value(), "hello");
+        assert!(field.key(Key::Redo));
+        assert_eq!(field.text_value(), "");
+        // `key` reports consumed; the direct stack call reports effect.
+        assert!(!field.redo());
+        assert!(!field.cut_selection());
+    }
+
+    #[test]
+    fn typing_replaces_selection_in_one_undo_step() {
+        let (mut field, _) = typed("hello");
+        field.key(Key::SelectAll);
+        field.type_text("hi");
+        assert_eq!(field.text_value(), "hi");
+        field.key(Key::Undo);
+        assert_eq!(field.text_value(), "hello");
+    }
+
+    #[test]
+    fn cut_copy_paste_roundtrip() {
+        let (mut field, _) = typed("hello world");
+        for _ in 0..5 {
+            field.key(Key::SelectLeft);
+        }
+        assert_eq!(field.selected_text(), "world");
+        assert!(field.key(Key::Copy));
+        assert_eq!(field.text_value(), "hello world");
+        assert!(field.key(Key::Cut));
+        assert_eq!(field.text_value(), "hello ");
+        assert!(field.key(Key::Paste));
+        assert_eq!(field.text_value(), "hello world");
+    }
+
+    #[test]
+    fn double_click_highlights_word() {
+        use std::time::Instant;
+
+        let (mut field, _) = typed("hello world");
+        field.core.finish_press(3, Instant::now());
+        assert_eq!(field.selection_range(), None);
+        field.core.finish_press(3, Instant::now());
+        assert_eq!(field.selection_range(), Some((0, 5)));
+        assert_eq!(field.selected_text(), "hello");
+    }
+
+    #[test]
+    fn drag_extends_from_press_anchor() {
+        use std::time::Instant;
+
+        let (mut field, _) = typed("hello world");
+        field.core.finish_press(0, Instant::now());
+        field.core.finish_drag(5);
+        assert_eq!(field.selection_range(), Some((0, 5)));
+    }
+
+    #[test]
+    fn shortcuts_ignore_deselected_field() {
+        let mut field = field();
+        assert!(!field.key(Key::SelectAll));
+        assert!(!field.key(Key::Copy));
+        assert!(!field.key(Key::Paste));
+        assert!(!field.key(Key::Undo));
     }
 }

@@ -437,7 +437,7 @@ impl BasicTable {
         field.set_focused(self.focused);
         let (fx, fy, fw, fh) = self.edit_rect(row, col);
         field.place(&mut FontSystem::new(), fx, fy, fw, fh);
-        field.mouse_down(((fx + fw / 2.0) as f64), ((fy + fh / 2.0) as f64));
+        field.mouse_down((fx + fw / 2.0) as f64, (fy + fh / 2.0) as f64);
         self.editing = Some(Editing { row, col, field });
         self.notify_edit_request(row, col);
         true
@@ -476,6 +476,14 @@ impl BasicTable {
 
     pub fn is_editing(&self) -> bool {
         self.editing.is_some()
+    }
+
+    /// True while the pointer hovers the inline editor: the app
+    /// returns the I-beam cursor from `App::cursor` then.
+    pub fn wants_text_cursor(&self) -> bool {
+        self.editing
+            .as_ref()
+            .is_some_and(|edit| edit.field.wants_text_cursor())
     }
 
     pub fn editing_cell(&self) -> Option<(usize, usize)> {
@@ -573,7 +581,7 @@ impl BasicTable {
                 self.last_click = None;
                 self.click_header(col);
             }
-            Some(TableHit::Cell(row, col)) => self.click_cell(row, col),
+            Some(TableHit::Cell(row, col)) => self.click_cell(row, col, x, y),
             None => {
                 self.last_click = None;
                 if self.selectable && self.in_body(x32, y32) {
@@ -586,6 +594,9 @@ impl BasicTable {
     pub fn mouse_up(&mut self, x: f64, y: f64) {
         self.vbar.mouse_up(x, y);
         self.h_drag = None;
+        if let Some(edit) = self.editing.as_mut() {
+            edit.field.mouse_up(x, y);
+        }
     }
 
     /// Scroll wheel delta in logical px (right/down positive, like
@@ -613,7 +624,7 @@ impl BasicTable {
         self.notify_sort(col, ascending);
     }
 
-    fn click_cell(&mut self, row: usize, col: usize) {
+    fn click_cell(&mut self, row: usize, col: usize, x: f64, y: f64) {
         if self.selectable {
             if self.ctrl {
                 let data = self.order[row];
@@ -652,8 +663,12 @@ impl BasicTable {
             if r == row && c == col && now.duration_since(t).as_secs_f64() < GESTURE_DOUBLE_TAP_SECONDS);
         if double {
             self.last_click = None;
-            if self.edit_on_double_click {
-                self.begin_edit(row, col);
+            if self.edit_on_double_click && self.begin_edit(row, col) {
+                // Focus the real click point (not the field center
+                // `begin_edit` pressed): the caret lands there.
+                if let Some(edit) = self.editing.as_mut() {
+                    edit.field.mouse_down(x, y);
+                }
             }
         } else {
             self.last_click = Some((row, col, now));
@@ -1209,6 +1224,9 @@ impl View for BasicTable {
 
     fn set_hover(&mut self, x: f32, y: f32) {
         self.vbar.mouse_move(x as f64, y as f64);
+        if let Some(edit) = self.editing.as_mut() {
+            edit.field.set_hover(x, y);
+        }
         if let Some(grab) = self.h_drag {
             let max = self.max_hoff();
             let travel = (self.width - self.hbar_thumb_w()).max(1.0);

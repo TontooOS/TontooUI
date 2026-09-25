@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::time::Instant;
 
 use vello::Scene;
 use vello::peniko::Color;
@@ -106,23 +107,77 @@ impl TextEditor {
     }
 
     /// Key handling while selected: Backspace deletes, arrows move
-    /// the caret (Up/Down keep the column), Enter breaks the line,
-    /// ESC deselects. Returns true when consumed. Needs fonts for
-    /// the multiline caret geometry.
+    /// the caret (Up/Down keep the column, Shift extends), Enter
+    /// breaks the line, Ctrl+A/C/X/V/Z/Y select, copy, cut, paste,
+    /// undo, redo, ESC deselects. Returns true when consumed. Needs
+    /// fonts for the multiline caret geometry.
     pub fn key(&mut self, fonts: &mut FontSystem, key: Key) -> bool {
         if !self.core.selected {
             return false;
         }
         match key {
-            Key::Backspace => self.core.backspace(),
-            Key::Left => self.core.move_left(),
-            Key::Right => self.core.move_right(),
-            Key::Up => self.move_vertical(fonts, true, self.inner_width().max(0.0)),
-            Key::Down => self.move_vertical(fonts, false, self.inner_width().max(0.0)),
+            Key::Up => self.move_vertical(fonts, true, self.inner_width().max(0.0), false),
+            Key::Down => self.move_vertical(fonts, false, self.inner_width().max(0.0), false),
+            Key::SelectUp => self.move_vertical(fonts, true, self.inner_width().max(0.0), true),
+            Key::SelectDown => {
+                self.move_vertical(fonts, false, self.inner_width().max(0.0), true)
+            }
             Key::Enter => self.core.insert("\n"),
-            Key::Escape => self.core.deselect(),
+            _ => return self.core.handle_key(key),
         }
         true
+    }
+
+    /// Highlight everything (Ctrl+A equivalent).
+    pub fn select_all(&mut self) {
+        if self.core.selected {
+            self.core.select_all();
+        }
+    }
+
+    /// Currently highlighted text (empty when nothing is selected).
+    pub fn selected_text(&self) -> String {
+        self.core.selected_text()
+    }
+
+    /// Visible selection as a sorted byte range, if any.
+    pub fn selection_range(&self) -> Option<(usize, usize)> {
+        self.core.selection_range()
+    }
+
+    /// Undo the last edit. Returns false when the stack is empty.
+    pub fn undo(&mut self) -> bool {
+        self.core.undo()
+    }
+
+    /// Redo the last undone edit. Returns false when empty.
+    pub fn redo(&mut self) -> bool {
+        self.core.redo()
+    }
+
+    /// Copy the highlight to the clipboard. Returns false when
+    /// nothing is selected.
+    pub fn copy_selection(&mut self) -> bool {
+        self.core.copy()
+    }
+
+    /// Cut the highlight to the clipboard. Returns false when
+    /// nothing is selected.
+    pub fn cut_selection(&mut self) -> bool {
+        self.core.cut()
+    }
+
+    /// Paste clipboard text at the caret.
+    pub fn paste_clipboard(&mut self) {
+        if self.core.selected {
+            self.core.paste();
+        }
+    }
+
+    /// True while the pointer hovers the editor: the app returns
+    /// the I-beam cursor from `App::cursor` then.
+    pub fn wants_text_cursor(&self) -> bool {
+        self.core.hovered
     }
 
     /// Vertical caret motion with a goal column. Pure helper for
@@ -132,7 +187,10 @@ impl TextEditor {
         fonts: &mut FontSystem,
         up: bool,
         wrap: f32,
+        extend: bool,
     ) {
+        let before = self.core.caret;
+        let was_sel = self.core.sel;
         let (_, _, text) = field_colors(&self.core);
         let lines = editor_lines(fonts, &self.core.text, EDITOR_FONT_SIZE, text, wrap);
         let (line, goal_x) = editor_caret_pos(
@@ -165,13 +223,63 @@ impl TextEditor {
             );
         }
         // Down on the last line and Up on the first are no-ops.
+        if extend {
+            if !was_sel {
+                self.core.anchor = before;
+            }
+            self.core.sel = self.core.anchor != self.core.caret;
+        } else {
+            self.core.collapse();
+        }
     }
 
-    /// Press handling: click inside selects (caret to end), anywhere
-    /// else deselects. The app forwards every press here.
+    /// Byte caret at a field-coords point (click/drag mapping).
+    fn caret_at_point(&mut self, fonts: &mut FontSystem, qx: f32, qy: f32) -> usize {
+        let (_, _, text) = field_colors(&self.core);
+        let iw = self.inner_width().max(0.0);
+        let lines = editor_lines(fonts, &self.core.text, EDITOR_FONT_SIZE, text, iw);
+        let rel_y = (qy - self.y - EDITOR_PAD + self.scroll_y).max(0.0);
+        let mut line = lines.len().saturating_sub(1);
+        let mut acc = 0.0;
+        for (i, (_, _, h)) in lines.iter().enumerate() {
+            let lh = *h / fonts.scale;
+            if rel_y < acc + lh {
+                line = i;
+                break;
+            }
+            acc += lh;
+        }
+        editor_column(
+            fonts,
+            &self.core.text,
+            line,
+            (qx - self.x - EDITOR_PAD).max(0.0),
+            EDITOR_FONT_SIZE,
+            text,
+            &lines,
+        )
+    }
+
+    /// Resolve pending press/drag points to carets (needs fonts and
+    /// the placed geometry, so it runs at the top of `draw`).
+    fn resolve_press(&mut self, fonts: &mut FontSystem) {
+        if let Some((qx, qy)) = self.core.take_press() {
+            let caret = self.caret_at_point(fonts, qx, qy);
+            self.core.finish_press(caret, Instant::now());
+        }
+        if let Some((qx, qy)) = self.core.take_drag() {
+            let caret = self.caret_at_point(fonts, qx, qy);
+            self.core.finish_drag(caret);
+        }
+    }
+
+    /// Press handling: click inside focuses (the caret lands at the
+    /// click in `draw`, double-click highlights the word, dragging
+    /// extends), anywhere else deselects. The app forwards every
+    /// press here.
     pub fn mouse_down(&mut self, x: f64, y: f64) {
         if self.hit(x as f32, y as f32) {
-            self.core.select();
+            self.core.press(x as f32, y as f32);
         } else {
             self.core.deselect();
         }
@@ -241,6 +349,7 @@ impl View for TextEditor {
         fonts: &mut FontSystem,
         _images: &mut ImageLoader<'_>,
     ) {
+        self.resolve_press(fonts);
         let (fill, border, _) = field_colors(&self.core);
         self.scroll_y = draw_editor_multiline(
             scene,
@@ -255,6 +364,17 @@ impl View for TextEditor {
             border,
             self.scroll_y,
         );
+    }
+
+    fn mouse_up(&mut self, _x: f64, _y: f64) {
+        self.core.release();
+    }
+
+    fn set_hover(&mut self, x: f32, y: f32) {
+        self.core.hovered = self.hit(x, y);
+        if self.core.hovered || self.core.pressing {
+            self.core.drag_to_point(x, y);
+        }
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -288,7 +408,7 @@ mod tests {
         // Caret sits on line 1: Up keeps the column on line 0.
         let (line, x) = editor.caret_line_col(&mut fonts, 300.0);
         assert_eq!(line, 1);
-        editor.move_vertical(&mut fonts, true, 300.0);
+        editor.move_vertical(&mut fonts, true, 300.0, false);
         let (up_line, up_x) = editor.caret_line_col(&mut fonts, 300.0);
         assert_eq!(up_line, 0);
         assert!((up_x - x).abs() < 1e-4);
@@ -319,6 +439,35 @@ mod tests {
         editor.mouse_down(10.0, 10.0);
         editor.type_text("a\tb\rc\nd");
         assert_eq!(editor.text_value(), "abc\nd");
+    }
+
+    #[test]
+    fn select_up_extends_highlight() {
+        let mut editor = editor();
+        let mut fonts = FontSystem::new();
+        editor.place(&mut fonts, 0.0, 0.0, 400.0, 200.0);
+        editor.mouse_down(10.0, 10.0);
+        editor.type_text("ab\ncd");
+        assert!(editor.key(&mut fonts, Key::SelectUp));
+        assert_eq!(editor.selection_range(), Some((2, 5)));
+        assert_eq!(editor.selected_text(), "\ncd");
+        editor.key(&mut fonts, Key::Down);
+        assert_eq!(editor.selection_range(), None);
+    }
+
+    #[test]
+    fn select_all_and_cut_paste_multiline() {
+        let mut editor = editor();
+        let mut fonts = FontSystem::new();
+        editor.place(&mut fonts, 0.0, 0.0, 400.0, 200.0);
+        editor.mouse_down(10.0, 10.0);
+        editor.type_text("one\ntwo");
+        assert!(editor.key(&mut fonts, Key::SelectAll));
+        assert_eq!(editor.selected_text(), "one\ntwo");
+        assert!(editor.key(&mut fonts, Key::Cut));
+        assert_eq!(editor.text_value(), "");
+        assert!(editor.key(&mut fonts, Key::Paste));
+        assert_eq!(editor.text_value(), "one\ntwo");
     }
 
     #[test]

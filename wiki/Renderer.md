@@ -78,6 +78,9 @@ pub trait App {
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_move(&mut self, _x: f64, _y: f64) {}
     fn set_modifiers(&mut self, _ctrl: bool, _shift: bool) {}
+    fn cursor(&self, _x: f64, _y: f64) -> CursorKind {
+        CursorKind::Default
+    }
     fn mouse_wheel(&mut self, _dx: f64, _dy: f64) {}
     fn set_focused(&mut self, _focused: bool) {}
     fn text(&mut self, _text: &str) {}
@@ -122,6 +125,23 @@ pub enum Key {
     Right,
     Enter,
     Escape,
+    SelectAll,
+    Copy,
+    Cut,
+    Paste,
+    Undo,
+    Redo,
+    SelectLeft,
+    SelectRight,
+    SelectUp,
+    SelectDown,
+}
+```
+
+```rust
+pub enum CursorKind {
+    Default,
+    Text,
 }
 ```
 
@@ -152,7 +172,13 @@ pub fn wants_backdrop(&self) -> bool
   held) so idle frames stay single-pass.
 
 Non-printable keys forwarded to the view. Printable input arrives via
-`text()` as already-decoded strings (including key repeat). Wheel
+`text()` as already-decoded strings (including key repeat). Ctrl
+shortcuts translate before that: Ctrl+A/C/X/V/Z/Y (plus
+Ctrl+Shift+Z) arrive as `SelectAll`, `Copy`, `Cut`, `Paste`,
+`Undo` and `Redo`, and Shift+arrows as `SelectLeft`, `SelectRight`,
+`SelectUp` and `SelectDown` (see [Textfield.md](Textfield.md)).
+The shell queries `cursor` after every pointer move and sets the
+winit cursor (`Text` is the I-beam over editable text). Wheel
 scrolling arrives via `mouse_wheel` in logical px (right/down
 positive, line steps normalized to 20 px). Right-button presses
 arrive via `context_click` (context menus); touch contacts arrive
