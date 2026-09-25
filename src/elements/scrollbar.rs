@@ -33,6 +33,10 @@ pub const SCROLLBAR_HOVER_LIGHTEN: f32 = 0.15;
 pub const SCROLLBAR_PRESS_DARKEN: f32 = 0.12;
 /// Default thumb gray.
 pub const SCROLLBAR_GRAY: Color = Color::from_rgb8(0x8e, 0x8e, 0x93);
+/// Track fill for dark mode (subtle, shown on hover).
+pub const SCROLLBAR_TRACK_DARK: Color = Color::from_rgba8(255, 255, 255, 26);
+/// Track fill for light mode (subtle, shown on hover).
+pub const SCROLLBAR_TRACK_LIGHT: Color = Color::from_rgba8(0, 0, 0, 20);
 /// Theme accent that maps to the gray default (Multicolor/Blue).
 pub const SCROLLBAR_DEFAULT_ACCENT: Color = Color::from_rgb8(0x00, 0x7a, 0xff);
 /// Thumb widen speed in logical px per second.
@@ -58,7 +62,8 @@ fn darken(color: Color, amount: f32) -> Color {
 /// hidden until needed: it fades in while scrolling, hovering or
 /// dragging and fades out after `SCROLLBAR_HIDE_DELAY` idle seconds.
 /// Hovering widens the thumb from `SCROLLBAR_W` to
-/// `SCROLLBAR_W_HOVER`.
+/// `SCROLLBAR_W_HOVER` and reveals the full track from top to bottom,
+/// so the whole travel range is visible while aiming.
 ///
 /// Dragging the thumb follows the mouse directly; clicking the track
 /// jumps one page (the visible amount) toward the click with a short
@@ -84,6 +89,7 @@ pub struct Scrollbar {
     grab: f32,
     width_cur: f32,
     opacity: f32,
+    track_op: f32,
     idle: f32,
     anim: Option<TweenAnim<f32>>,
     anim_time: f32,
@@ -112,6 +118,7 @@ impl Scrollbar {
             grab: 0.0,
             width_cur: SCROLLBAR_W,
             opacity: 0.0,
+            track_op: 0.0,
             idle: SCROLLBAR_HIDE_DELAY,
             anim: None,
             anim_time: 0.0,
@@ -290,6 +297,14 @@ impl Scrollbar {
         }
     }
 
+    fn track_color(&self) -> Color {
+        if self.dark {
+            SCROLLBAR_TRACK_DARK
+        } else {
+            SCROLLBAR_TRACK_LIGHT
+        }
+    }
+
     fn thumb_h(&self) -> f32 {
         if !self.scrollable() || self.height <= 0.0 {
             return 0.0;
@@ -408,6 +423,14 @@ impl Scrollbar {
         let o_step = dt / SCROLLBAR_FADE_SECONDS.max(0.001);
         self.opacity += (o_target - self.opacity).clamp(-o_step, o_step);
         self.opacity = self.opacity.clamp(0.0, 1.0);
+        // Track: visible while aiming (hover or drag), same fade speed.
+        let t_target = if self.hovered || self.dragging {
+            1.0
+        } else {
+            0.0
+        };
+        self.track_op += (t_target - self.track_op).clamp(-o_step, o_step);
+        self.track_op = self.track_op.clamp(0.0, 1.0);
         // Page-jump animation; the offset follows the thumb so the
         // content glides with it.
         if self.anim.is_some() && !self.dragging {
@@ -471,6 +494,33 @@ impl View for Scrollbar {
         let y = self.thumb_y();
         if w <= 0.0 || h <= 0.0 {
             return;
+        }
+        // Full-height track behind the thumb while aiming, so the
+        // whole travel range is visible from top to bottom.
+        if self.track_op > 0.01 {
+            let tw = SCROLLBAR_W_HOVER.min(self.width);
+            let tx = self.x + self.width - tw;
+            if tw > 0.0 {
+                let track = RoundedRect::new(
+                    px(tx),
+                    px(self.y),
+                    px(tx + tw),
+                    px(self.y + self.height),
+                    px(tw / 2.0),
+                );
+                let t = self.eff(self.track_color()).to_rgba8();
+                let mut t_alpha = (t.a as f32 * self.track_op).round() as u8;
+                if self.disabled {
+                    t_alpha = (t_alpha as f32 * 0.4).round() as u8;
+                }
+                scene.fill(
+                    Fill::NonZero,
+                    Affine::IDENTITY,
+                    &Brush::Solid(Color::from_rgba8(t.r, t.g, t.b, t_alpha)),
+                    None,
+                    &track,
+                );
+            }
         }
         let thumb = RoundedRect::new(px(x), px(y), px(x + w), px(y + h), px(w / 2.0));
         let c = self.eff(self.thumb_color()).to_rgba8();
@@ -621,6 +671,27 @@ mod tests {
         assert!(!b.hovered);
         b.step(1.0);
         assert_eq!(b.width_cur, SCROLLBAR_W);
+    }
+
+    #[test]
+    fn hover_reveals_full_track_and_leave_hides_it() {
+        let mut b = placed();
+        assert_eq!(b.track_op, 0.0);
+        b.mouse_move(5.0, 100.0);
+        b.step(1.0);
+        assert_eq!(b.track_op, 1.0);
+        b.mouse_move(500.0, 500.0);
+        b.step(1.0);
+        assert_eq!(b.track_op, 0.0);
+    }
+
+    #[test]
+    fn track_color_follows_mode() {
+        let mut b = placed();
+        b.set_theme(Color::from_rgb8(0x00, 0x7a, 0xff), true);
+        assert_eq!(b.track_color(), SCROLLBAR_TRACK_DARK);
+        b.set_theme(Color::from_rgb8(0x00, 0x7a, 0xff), false);
+        assert_eq!(b.track_color(), SCROLLBAR_TRACK_LIGHT);
     }
 
     #[test]

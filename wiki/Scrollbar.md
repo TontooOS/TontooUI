@@ -3,9 +3,10 @@
 Overlay scrollbar in `src/elements/scrollbar.rs` (no subcategory): a
 side bar for scrollable content. The thumb stays hidden until needed:
 it fades in while scrolling, hovering or dragging and fades out after
-`SCROLLBAR_HIDE_DELAY` idle seconds. Hovering widens the thumb,
-dragging it follows the mouse directly and clicking the track jumps
-one page toward the click.
+`SCROLLBAR_HIDE_DELAY` idle seconds. Hovering widens the thumb and
+reveals the full track from top to bottom, so the whole travel range
+is visible while aiming. Dragging it follows the mouse directly and
+clicking the track jumps one page toward the click.
 
 ## Geometry
 
@@ -23,6 +24,7 @@ one page toward the click.
 | `SCROLLBAR_WIDEN_SPEED` | 30 px per second widen speed |
 | `SCROLLBAR_HIT_W` | 14 px generous thumb hit width |
 | `SCROLLBAR_GRAY` | `#8E8E93` default thumb gray |
+| `SCROLLBAR_TRACK_DARK` / `SCROLLBAR_TRACK_LIGHT` | Translucent full-height track, shown while aiming |
 | `SCROLLBAR_DEFAULT_ACCENT` | `#007AFF` theme accent that maps to gray |
 
 ## Scrollbar
@@ -72,6 +74,10 @@ pub fn mouse_wheel(&mut self, dx: f64, dy: f64)
 - Pressing the thumb drags it with a stable grab offset (no jump);
   releasing ends the drag anywhere. Clicking the track above or
   below the thumb jumps one page (`visible`) toward the click.
+- Hovering or dragging reveals the full-height track behind the
+  thumb (subtle mode-gray fill), so the travel range reads from top
+  to bottom while aiming; it fades out with the same speed when the
+  pointer leaves.
 - The fade targets opacity `1.0` while dragging, hovering or within
   `SCROLLBAR_HIDE_DELAY` of the last activity, else `0.0`, at
   `SCROLLBAR_FADE_SECONDS` speed. `flash` restarts the delay (e.g.
