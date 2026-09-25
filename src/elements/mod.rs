@@ -11,6 +11,7 @@ pub mod scrollbar;
 pub mod sliders;
 pub mod titlebar;
 pub mod toggles;
+pub mod toolbar;
 
 pub use buttons::{
     Button, ButtonShape, ButtonStyle, BUTTON_ACCENT, BUTTON_BG_DARK, BUTTON_BG_LIGHT,
@@ -88,5 +89,9 @@ pub use toggles::{
     TOGGLE_SWITCH_W,
 };
 pub use glass::{GlassContainer, GlassType};
+pub use toolbar::{
+    BasicToolbar, ToolbarPlacement, TOOLBAR_GAP, TOOLBAR_HEIGHT, TOOLBAR_HIT,
+    TOOLBAR_ICON_SIZE, TOOLBAR_PAD_X, TOOLBAR_RADIUS,
+};
 pub use layout::{Align, Background, Frame, HStack, Padding, Spacer, View, VStack, ZStack};
 pub use titlebar::{Titlebar, TitlebarHeight, TrafficAction};

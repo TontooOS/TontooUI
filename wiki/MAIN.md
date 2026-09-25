@@ -29,6 +29,7 @@ theme, animation and a Vello/WGPU renderer.
 | Theme | [Theme.md](Theme.md) | Live dark/light, accent, glass stage |
 | Titlebar | [Titlebar.md](Titlebar.md) | Custom decoration bar with drag region |
 | Toggle | [Toggle.md](Toggle.md) | Switch, button and checkbox styles |
+| Toolbar | [Toolbar.md](Toolbar.md) | Small clear-glass icon toolbar |
 
 ## Quick Start
 
