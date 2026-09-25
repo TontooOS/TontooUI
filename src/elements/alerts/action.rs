@@ -11,8 +11,9 @@ use vello::peniko::{BlendMode, Brush, Color, Fill};
 use super::super::buttons::{Button, ButtonShape, ButtonStyle};
 use super::super::glass::{GlassContainer, GlassType};
 use super::super::layout::View;
+use super::basic::{AlertAction, AlertButton, AlertState};
 use super::{
-    ALERT_ACCENT, ALERT_BUTTON_GAP, ALERT_BUTTON_H, ALERT_CANCEL, ALERT_DIM_ALPHA,
+    ALERT_BUTTON_GAP, ALERT_BUTTON_H, ALERT_CANCEL, ALERT_DIM_ALPHA,
     ALERT_FADE_SECONDS, ALERT_MESSAGE_DARK, ALERT_MESSAGE_GAP,
     ALERT_MESSAGE_LIGHT, ALERT_MESSAGE_SIZE, ALERT_PAD, ALERT_RADIUS,
     ALERT_TITLE_DARK, ALERT_TITLE_GAP, ALERT_TITLE_LIGHT, ALERT_TITLE_SIZE,
@@ -23,72 +24,27 @@ use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
 use crate::theme::{GlassAmount, ThemeMode};
 
-/// Dismiss action of an alert button.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AlertAction {
-    Ok,
-    Cancel,
-}
-
-/// One alert button: label, action and an optional custom tint. `Ok`
-/// renders prominent blue, `Cancel` renders bordered gray; a custom
-/// color renders the tinted style (translucent fill, colored label),
-/// like a red delete button.
+/// Press event of an action alert: which button (`index` into the
+/// defs, 0 left, 1 right) with its action and label.
 #[derive(Clone, Debug, PartialEq)]
-pub struct AlertButton {
-    pub label: String,
+pub struct AlertEvent {
+    pub index: usize,
     pub action: AlertAction,
-    pub color: Option<Color>,
+    pub label: String,
 }
 
-impl AlertButton {
-    pub fn ok(label: impl Into<String>) -> Self {
-        Self {
-            label: label.into(),
-            action: AlertAction::Ok,
-            color: None,
-        }
-    }
-
-    pub fn cancel(label: impl Into<String>) -> Self {
-        Self {
-            label: label.into(),
-            action: AlertAction::Cancel,
-            color: None,
-        }
-    }
-
-    /// Custom tint for the button (translucent fill, colored label).
-    /// Wins over the role default.
-    pub fn color(mut self, color: Color) -> Self {
-        self.color = Some(color);
-        self
-    }
-}
-
-/// Visibility of the alert.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub(crate) enum AlertState {
-    #[default]
-    Hidden,
-    Opening,
-    Open,
-    Closing,
-}
-
-/// Basic modal alert: frosted LiquidGlass card centered over the app
-/// with a dimmed backdrop, a semibold title, a message and one (OK)
-/// or two (Cancel + OK) action buttons. Cannot be dismissed by
-/// clicking outside — only the buttons close it. Entrance and exit
-/// fade through an engine tween; the app triggers it with `show`
-/// (e.g. from its own buttons) and reads the result from `mouse_up`.
-/// Alert buttons react to clicks only: hover does nothing.
-pub struct BasicAlert {
+/// Alert with actions: like `BasicAlert` (frosted card, dimmed
+/// backdrop, engine fade, modal) but with the title and message
+/// leading-aligned and exactly two side-by-side buttons with custom
+/// tints (e.g. gray Cancel plus red Delete). A press returns the
+/// button as an `AlertEvent`; the plain `BasicAlert` reports no such
+/// event. Clicks outside or mid-fade are swallowed.
+pub struct ActionAlert {
     title: String,
     message: String,
-    defs: Vec<AlertButton>,
+    defs: [AlertButton; 2],
     buttons: Vec<Button>,
-    fired: Rc<RefCell<Option<AlertAction>>>,
+    fired: Rc<RefCell<Option<usize>>>,
     glass: GlassContainer,
     state: AlertState,
     opacity: f32,
@@ -97,8 +53,6 @@ pub struct BasicAlert {
     dark: bool,
     focused: bool,
     accent: Color,
-    title_color: Color,
-    message_color: Color,
     vx: f32,
     vy: f32,
     vw: f32,
@@ -112,13 +66,18 @@ pub struct BasicAlert {
     dirty: bool,
 }
 
-impl BasicAlert {
-    fn build(title: String, message: String, defs: Vec<AlertButton>) -> Self {
-        let fired: Rc<RefCell<Option<AlertAction>>> = Rc::new(RefCell::new(None));
+impl ActionAlert {
+    pub fn new(
+        title: impl Into<String>,
+        message: impl Into<String>,
+        left: AlertButton,
+        right: AlertButton,
+    ) -> Self {
+        let fired: Rc<RefCell<Option<usize>>> = Rc::new(RefCell::new(None));
         let mut alert = Self {
-            title,
-            message,
-            defs,
+            title: title.into(),
+            message: message.into(),
+            defs: [left, right],
             buttons: Vec::new(),
             fired,
             glass: GlassContainer::new().glass_type(GlassType::Frosted),
@@ -128,9 +87,7 @@ impl BasicAlert {
             t0: Instant::now(),
             dark: true,
             focused: true,
-            accent: ALERT_ACCENT,
-            title_color: ALERT_TITLE_DARK,
-            message_color: ALERT_MESSAGE_DARK,
+            accent: super::ALERT_ACCENT,
             vx: 0.0,
             vy: 0.0,
             vw: 0.0,
@@ -147,33 +104,9 @@ impl BasicAlert {
         alert
     }
 
-    /// Basic variant: title, message and a single OK button.
-    pub fn ok(title: impl Into<String>, message: impl Into<String>) -> Self {
-        Self::build(
-            title.into(),
-            message.into(),
-            vec![AlertButton::ok("OK")],
-        )
-    }
-
-    /// Custom buttons: one fills the row, two share it (Cancel left,
-    /// OK right). Empty falls back to a single OK.
-    pub fn buttons(
-        title: impl Into<String>,
-        message: impl Into<String>,
-        buttons: Vec<AlertButton>,
-    ) -> Self {
-        let mut defs = buttons;
-        if defs.is_empty() {
-            defs.push(AlertButton::ok("OK"));
-        }
-        defs.truncate(2);
-        Self::build(title.into(), message.into(), defs)
-    }
-
     fn rebuild_buttons(&mut self) {
         self.buttons.clear();
-        for def in &self.defs {
+        for (index, def) in self.defs.iter().enumerate() {
             // Custom tint wins (translucent style); otherwise Ok is
             // prominent blue and Cancel is tinted gray.
             let style = match (def.color, def.action) {
@@ -181,7 +114,6 @@ impl BasicAlert {
                 (None, AlertAction::Ok) => ButtonStyle::BorderedProminent,
                 (None, AlertAction::Cancel) => ButtonStyle::BorderedTinted,
             };
-            let action = def.action;
             let fired = self.fired.clone();
             self.buttons.push(
                 Button::new(def.label.clone())
@@ -189,7 +121,7 @@ impl BasicAlert {
                     .shape(ButtonShape::Capsule)
                     .hover_effect(false)
                     .on_press(move || {
-                        *fired.borrow_mut() = Some(action);
+                        *fired.borrow_mut() = Some(index);
                     }),
             );
         }
@@ -210,20 +142,11 @@ impl BasicAlert {
         }
     }
 
-    /// Live theme: frost amount, dark mode and the OK accent.
+    /// Live theme: frost amount, dark mode and the default OK accent
+    /// (custom button tints win).
     pub fn set_theme(&mut self, mode: ThemeMode, accent: Color, glass: GlassAmount) {
         self.dark = mode == ThemeMode::Dark;
         self.accent = accent;
-        self.title_color = if self.dark {
-            ALERT_TITLE_DARK
-        } else {
-            ALERT_TITLE_LIGHT
-        };
-        self.message_color = if self.dark {
-            ALERT_MESSAGE_DARK
-        } else {
-            ALERT_MESSAGE_LIGHT
-        };
         self.glass.set_theme(mode, glass);
         self.apply_accents();
         self.dirty = true;
@@ -262,12 +185,7 @@ impl BasicAlert {
         self.vh = h;
     }
 
-    pub fn viewport(&self) -> (f32, f32, f32, f32) {
-        (self.vx, self.vy, self.vw, self.vh)
-    }
-
-    /// Trigger the alert: fades in from transparent. Safe to call
-    /// when already visible (restarts the entrance).
+    /// Trigger the alert: fades in from transparent.
     pub fn show(&mut self) {
         self.anim = Some(TweenAnim::new(
             Tween::new(0.0_f32, 1.0, ALERT_FADE_SECONDS).easing(Easing::CubicOut),
@@ -299,18 +217,13 @@ impl BasicAlert {
         self.state != AlertState::Hidden
     }
 
-    /// Current fade opacity (0..1). Pure sampling helper for tests.
-    pub fn opacity_at(&self, elapsed: f32) -> f32 {
-        super::fade_sample(elapsed)
-    }
-
     pub fn opacity_value(&self) -> f32 {
         self.opacity
     }
 
     /// Press handling. Forwards to the buttons only while fully open;
     /// clicks outside or mid-fade are swallowed and return `None`.
-    /// Returns the clicked action once per click.
+    /// Returns the pressed button as an event once per click.
     pub fn mouse_down(&mut self, x: f64, y: f64) {
         if self.state != AlertState::Open {
             return;
@@ -320,18 +233,33 @@ impl BasicAlert {
         }
     }
 
-    pub fn mouse_up(&mut self, x: f64, y: f64) -> Option<AlertAction> {
+    pub fn mouse_up(&mut self, x: f64, y: f64) -> Option<AlertEvent> {
         if self.state != AlertState::Open {
             return None;
         }
         for button in &mut self.buttons {
             button.mouse_up(x, y);
         }
-        self.fired.borrow_mut().take()
+        self.fired.borrow_mut().take().map(|index| {
+            let def = &self.defs[index.min(1)];
+            AlertEvent {
+                index: index.min(1),
+                action: def.action,
+                label: def.label.clone(),
+            }
+        })
     }
 
     fn text_width(&self) -> f32 {
         (ALERT_WIDTH - ALERT_PAD * 2.0).max(0.0)
+    }
+
+    fn text_colors(&self) -> (Color, Color) {
+        if self.dark {
+            (ALERT_TITLE_DARK, ALERT_MESSAGE_DARK)
+        } else {
+            (ALERT_TITLE_LIGHT, ALERT_MESSAGE_LIGHT)
+        }
     }
 
     fn ensure_layout(&mut self, fonts: &mut FontSystem) {
@@ -339,17 +267,18 @@ impl BasicAlert {
             return;
         }
         let max = self.text_width();
+        let (title_color, message_color) = self.text_colors();
         self.title_layout = Some(fonts.layout_text_weighted(
             &self.title,
             ALERT_TITLE_SIZE,
-            self.title_color,
+            title_color,
             600.0,
             Some(max),
         ));
         self.message_layout = Some(fonts.layout_text_weighted(
             &self.message,
             ALERT_MESSAGE_SIZE,
-            self.message_color,
+            message_color,
             400.0,
             Some(max),
         ));
@@ -384,30 +313,20 @@ impl BasicAlert {
         self.glass.set_bounds(cx, cy, ALERT_WIDTH, height);
         self.glass.set_radius(ALERT_RADIUS);
         let btn_y = cy + height - ALERT_PAD - ALERT_BUTTON_H;
-        if self.buttons.len() == 1 {
-            self.buttons[0].place(
+        let bw = (ALERT_WIDTH - ALERT_PAD * 2.0 - ALERT_BUTTON_GAP) / 2.0;
+        for (index, button) in self.buttons.iter_mut().enumerate() {
+            button.place(
                 fonts,
-                cx + ALERT_PAD,
+                cx + ALERT_PAD + index as f32 * (bw + ALERT_BUTTON_GAP),
                 btn_y,
-                ALERT_WIDTH - ALERT_PAD * 2.0,
+                bw,
                 ALERT_BUTTON_H,
             );
-        } else {
-            let bw = (ALERT_WIDTH - ALERT_PAD * 2.0 - ALERT_BUTTON_GAP) / 2.0;
-            for (index, button) in self.buttons.iter_mut().enumerate() {
-                button.place(
-                    fonts,
-                    cx + ALERT_PAD + index as f32 * (bw + ALERT_BUTTON_GAP),
-                    btn_y,
-                    bw,
-                    ALERT_BUTTON_H,
-                );
-            }
         }
     }
 }
 
-impl View for BasicAlert {
+impl View for ActionAlert {
     fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
         (ALERT_WIDTH, self.card_height(fonts))
     }
@@ -482,7 +401,7 @@ impl View for BasicAlert {
             &dim,
         );
         self.glass.draw(scene, fonts, images);
-        // Centered title and message.
+        // Leading-aligned title and message.
         let title_h = self
             .title_layout
             .as_ref()
@@ -490,22 +409,20 @@ impl View for BasicAlert {
             .unwrap_or(0.0);
         if self.title_layout.is_some() {
             let layout = self.title_layout.as_ref().expect("layout built");
-            let (tw, _) = FontSystem::layout_size(layout);
             draw_layout(
                 scene,
                 layout,
-                self.x + (ALERT_WIDTH - tw / fonts.scale) / 2.0,
+                self.x + ALERT_PAD,
                 self.y + ALERT_PAD,
                 fonts.scale,
             );
         }
         if self.message_layout.is_some() {
             let layout = self.message_layout.as_ref().expect("layout built");
-            let (tw, _) = FontSystem::layout_size(layout);
             draw_layout(
                 scene,
                 layout,
-                self.x + (ALERT_WIDTH - tw / fonts.scale) / 2.0,
+                self.x + ALERT_PAD,
                 self.y + ALERT_PAD + title_h + ALERT_TITLE_GAP,
                 fonts.scale,
             );
@@ -524,64 +441,32 @@ impl View for BasicAlert {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::renderer::text::FontSystem;
 
-    fn alert() -> BasicAlert {
-        BasicAlert::ok("Alert Title", "This is a basic alert message.")
+    fn alert() -> ActionAlert {
+        ActionAlert::new(
+            "Delete Item?",
+            "Are you sure you want to delete this item?",
+            AlertButton::cancel("Cancel"),
+            AlertButton::ok("Delete").color(Color::from_rgb8(0xff, 0x3b, 0x30)),
+        )
     }
 
     #[test]
-    fn ok_variant_has_single_ok_button() {
+    fn keeps_both_defs_with_custom_tint() {
         let alert = alert();
-        assert_eq!(alert.defs.len(), 1);
-        assert_eq!(alert.defs[0].action, AlertAction::Ok);
+        assert_eq!(alert.defs[0].action, AlertAction::Cancel);
+        assert_eq!(alert.defs[1].action, AlertAction::Ok);
+        assert_eq!(
+            alert.defs[1].color,
+            Some(Color::from_rgb8(0xff, 0x3b, 0x30))
+        );
         assert!(!alert.is_visible());
         assert!(!alert.is_open());
     }
 
     #[test]
-    fn two_buttons_share_cancel_ok() {
-        let alert = BasicAlert::buttons(
-            "Title",
-            "Message",
-            vec![AlertButton::cancel("Cancel"), AlertButton::ok("OK")],
-        );
-        assert_eq!(alert.defs.len(), 2);
-        assert_eq!(alert.defs[0].action, AlertAction::Cancel);
-        // More than two clamp to the first two.
-        let alert = BasicAlert::buttons(
-            "Title",
-            "Message",
-            vec![
-                AlertButton::cancel("Cancel"),
-                AlertButton::ok("OK"),
-                AlertButton::ok("Extra"),
-            ],
-        );
-        assert_eq!(alert.defs.len(), 2);
-    }
-
-    #[test]
-    fn empty_buttons_fall_back_to_ok() {
-        let alert = BasicAlert::buttons("Title", "Message", vec![]);
-        assert_eq!(alert.defs.len(), 1);
-        assert_eq!(alert.defs[0].action, AlertAction::Ok);
-    }
-
-    #[test]
-    fn fade_ramps_through_engine() {
-        let alert = alert();
-        assert_eq!(alert.opacity_at(0.0), 0.0);
-        let mid = alert.opacity_at(ALERT_FADE_SECONDS / 2.0);
-        assert!(mid > 0.0 && mid < 1.0);
-        assert_eq!(alert.opacity_at(ALERT_FADE_SECONDS * 2.0), 1.0);
-    }
-
-    #[test]
-    fn clicks_outside_open_do_nothing() {
+    fn hidden_alert_reports_no_event() {
         let mut alert = alert();
-        // Hidden alerts swallow everything.
-        assert_eq!(alert.mouse_up(10.0, 10.0), None);
         alert.mouse_down(10.0, 10.0);
         assert_eq!(alert.mouse_up(10.0, 10.0), None);
     }
@@ -593,5 +478,13 @@ mod tests {
         let (w, h) = alert.measure(&mut fonts);
         assert_eq!(w, ALERT_WIDTH);
         assert!(h > ALERT_BUTTON_H + ALERT_PAD * 2.0);
+    }
+
+    #[test]
+    fn compact_tokens_are_half() {
+        assert_eq!(ALERT_WIDTH, 210.0);
+        assert_eq!(ALERT_TITLE_SIZE, 8.5);
+        assert_eq!(ALERT_MESSAGE_SIZE, 7.5);
+        assert_eq!(ALERT_BUTTON_H, 22.0);
     }
 }

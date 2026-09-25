@@ -2,8 +2,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use tontooui::elements::{
-    AlertAction, AlertButton, BasicAlert, BasicToolbar, Button, ButtonStyle,
-    Titlebar, TrafficAction, View, VStack,
+    ActionAlert, AlertAction, AlertButton, BasicAlert, BasicToolbar, Button,
+    ButtonStyle, Titlebar, TrafficAction, View, VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
@@ -18,8 +18,10 @@ struct AlertDemo {
     toolbar: BasicToolbar,
     alert_ok: BasicAlert,
     alert_both: BasicAlert,
+    alert_action: ActionAlert,
     show_ok: Rc<RefCell<bool>>,
     show_both: Rc<RefCell<bool>>,
+    show_action: Rc<RefCell<bool>>,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -30,8 +32,10 @@ impl AlertDemo {
     fn new() -> Self {
         let show_ok: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
         let show_both: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
+        let show_action: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
         let flag_ok = show_ok.clone();
         let flag_both = show_both.clone();
+        let flag_action = show_action.clone();
         let stack = VStack::new()
             .spacing(16.0)
             .child(
@@ -47,6 +51,13 @@ impl AlertDemo {
                     .on_press(move || {
                         *flag_both.borrow_mut() = true;
                     }),
+            )
+            .child(
+                Button::new("Show Action Alert")
+                    .style(ButtonStyle::Bordered)
+                    .on_press(move || {
+                        *flag_action.borrow_mut() = true;
+                    }),
             );
         Self {
             bar: Titlebar::new("Alert"),
@@ -61,8 +72,16 @@ impl AlertDemo {
                 "This cannot be undone.",
                 vec![AlertButton::cancel("Cancel"), AlertButton::ok("OK")],
             ),
+            alert_action: ActionAlert::new(
+                "Delete Item?",
+                "Are you sure you want to delete this item?",
+                AlertButton::cancel("Cancel"),
+                AlertButton::ok("Delete")
+                    .color(Color::from_rgb8(0xff, 0x3b, 0x30)),
+            ),
             show_ok,
             show_both,
+            show_action,
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -70,7 +89,7 @@ impl AlertDemo {
         }
     }
 
-    /// The alert currently on screen, if any.
+    /// The basic alert currently on screen, if any.
     fn visible(&mut self) -> Option<&mut BasicAlert> {
         if self.alert_ok.is_visible() {
             Some(&mut self.alert_ok)
@@ -82,7 +101,9 @@ impl AlertDemo {
     }
 
     fn any_visible(&self) -> bool {
-        self.alert_ok.is_visible() || self.alert_both.is_visible()
+        self.alert_ok.is_visible()
+            || self.alert_both.is_visible()
+            || self.alert_action.is_visible()
     }
 
     fn each_button(&mut self, mut f: impl FnMut(&mut Button)) {
@@ -115,11 +136,18 @@ impl App for AlertDemo {
         // in over the dimmed content.
         if std::mem::replace(&mut *self.show_ok.borrow_mut(), false) {
             self.alert_both.dismiss();
+            self.alert_action.dismiss();
             self.alert_ok.show();
         }
         if std::mem::replace(&mut *self.show_both.borrow_mut(), false) {
             self.alert_ok.dismiss();
+            self.alert_action.dismiss();
             self.alert_both.show();
+        }
+        if std::mem::replace(&mut *self.show_action.borrow_mut(), false) {
+            self.alert_ok.dismiss();
+            self.alert_both.dismiss();
+            self.alert_action.show();
         }
 
         self.each_button(|button| {
@@ -132,6 +160,9 @@ impl App for AlertDemo {
             alert.set_theme(theme.mode, palette.accent, theme.glass);
             alert.set_focused(focused);
         }
+        self.alert_action
+            .set_theme(theme.mode, palette.accent, theme.glass);
+        self.alert_action.set_focused(focused);
 
         self.bar.set_palette(
             palette.titlebar_bg,
@@ -162,7 +193,11 @@ impl App for AlertDemo {
 
         // Modal overlay on top of everything below the titlebar.
         if self.any_visible() {
-            if let Some(alert) = self.visible() {
+            if self.alert_action.is_visible() {
+                let alert = &mut self.alert_action;
+                alert.set_viewport(viewport.x, top, viewport.width, content_h);
+                alert.draw(scene, fonts, images);
+            } else if let Some(alert) = self.visible() {
                 alert.set_viewport(viewport.x, top, viewport.width, content_h);
                 alert.draw(scene, fonts, images);
             }
@@ -184,7 +219,9 @@ impl App for AlertDemo {
     fn mouse_down(&mut self, x: f64, y: f64) {
         // Modal: only the alert hears clicks while visible.
         if self.any_visible() {
-            if let Some(alert) = self.visible() {
+            if self.alert_action.is_visible() {
+                self.alert_action.mouse_down(x, y);
+            } else if let Some(alert) = self.visible() {
                 alert.mouse_down(x, y);
             }
             return;
@@ -203,6 +240,13 @@ impl App for AlertDemo {
 
     fn mouse_up(&mut self, x: f64, y: f64) {
         if self.any_visible() {
+            // The action alert reports its button as an event.
+            if self.alert_action.is_visible() {
+                if self.alert_action.mouse_up(x, y).is_some() {
+                    self.alert_action.dismiss();
+                }
+                return;
+            }
             let action = self.visible().and_then(|alert| alert.mouse_up(x, y));
             match action {
                 // Any button closes the alert with a fade-out.
