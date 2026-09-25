@@ -37,6 +37,21 @@ chrome, including rounded corners, traffic lights and title bars.
 > shadow. TontooUI draws no shadows itself.
 
 ```rust
+pub const SCREEN_MARGIN: f32;
+pub const MIN_WINDOW: u32;
+```
+
+No window may start bigger than the screen: the requested size is
+clamped to the primary monitor minus `SCREEN_MARGIN` (currently
+`48.0` logical px, reserving room for taskbars and docks; winit only
+reports the full monitor size) and at least `MIN_WINDOW` (currently
+`320` logical px per dimension). Without a monitor (e.g. headless)
+the request is kept. The same bound is installed as the max inner
+size, so windows can never be resized beyond the screen either.
+Overflowing content must scroll inside (see
+[ScrollView.md](ScrollView.md)) instead of growing the window.
+
+```rust
 pub fn run(title: &str, width: u32, height: u32, app: impl App + 'static) -> Result<(), Box<dyn Error>>
 ```
 

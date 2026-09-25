@@ -168,6 +168,8 @@ stack.draw(scene, fonts);
 
 ## Cross References
 
+- [ScrollView.md](ScrollView.md) – clipped scroll container for stacks that must not grow the window
+
 - [Renderer.md](Renderer.md) – `FontSystem`, frame, `View` trait
 - [Titlebar.md](Titlebar.md) – decoration bar
 - [Button.md](Button.md) – standard button hosted in stacks

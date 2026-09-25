@@ -1,6 +1,6 @@
 use tontooui::elements::{
-    Align, BasicText, FormattedText, LabeledText, Span, TextAlignment, TextForeground, TextStyle,
-    Titlebar, TrafficAction, View, VStack,
+    Align, BasicText, FormattedText, LabeledText, ScrollView, Span, TextAlignment,
+    TextForeground, TextStyle, Titlebar, TrafficAction, View, VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
@@ -14,7 +14,7 @@ fn style_row(name: &str, style: TextStyle) -> BasicText {
 
 struct TextDemo {
     bar: Titlebar,
-    stack: VStack,
+    scroll: ScrollView,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -105,7 +105,7 @@ impl TextDemo {
             );
         Self {
             bar: Titlebar::new("Text"),
-            stack,
+            scroll: ScrollView::new(stack),
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -113,42 +113,40 @@ impl TextDemo {
         }
     }
 
+    fn stack_mut(&mut self) -> Option<&mut VStack> {
+        self.scroll.child_mut::<VStack>()
+    }
+
     fn each_text(&mut self, mut f: impl FnMut(&mut BasicText)) {
-        let mut index = 0;
-        loop {
-            match self.stack.child_mut::<BasicText>(index) {
-                Some(text) => f(text),
-                None => break,
+        let Some(stack) = self.stack_mut() else {
+            return;
+        };
+        for index in 0..stack.len() {
+            if let Some(text) = stack.child_mut::<BasicText>(index) {
+                f(text);
             }
-            index += 1;
         }
     }
 
     fn each_formatted(&mut self, mut f: impl FnMut(&mut FormattedText)) {
-        let mut index = 0;
-        loop {
-            if let Some(text) = self.stack.child_mut::<FormattedText>(index) {
+        let Some(stack) = self.stack_mut() else {
+            return;
+        };
+        for index in 0..stack.len() {
+            if let Some(text) = stack.child_mut::<FormattedText>(index) {
                 f(text);
-            } else if self.stack.child_mut::<BasicText>(index).is_none()
-                && self.stack.child_mut::<LabeledText>(index).is_none()
-            {
-                break;
             }
-            index += 1;
         }
     }
 
     fn each_labeled(&mut self, mut f: impl FnMut(&mut LabeledText)) {
-        let mut index = 0;
-        loop {
-            if let Some(text) = self.stack.child_mut::<LabeledText>(index) {
+        let Some(stack) = self.stack_mut() else {
+            return;
+        };
+        for index in 0..stack.len() {
+            if let Some(text) = stack.child_mut::<LabeledText>(index) {
                 f(text);
-            } else if self.stack.child_mut::<BasicText>(index).is_none()
-                && self.stack.child_mut::<FormattedText>(index).is_none()
-            {
-                break;
             }
-            index += 1;
         }
     }
 }
@@ -200,15 +198,20 @@ impl App for TextDemo {
         self.bar.set_rect(viewport.x, viewport.y, viewport.width);
         self.bar.draw(scene, fonts);
 
+        self.scroll.set_theme(palette.accent, dark);
+        self.scroll.set_focused(self.focused);
+
+        // Fixed viewport: rows scroll inside instead of growing the
+        // window beyond the screen.
         let top = viewport.y + 31.0;
-        self.stack.place(
+        self.scroll.place(
             fonts,
             viewport.x + 24.0,
             top + 16.0,
             (viewport.width - 48.0).max(0.0),
             (viewport.height - 47.0).max(0.0),
         );
-        self.stack.draw(scene, fonts, images);
+        self.scroll.draw(scene, fonts, images);
     }
 
     fn background(&self) -> Color {
@@ -231,6 +234,10 @@ impl App for TextDemo {
                 self.command = Some(WindowCommand::ToggleMaximize)
             }
             None => {
+                // The scroll view drives its bar and forwards presses
+                // through the `View` trait; link arming needs the
+                // concrete `mouse_down` which the trait does not carry.
+                self.scroll.mouse_down(x, y);
                 self.each_formatted(|text| text.mouse_down(x, y));
             }
         }
@@ -238,20 +245,28 @@ impl App for TextDemo {
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
+        self.scroll.mouse_move(x, y);
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {
-        self.each_formatted(|text| text.mouse_up(x, y));
+        // Reaches `FormattedText` through the `View` trait and
+        // finishes link presses.
+        self.scroll.mouse_up(x, y);
+    }
+
+    fn mouse_wheel(&mut self, dx: f64, dy: f64) {
+        self.scroll.mouse_wheel(dx, dy);
     }
 
     fn set_focused(&mut self, focused: bool) {
         self.focused = focused;
         self.bar.set_focused(focused);
+        self.scroll.set_focused(focused);
     }
 }
 
 fn main() {
-    if let Err(err) = run("Text", 800, 1250, TextDemo::new()) {
+    if let Err(err) = run("Text", 800, 640, TextDemo::new()) {
         eprintln!("error: {err}");
         std::process::exit(1);
     }

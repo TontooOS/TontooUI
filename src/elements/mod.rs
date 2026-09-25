@@ -18,6 +18,7 @@ pub mod menu;
 pub mod pickers;
 pub mod progress;
 pub mod scrollbar;
+pub mod scrollview;
 pub mod shapes;
 pub mod sliders;
 pub mod text;
@@ -140,6 +141,7 @@ pub use scrollbar::{
     SCROLLBAR_PRESS_DARKEN, SCROLLBAR_TRACK_DARK, SCROLLBAR_TRACK_LIGHT, SCROLLBAR_W,
     SCROLLBAR_W_HOVER, SCROLLBAR_WIDEN_SPEED,
 };
+pub use scrollview::{ScrollView, SCROLLVIEW_BAR_W};
 pub use toggles::{
     Toggle, ToggleStyle, TOGGLE_ANIM_SECONDS, TOGGLE_BOX, TOGGLE_BOX_RADIUS, TOGGLE_GAP,
     TOGGLE_ICON_BOX, TOGGLE_ICON_GLYPH, TOGGLE_ICON_RADIUS, TOGGLE_KNOB_EXPAND_H,

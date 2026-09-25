@@ -108,6 +108,8 @@ The titlebar shows the live offset; the bar fades out when idle.
 
 ## Cross References
 
+- [ScrollView.md](ScrollView.md) – clipped scroll container with this bar built in
+
 - [Picker.md](Picker.md) – date popup year list with the same offset model
 - [Slider.md](Slider.md) – drag, track-click tween and `on_change` callback
 - [Layout.md](Layout.md) – stacks hosting the bar, `View` trait, `Frame`

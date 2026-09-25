@@ -20,6 +20,14 @@ use super::text::FontSystem;
 /// Window background. Dark mode base color per TontooOS convention.
 pub const BACKGROUND: Color = Color::from_rgb8(0x1b, 0x20, 0x22);
 
+/// Safety margin kept free around a clamped window in logical px.
+/// winit only reports the full monitor size, so this reserves room
+/// for taskbars and docks when fitting windows to the screen.
+pub const SCREEN_MARGIN: f32 = 48.0;
+/// Minimum window dimension in logical px used when clamping to the
+/// screen, so tiny displays still yield a usable window.
+pub const MIN_WINDOW: u32 = 320;
+
 /// Standard window corner radius in logical px. Follows the macOS 27 Golden
 /// Gate direction: one fixed radius for all windows, tighter than Tahoe.
 /// Physical pixels = value x window scale factor (20 pt is ~40 px at 2x).
@@ -359,6 +367,24 @@ impl<V: App> ApplicationHandler for Shell<V> {
         if self.active.is_some() {
             return;
         }
+        // No window may start bigger than the screen: clamp the
+        // requested size to the primary monitor minus a safety
+        // margin. Without a monitor (e.g. headless) keep the request.
+        let max_logical = event_loop.primary_monitor().map(|m| {
+            let logical: winit::dpi::LogicalSize<f64> =
+                m.size().to_logical(m.scale_factor());
+            (
+                (logical.width - SCREEN_MARGIN as f64).max(MIN_WINDOW as f64),
+                (logical.height - SCREEN_MARGIN as f64).max(MIN_WINDOW as f64),
+            )
+        });
+        let (width, height) = match max_logical {
+            Some((max_w, max_h)) => (
+                (self.width.max(1) as f64).min(max_w) as u32,
+                (self.height.max(1) as f64).min(max_h) as u32,
+            ),
+            None => (self.width.max(1), self.height.max(1)),
+        };
         let window = Arc::new(
             event_loop
                 .create_window(
@@ -366,10 +392,14 @@ impl<V: App> ApplicationHandler for Shell<V> {
                         .with_title(&self.title)
                         .with_decorations(false)
                         .with_transparent(true)
-                        .with_inner_size(LogicalSize::new(self.width, self.height)),
+                        .with_inner_size(LogicalSize::new(width, height)),
                 )
                 .expect("create window"),
         );
+        // Never resizable beyond the screen either.
+        if let Some((max_w, max_h)) = max_logical {
+            window.set_max_inner_size(Some(LogicalSize::new(max_w as u32, max_h as u32)));
+        }
         let scale = window.scale_factor();
         let size = window.inner_size();
 
