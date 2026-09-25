@@ -184,9 +184,10 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
 - The panel prefers below the button, falls back above it and is
   always clamped into the `set_viewport` bounds (including a cap at
   the window size), so the glass never samples outside the window.
-  Apps must call `set_viewport` every frame and return `is_open()`
-  from `App::wants_backdrop` so the shell runs the blur pass while
-  the menu is open.
+  Rows draw inside a clip layer matching the panel, so text never
+  spills outside it. Apps must call `set_viewport` every frame and
+  return `is_open()` from `App::wants_backdrop` so the shell runs
+  the blur pass while the menu is open.
 - Empty option lists draw only the label and never open; out-of-range
   indices clamp to the last option.
 
@@ -243,7 +244,9 @@ pub fn mouse_wheel(&mut self, dx: f64, dy: f64)
   `hover_fill`) and a checkmark on the current entry; a row click
   picks it and keeps the calendar open, header taps switch lists,
   anything else closes the whole calendar (or `Escape` closes the
-  list first, then the calendar).
+  list first, then the calendar). Popup rows draw inside a clip
+  layer matching the list area, so scrolled text never spills over
+  the panel edge.
 - Hovering a day, the month/year zones or the steppers tints them
   with the accent color. Hover only exists inside the open calendar.
 - Date math is dependency-free (civil algorithms, Gregorian leap

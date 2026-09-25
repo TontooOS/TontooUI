@@ -657,7 +657,16 @@ impl View for MenuPicker {
         );
         self.glass.draw(scene, fonts, images);
 
-        // Rows on top of the glass.
+        // Rows on top of the glass, clipped to the panel so text
+        // never spills outside it (e.g. when the panel is clamped
+        // into a small viewport).
+        let clip = vello::kurbo::Rect::new(
+            px(self.menu_x),
+            px(self.menu_y + MENU_PAD),
+            px(self.menu_x + self.menu_w),
+            px(self.menu_y + self.menu_h - MENU_PAD),
+        );
+        scene.push_clip_layer(Fill::NonZero, Affine::IDENTITY, &clip);
         for (i, option) in self.options.clone().iter().enumerate() {
             let ry = self.row_y(i);
             let is_hovered = Some(i) == self.hovered && !self.disabled;
@@ -707,6 +716,7 @@ impl View for MenuPicker {
                 fonts.scale,
             );
         }
+        scene.pop_layer();
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {

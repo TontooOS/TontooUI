@@ -1413,6 +1413,15 @@ impl DatePicker {
         let visible = self.list_visible();
         let current = self.popup_current_row();
         let first_visible = (self.list_offset / self.list_stride()).floor() as usize;
+        // Clip rows to the list area: scrolled rows must never spill
+        // over the panel edge (no text outside the popup).
+        let clip = vello::kurbo::Rect::new(
+            px(self.pop_x),
+            px(list_y),
+            px(self.pop_x + self.pop_w),
+            px(list_y + self.list_visible_h()),
+        );
+        scene.push_clip_layer(Fill::NonZero, Affine::IDENTITY, &clip);
         for i in 0..=visible {
             let row = first_visible + i;
             if row >= rows {
@@ -1470,6 +1479,7 @@ impl DatePicker {
                 fonts.scale,
             );
         }
+        scene.pop_layer();
 
         // Scrollbar when content exceeds the visible rows.
         if rows > visible {
