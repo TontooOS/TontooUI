@@ -72,24 +72,22 @@ impl ListDemo {
     }
 
     fn each_list(&mut self, mut f: impl FnMut(&mut BasicList)) {
-        let mut index = 0;
-        loop {
-            match self.stack.child_mut::<BasicList>(index) {
-                Some(list) => f(list),
-                None => break,
+        // Mixed stack: skip type mismatches instead of stopping at
+        // the first one.
+        for index in 0..self.stack.len() {
+            if let Some(list) = self.stack.child_mut::<BasicList>(index) {
+                f(list);
             }
-            index += 1;
         }
     }
 
     fn each_group(&mut self, mut f: impl FnMut(&mut DisclosureGroup)) {
-        let mut index = 0;
-        loop {
-            match self.stack.child_mut::<DisclosureGroup>(index) {
-                Some(group) => f(group),
-                None => break,
+        // Mixed stack: skip type mismatches instead of stopping at
+        // the first one.
+        for index in 0..self.stack.len() {
+            if let Some(group) = self.stack.child_mut::<DisclosureGroup>(index) {
+                f(group);
             }
-            index += 1;
         }
     }
 }

@@ -98,6 +98,9 @@ macro_rules! stack_boilerplate {
             }
 
             /// Access a child by index for state updates (typing, toggles).
+            /// Returns `None` when the index is out of bounds or the
+            /// child has a different type; use `len` to iterate mixed
+            /// stacks without stopping at the first mismatch.
             pub fn child_mut<T: View + 'static>(
                 &mut self,
                 index: usize,
@@ -106,6 +109,16 @@ macro_rules! stack_boilerplate {
                     .get_mut(index)?
                     .as_any_mut()
                     .downcast_mut::<T>()
+            }
+
+            /// Number of children in the stack.
+            pub fn len(&self) -> usize {
+                self.children.len()
+            }
+
+            /// True when the stack has no children.
+            pub fn is_empty(&self) -> bool {
+                self.children.is_empty()
             }
         }
 
@@ -143,6 +156,16 @@ impl ZStack {
             .get_mut(index)?
             .as_any_mut()
             .downcast_mut::<T>()
+    }
+
+    /// Number of children in the stack.
+    pub fn len(&self) -> usize {
+        self.children.len()
+    }
+
+    /// True when the stack has no children.
+    pub fn is_empty(&self) -> bool {
+        self.children.is_empty()
     }
 }
 
@@ -547,5 +570,42 @@ impl View for ZStack {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn len_counts_children() {
+        let stack = VStack::new()
+            .spacing(0.0)
+            .child(Spacer::new())
+            .child(VStack::new());
+        assert_eq!(stack.len(), 2);
+        assert!(!stack.is_empty());
+        assert!(VStack::new().is_empty());
+        assert_eq!(HStack::new().len(), 0);
+        assert_eq!(ZStack::new().len(), 0);
+    }
+
+    #[test]
+    fn mixed_stacks_reach_children_past_a_mismatch() {
+        // Regression test: iterating with `break` on the first
+        // `child_mut` miss never reaches later children in mixed
+        // stacks (this broke disclosure toggles in the list demo).
+        let mut stack = VStack::new()
+            .spacing(0.0)
+            .child(Spacer::new())
+            .child(Spacer::new())
+            .child(VStack::new());
+        let mut seen = 0;
+        for index in 0..stack.len() {
+            if stack.child_mut::<VStack>(index).is_some() {
+                seen += 1;
+            }
+        }
+        assert_eq!(seen, 1);
     }
 }

@@ -84,6 +84,8 @@ proportionally.
 
 ```rust
 pub fn child_mut<T: View + 'static>(&mut self, index: usize) -> Option<&mut T>
+pub fn len(&self) -> usize
+pub fn is_empty(&self) -> bool
 ```
 
 Available on all three stacks. Typed access by position for state updates
@@ -95,7 +97,17 @@ if let Some(bar) = stack.child_mut::<Titlebar>(0) {
 }
 ```
 
-Returns `None` for a wrong index or type.
+Returns `None` for a wrong index or type. To visit every child of one
+type in a mixed stack, iterate `0..len` and skip misses: stopping at
+the first `None` never reaches children past a type mismatch.
+
+```rust
+for index in 0..stack.len() {
+    if let Some(group) = stack.child_mut::<DisclosureGroup>(index) {
+        group.set_focused(focused);
+    }
+}
+```
 
 ## Modifiers
 
