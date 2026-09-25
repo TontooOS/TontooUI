@@ -24,4 +24,5 @@ Dark Mode:
 Background: R: 027, G: 032, B: 034
 Text: R: 216, G: 217, B: 217
 
-THIS COLORS ARE FROM MACOS 27 NEWEST VERSION
+THIS COLORS ARE FROM MACOS 27 NEWEST VERSION,
+The Colors are for Default Text / App Backgrounds 
