@@ -49,8 +49,9 @@ pub fn option_text(&self) -> &str
 pub fn select(&mut self, index: usize) -> bool
 ```
 
-- Text and secure rows edit borderless (no fill, ring or border,
-  see [Textfield.md](Textfield.md)) with the label on the left.
+- Text and secure rows edit borderless and right-aligned (no
+  fill, ring or border, see [Textfield.md](Textfield.md)) with the
+  label on the left.
 - Toggle rows use the switch style without a label of their own.
 - Picker rows wrap a `Menu` dropdown: the button shows the selected
   option with a checkmark on it. Menu `on_action` indices land in
@@ -103,7 +104,11 @@ pub fn key(&mut self, key: Key) -> bool
   with the full height, so a `ScrollView` pages long forms.
 - The app forwards presses, moves, wheel (open picker panels),
   `text`, `key`, `set_hover` and the viewport (picker clamping)
-  every frame, plus theme, glass and focus.
+  every frame, plus theme, glass and focus. Deliver each event
+  exactly once: when the form sits in a stack or scroll view,
+  forward through the container only (it routes into the form).
+  Forwarding to both arms every control twice, so a menu would
+  open and instantly close again.
 - `wants_backdrop` is true while a picker panel is open or a
   switch knob is held; return it from `App::wants_backdrop`.
   `wants_text_cursor` is true while an input hovers (I-beam).

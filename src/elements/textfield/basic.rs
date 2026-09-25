@@ -62,6 +62,17 @@ impl BasicTextField {
         self.core.borderless = borderless;
     }
 
+    /// Right-aligned text (form rows): short content hugs the box
+    /// end, long content scrolls like left-aligned.
+    pub fn align_right(mut self, align_right: bool) -> Self {
+        self.core.align_right = align_right;
+        self
+    }
+
+    pub fn set_align_right(&mut self, align_right: bool) {
+        self.core.align_right = align_right;
+    }
+
     pub fn set_focused(&mut self, focused: bool) {
         self.core.focused = focused;
         self.core.dirty = true;
@@ -218,7 +229,9 @@ impl View for BasicTextField {
         // needs fonts, which only `draw` has.
         let echo = self.core.echo();
         let (_, _, text) = field_colors(&self.core);
-        let origin_x = self.x + TEXTFIELD_PAD_X - self.core.scroll;
+        let iw = (self.placed_w - TEXTFIELD_PAD_X * 2.0).max(0.0);
+        let origin_x = self.x + TEXTFIELD_PAD_X - self.core.scroll
+            + self.core.align_shift(fonts, TEXTFIELD_FONT_SIZE, text, iw);
         resolve_press_single(
             &mut self.core,
             fonts,
@@ -417,6 +430,32 @@ mod tests {
         field.core.finish_press(0, Instant::now());
         field.core.finish_drag(5);
         assert_eq!(field.selection_range(), Some((0, 5)));
+    }
+
+    #[test]
+    fn align_right_shifts_short_text_to_the_end() {
+        let mut field = field();
+        let mut fonts = FontSystem::new();
+        let (_, h) = field.measure(&mut fonts);
+        field.place(&mut fonts, 0.0, 0.0, 400.0, h.max(28.0));
+        field.mouse_down(300.0, 10.0);
+        field.type_text("hi");
+        let color = Color::WHITE;
+        let iw = 400.0 - TEXTFIELD_PAD_X * 2.0;
+        assert_eq!(field.core.align_shift(&mut fonts, TEXTFIELD_FONT_SIZE, color, iw), 0.0);
+        field.set_align_right(true);
+        assert!(field.core.align_right);
+        let shift = field.core.align_shift(&mut fonts, TEXTFIELD_FONT_SIZE, color, iw);
+        assert!(shift > 100.0);
+        // Long text scrolls instead of shifting.
+        field.set_text("x".repeat(200));
+        assert_eq!(field.core.align_shift(&mut fonts, TEXTFIELD_FONT_SIZE, color, iw), 0.0);
+    }
+
+    #[test]
+    fn align_right_builder_sets_flag() {
+        let field = BasicTextField::new("x").align_right(true);
+        assert!(field.core.align_right);
     }
 
     #[test]

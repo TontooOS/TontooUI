@@ -205,7 +205,9 @@ impl View for LargeTextField {
     ) {
         let echo = self.core.echo();
         let (_, _, text) = field_colors(&self.core);
-        let origin_x = self.x + LARGE_FIELD_PAD_X - self.core.scroll;
+        let iw = (self.placed_w - LARGE_FIELD_PAD_X * 2.0).max(0.0);
+        let origin_x = self.x + LARGE_FIELD_PAD_X - self.core.scroll
+            + self.core.align_shift(fonts, LARGE_FIELD_FONT_SIZE, text, iw);
         resolve_press_single(
             &mut self.core,
             fonts,

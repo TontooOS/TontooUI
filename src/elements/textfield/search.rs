@@ -263,7 +263,9 @@ impl View for SearchField {
         let ix_probe = self.x + SEARCH_PAD_X + SEARCH_ICON_SIZE + SEARCH_GAP;
         {
             let echo = self.core.echo();
-            let origin_x = ix_probe - self.core.scroll;
+            let iw_probe = (self.placed_w - (ix_probe - self.x) - SEARCH_PAD_X).max(0.0);
+            let origin_x = ix_probe - self.core.scroll
+                + self.core.align_shift(fonts, SEARCH_FONT_SIZE, text, iw_probe);
             resolve_press_single(
                 &mut self.core,
                 fonts,

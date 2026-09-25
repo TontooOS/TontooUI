@@ -118,11 +118,15 @@ pub fn mouse_down(&mut self, x: f64, y: f64)
 pub fn rect(&self) -> (f32, f32, f32, f32)
 pub fn borderless(self, borderless: bool) -> Self
 pub fn set_borderless(&mut self, borderless: bool)
+pub fn align_right(self, align_right: bool) -> Self
+pub fn set_align_right(&mut self, align_right: bool)
 ```
 
 - `borderless` paints text, caret and highlight only (no fill,
   ring or border) for inputs embedded in form rows (see
   [Form.md](Form.md)).
+- `align_right` hugs short content to the box end (form rows);
+  long content scrolls like left-aligned, clicks map accordingly.
 - `type_text` inserts at the caret while selected (the app forwards
   its `text` here); programmatic `set_text` moves the caret to the
   end without firing `on_change`, which fires with the full text on

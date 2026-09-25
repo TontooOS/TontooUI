@@ -84,9 +84,9 @@ pub struct FormRow {
 }
 
 impl FormRow {
-    /// Text row: label left, borderless input right.
+    /// Text row: label left, borderless right-aligned input right.
     pub fn text(label: impl Into<String>, value: impl Into<String>) -> Self {
-        let mut field = BasicTextField::new("").borderless(true);
+        let mut field = BasicTextField::new("").borderless(true).align_right(true);
         field.set_text(value);
         Self {
             label: label.into(),
@@ -108,9 +108,10 @@ impl FormRow {
         }
     }
 
-    /// Secure row: label left, borderless password input right.
+    /// Secure row: label left, borderless right-aligned password
+    /// input right.
     pub fn secure(label: impl Into<String>, value: impl Into<String>) -> Self {
-        let mut field = SecureField::new("").borderless(true);
+        let mut field = SecureField::new("").borderless(true).align_right(true);
         field.set_text(value);
         Self {
             label: label.into(),

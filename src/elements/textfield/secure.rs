@@ -59,6 +59,17 @@ impl SecureField {
         self.core.borderless = borderless;
     }
 
+    /// Right-aligned text (form rows): short content hugs the box
+    /// end, long content scrolls like left-aligned.
+    pub fn align_right(mut self, align_right: bool) -> Self {
+        self.core.align_right = align_right;
+        self
+    }
+
+    pub fn set_align_right(&mut self, align_right: bool) {
+        self.core.align_right = align_right;
+    }
+
     pub fn set_focused(&mut self, focused: bool) {
         self.core.focused = focused;
         self.core.dirty = true;
@@ -215,7 +226,9 @@ impl View for SecureField {
     ) {
         let echo = self.core.echo();
         let (_, _, text) = field_colors(&self.core);
-        let origin_x = self.x + TEXTFIELD_PAD_X - self.core.scroll;
+        let iw = (self.placed_w - TEXTFIELD_PAD_X * 2.0).max(0.0);
+        let origin_x = self.x + TEXTFIELD_PAD_X - self.core.scroll
+            + self.core.align_shift(fonts, TEXTFIELD_FONT_SIZE, text, iw);
         resolve_press_single(
             &mut self.core,
             fonts,

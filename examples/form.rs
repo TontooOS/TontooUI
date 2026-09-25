@@ -1,4 +1,5 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
+use std::rc::Rc;
 
 use tontooui::elements::{
     BasicText, Button, ButtonStyle, Form, FormRow, FormSection, ScrollView, Titlebar,
@@ -19,6 +20,7 @@ struct FormDemo {
     bg: Color,
     menu_open: Cell<bool>,
     text_cursor: Cell<bool>,
+    status: Rc<RefCell<String>>,
     command: Option<WindowCommand>,
 }
 
@@ -70,6 +72,11 @@ impl FormDemo {
                 FormSection::titled("Schedule").row(FormRow::text("Start Date", "25. 09. 2026")),
             );
         // Form button row: agreement plus centered Cancel/Save.
+        // Buttons carry press callbacks: the status lands in the
+        // titlebar through shared state.
+        let status: Rc<RefCell<String>> = Rc::new(RefCell::new(String::new()));
+        let saved = status.clone();
+        let cancelled = status.clone();
         let buttons = Form::new()
             .section(
                 FormSection::new().row(FormRow::text("Email Address", "")),
@@ -81,8 +88,12 @@ impl FormDemo {
             )
             .section(
                 FormSection::new().row(FormRow::buttons(vec![
-                    Button::new("Cancel").style(ButtonStyle::Bordered),
-                    Button::new("Save").style(ButtonStyle::BorderedProminent),
+                    Button::new("Cancel").style(ButtonStyle::Bordered).on_press(move || {
+                        *cancelled.borrow_mut() = "Cancelled".to_string();
+                    }),
+                    Button::new("Save").style(ButtonStyle::BorderedProminent).on_press(move || {
+                        *saved.borrow_mut() = "Saved".to_string();
+                    }),
                 ])),
             );
         let stack = VStack::new()
@@ -103,6 +114,7 @@ impl FormDemo {
             bg: tontooui::renderer::window::BACKGROUND,
             menu_open: Cell::new(false),
             text_cursor: Cell::new(false),
+            status,
             command: None,
         }
     }
@@ -171,6 +183,12 @@ impl App for FormDemo {
             palette.titlebar_text,
             palette.divider,
         );
+        let status = self.status.borrow().clone();
+        self.bar.set_title(if status.is_empty() {
+            "Form".to_string()
+        } else {
+            format!("Form — {status}")
+        });
         self.bar.set_rect(viewport.x, viewport.y, viewport.width);
         self.bar.draw(scene, fonts);
 
@@ -218,31 +236,26 @@ impl App for FormDemo {
             Some(TrafficAction::Maximize) => {
                 self.command = Some(WindowCommand::ToggleMaximize)
             }
-            None => {
-                self.scroll.mouse_down(x, y);
-                self.each_form(|form| form.mouse_down(x, y));
-            }
+            // Single delivery: the scroll view routes presses through
+            // the stack into the forms. Forwarding to both would arm
+            // every control twice (a menu would open and instantly
+            // close again).
+            None => self.scroll.mouse_down(x, y),
         }
     }
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
         self.scroll.mouse_move(x, y);
-        self.each_form(|form| form.set_hover(x as f32, y as f32));
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {
         self.scroll.mouse_up(x, y);
-        self.each_form(|form| form.mouse_up(x, y));
     }
 
     fn mouse_wheel(&mut self, dx: f64, dy: f64) {
-        // Open picker panels scroll; otherwise the page scrolls.
-        if self.menu_open.get() {
-            self.each_form(|form| form.mouse_wheel(dx, dy));
-        } else {
-            self.scroll.mouse_wheel(dx, dy);
-        }
+        // Picker panels cap at the window and never scroll.
+        self.scroll.mouse_wheel(dx, dy);
     }
 
     fn text(&mut self, text: &str) {

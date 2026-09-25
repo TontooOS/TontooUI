@@ -109,6 +109,7 @@ pub(crate) struct FieldCore {
     masked: bool,
     multiline: bool,
     borderless: bool,
+    align_right: bool,
     accent: Color,
     dark: bool,
     focused: bool,
@@ -143,6 +144,7 @@ impl FieldCore {
             masked: false,
             multiline: false,
             borderless: false,
+            align_right: false,
             accent: TEXTFIELD_ACCENT,
             dark: true,
             focused: true,
@@ -554,6 +556,29 @@ impl FieldCore {
         if let Some(callback) = self.on_change.as_mut() {
             callback(&self.text.clone());
         }
+    }
+
+    /// Right shift in logical px for right-aligned text: pushes
+    /// short content to the box end, zero once it scrolls. Uses the
+    /// displayed content (placeholder when empty).
+    pub(crate) fn align_shift(
+        &self,
+        fonts: &mut FontSystem,
+        size: f32,
+        color: Color,
+        avail_w: f32,
+    ) -> f32 {
+        if !self.align_right {
+            return 0.0;
+        }
+        let content = if self.text.is_empty() {
+            self.placeholder.clone()
+        } else {
+            self.echo()
+        };
+        let layout = fonts.layout_text(&content, size, color, None);
+        let (tw, _) = FontSystem::layout_size(&layout);
+        (avail_w - tw / fonts.scale).max(0.0)
     }
 
     /// Displayed content: bullets per char when masked, the raw
@@ -1241,15 +1266,16 @@ pub(crate) fn draw_field(
     let caret_x = core.caret_x(fonts, metrics.font_size, text);
     core.track_caret(caret_x, iw);
     let scroll = core.scroll;
+    let shift = core.align_shift(fonts, metrics.font_size, text, iw);
     {
         let (layout, _) =
             core.ensure_layout(fonts, metrics.font_size, text, placeholder, None);
-        draw_layout(scene, layout, ix - scroll, ty, fonts.scale);
+        draw_layout(scene, layout, ix - scroll + shift, ty, fonts.scale);
     }
     // Highlighted range wash under the text.
     if let Some((a, b)) = core.selection_range() {
-        let x0 = ix - scroll + core.echo_advance(fonts, a, metrics.font_size, text);
-        let x1 = ix - scroll + core.echo_advance(fonts, b, metrics.font_size, text);
+        let x0 = ix - scroll + shift + core.echo_advance(fonts, a, metrics.font_size, text);
+        let x1 = ix - scroll + shift + core.echo_advance(fonts, b, metrics.font_size, text);
         scene.fill(
             Fill::NonZero,
             Affine::IDENTITY,
@@ -1260,7 +1286,7 @@ pub(crate) fn draw_field(
     }
     // Blinking caret while selected.
     if core.selected && caret_blink() {
-        let cx = ix - scroll + caret_x;
+        let cx = ix - scroll + shift + caret_x;
         scene.fill(
             Fill::NonZero,
             Affine::IDENTITY,
