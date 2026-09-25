@@ -147,12 +147,12 @@ impl App for DateDemo {
         self.refresh_caption();
     }
 
-    fn text(&mut self, text: &str) {
-        self.each_picker(|picker| picker.text(text));
-    }
-
     fn key(&mut self, key: Key) {
         self.each_picker(|picker| picker.key(key));
+    }
+
+    fn mouse_wheel(&mut self, dx: f64, dy: f64) {
+        self.each_picker(|picker| picker.mouse_wheel(dx, dy));
     }
 
     fn set_focused(&mut self, focused: bool) {

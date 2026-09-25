@@ -62,6 +62,7 @@ pub trait App {
     );
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_move(&mut self, _x: f64, _y: f64) {}
+    fn mouse_wheel(&mut self, _dx: f64, _dy: f64) {}
     fn set_focused(&mut self, _focused: bool) {}
     fn text(&mut self, _text: &str) {}
     fn key(&mut self, _key: Key) {}
@@ -135,7 +136,9 @@ pub fn wants_backdrop(&self) -> bool
   held) so idle frames stay single-pass.
 
 Non-printable keys forwarded to the view. Printable input arrives via
-`text()` as already-decoded strings (including key repeat).
+`text()` as already-decoded strings (including key repeat). Wheel
+scrolling arrives via `mouse_wheel` in logical px (right/down
+positive, line steps normalized to 20 px).
 
 ## Frame Pipeline
 

@@ -48,9 +48,16 @@ reference) instead.
 | `DATE_HEADER_H` / `DATE_WEEK_H` | 32 px title bar / 20 px weekday row |
 | `DATE_PAD` / `DATE_RADIUS` | 8 px panel padding / 9 px panel radius |
 | `DATE_TITLE_SIZE` / `DATE_DAY_SIZE` | 14 px title and day numbers |
-| `DATE_WEEK_SIZE` / `DATE_EDIT_SIZE` | 10 px weekday header / 13 px input text |
+| `DATE_WEEK_SIZE` / `DATE_LIST_SIZE` | 10 px weekday header / 13 px popup rows |
+| `DATE_TITLE_GAP` | 8 px month-to-year gap |
 | `DATE_SEL_R` | 12 px selection circle radius |
 | `DATE_NAV_W` | 28 px month stepper hit width |
+| `DATE_LIST_ROW_H` / `DATE_LIST_SPACING` | 26 px rows, 2 px row gap |
+| `DATE_LIST_PAD` / `DATE_LIST_RADIUS` | 6 px popup padding / 9 px popup radius |
+| `DATE_LIST_VISIBLE` | 8 visible popup rows |
+| `DATE_LIST_CHECK_COL` / `DATE_LIST_TEXT_GAP` | 20 px check column / 6 px text gap |
+| `DATE_SCROLL_W` / `DATE_POP_GAP` | 6 px scrollbar / 4 px header-to-popup gap |
+| `DATE_YEAR_MIN` / `DATE_YEAR_MAX` | 1 to 3000 selectable years |
 | `DATE_SHADOW_BLUR` | 24 px heavy edge shadow |
 | `DATE_ACCENT` | `#007AFF` manual selection fill |
 | `DATE_MONTHS` / `DATE_WEEKDAYS` | English month names / Monday-first headers |
@@ -185,22 +192,22 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
 pub fn new() -> Self
 pub fn selected(self, year: i32, month: u32, day: u32) -> Self
 pub fn accent(self, color: Color) -> Self
+pub fn hover_fill(self, color: Color) -> Self
 pub fn disabled(self, disabled: bool) -> Self
 pub fn on_select(self, callback: impl FnMut(i32, u32, u32) + 'static) -> Self
 pub fn selected_date(&self) -> (i32, u32, u32)
 pub fn viewed(&self) -> (i32, u32)
-pub fn is_editing(&self) -> bool
 pub fn set_selected(&mut self, year: i32, month: u32, day: u32)
 pub fn step_month(&mut self, delta: i32)
 pub fn set_theme(&mut self, accent: Color, dark: bool)
 pub fn set_glass(&mut self, mode: ThemeMode, glass: GlassAmount)
 pub fn set_focused(&mut self, focused: bool)
 pub fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32)
-pub fn text(&mut self, input: &str)
 pub fn key(&mut self, key: Key)
 pub fn mouse_down(&mut self, x: f64, y: f64)
 pub fn mouse_move(&mut self, x: f64, y: f64)
 pub fn mouse_up(&mut self, x: f64, y: f64)
+pub fn mouse_wheel(&mut self, dx: f64, dy: f64)
 ```
 
 - The frosted glass panel shows a 7-column Monday-first grid with a
@@ -208,24 +215,28 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
   header and blank cells outside the month. Clicking a day selects
   it with a filled circle (`set_selected` clamps the day and fires
   `on_select` when the date changed).
-- The header shows "Month Year" plus a blue edit chevron and
+- The header shows the month and the year as two menus plus
   `<`/`>` steppers that move one month (wrapping years). Clicking
-  the title turns it into a text input: typing edits the buffer
-  (16 chars max, blinking caret), `Enter` commits `"July 2026"`,
-  `"jul 2026"`, `"7/2026"` or `"7 2026"` (years 1900-2100),
-  `Escape` cancels, clicking outside commits. Invalid input keeps
-  the viewed month.
+  the month opens all twelve months; clicking the year opens years
+  `DATE_YEAR_MIN` to `DATE_YEAR_MAX` (1-3000) with the current year
+  visible on open. Lists show 8 rows with a scrollbar, hover in the
+  accent fill (or the fixed `hover_fill`) and a checkmark on the
+  current entry; a row click picks it, header taps switch lists,
+  anything else (or `Escape`) closes. Both lists clamp into the
+  viewport like the menu.
+- Hovering a day, the month/year zones or the steppers tints them
+  with the accent color.
 - Date math is dependency-free (civil algorithms, Gregorian leap
   rule); the default selection is today from the system clock.
-- Like the menu, the panel clamps into the `set_viewport` bounds so
+- Like the menu, the panels clamp into the `set_viewport` bounds so
   the glass never samples outside the window. Apps must call
-  `set_viewport` every frame, forward `text`/`key` and return true
-  from `App::wants_backdrop` (the calendar is always glass).
+  `set_viewport` every frame, forward `mouse_wheel` (year scrolling)
+  and return true from `App::wants_backdrop` (the calendar is always
+  glass).
 
 ```rust
 pub fn days_in_month(year: i32, month: u32) -> u32
 pub fn first_weekday(year: i32, month: u32) -> u32
-pub fn parse_month_year(input: &str) -> Option<(i32, u32)>
 ```
 
 ## Usage / Example
@@ -261,8 +272,8 @@ color.set_glass(ThemeMode::Dark, GlassAmount::Glass);
 
 Run `cargo run --example date`: July 2026 calendar defaulting to
 today (16 July 2026 in the reference) with a `Selected: ...`
-caption. Click the title to type a month, use `<`/`>` to step
-months, click a day to select.
+caption. Click the month or year for popup lists (scroll the years
+with the wheel), use `<`/`>` to step months, click a day to select.
 
 ## Cross References
 

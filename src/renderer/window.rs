@@ -8,7 +8,7 @@ use vello::{AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, Scene}
 use wgpu::PresentMode;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
-use winit::event::{ElementState, MouseButton, WindowEvent};
+use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowAttributes};
@@ -67,6 +67,8 @@ pub trait App {
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_up(&mut self, _x: f64, _y: f64) {}
     fn mouse_move(&mut self, _x: f64, _y: f64) {}
+    /// Scroll wheel delta in logical px (right/down positive).
+    fn mouse_wheel(&mut self, _dx: f64, _dy: f64) {}
     fn set_focused(&mut self, _focused: bool) {}
     fn text(&mut self, _text: &str) {}
     fn key(&mut self, _key: Key) {}
@@ -484,6 +486,15 @@ impl<V: App> ApplicationHandler for Shell<V> {
                 if redraw {
                     active.window.request_redraw();
                 }
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                let scale = active.scale;
+                let (dx, dy) = match delta {
+                    MouseScrollDelta::LineDelta(x, y) => (x as f64 * 20.0, y as f64 * 20.0),
+                    MouseScrollDelta::PixelDelta(pos) => (pos.x / scale, pos.y / scale),
+                };
+                self.app.mouse_wheel(dx, dy);
+                active.window.request_redraw();
             }
             WindowEvent::RedrawRequested => self.render(event_loop),
             _ => {}
