@@ -6,7 +6,9 @@ sending progress numbers while the shown fill chases the target at
 a limited speed, so the bar always moves slowly and glides through
 brief app stalls. Display-only (no mouse handling). The fill
 follows the system accent (Multicolor renders blue) unless the dev
-sets it manually with `fill`.
+sets it manually with `fill`. `Spinner` in `spinner.rs` is the
+indeterminate counterpart: twelve rotating spokes with a fade
+trail, always gray unless the dev sets a color (no accent).
 
 ## Geometry
 
@@ -50,11 +52,43 @@ pub fn set_focused(&mut self, focused: bool)
   palette. No mouse methods: forward nothing (see
   `examples/progress.rs`, titlebar only).
 
+## Spinner
+
+```rust
+pub fn new() -> Self
+pub fn color(self, color: Color) -> Self
+pub fn text(self, text: impl Into<String>) -> Self
+pub fn head(&self) -> usize
+pub fn set_dark(&mut self, dark: bool)
+```
+
+| Token | Value |
+|---|---|
+| `SPINNER_SPOKES` | 12 spokes, one revolution per second |
+| `SPINNER_R_OUT` / `SPINNER_R_IN` | 16 px outer / 9 px inner spoke radius |
+| `SPINNER_SPOKE_W` | 3.5 px rounded spokes |
+| `SPINNER_STEP_SECONDS` | 1/12 s per spoke step |
+| `SPINNER_TAIL_ALPHA` | 0.15 lightest trail spoke |
+| `SPINNER_TEXT_SIZE` / `SPINNER_TEXT_GAP` | 13 px caption / 8 px caption gap |
+| `SPINNER_GRAY` | `#8E8E93` default spoke color |
+
+- The head spoke is fully opaque; older spokes fade linearly down
+  to `SPINNER_TAIL_ALPHA`. Steps advance with wall-clock time, so
+  the spin is Hz-independent.
+- `color` sets spokes and caption together; there is intentionally
+  no accent following. `set_dark` only re-tints the caption gray.
+- No mouse methods: forward nothing.
+
 ## Usage / Example
 
 Run `cargo run --example progress`: pink bar fed by a fake app
-that reports jumpy progress with stalls; the bar chases it slowly
-(the titlebar shows the raw target percent).
+that reports jumpy progress with stalls (the titlebar shows the
+raw target percent), plus a gray `Loading...` spinner below.
+
+```rust
+let mut spin = Spinner::new().text("Loading...");
+spin.set_dark(true);
+```
 
 ```rust
 let mut loading = LinearProgress::new()

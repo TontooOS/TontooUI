@@ -1,4 +1,4 @@
-use tontooui::elements::{LinearProgress, Titlebar, TrafficAction, View, VStack};
+use tontooui::elements::{LinearProgress, Spinner, Titlebar, TrafficAction, View, VStack};
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
@@ -9,6 +9,7 @@ use vello::peniko::Color;
 struct ProgressDemo {
     bar: Titlebar,
     stack: VStack,
+    spinner: Spinner,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -26,6 +27,7 @@ impl ProgressDemo {
         Self {
             bar: Titlebar::new("Progress"),
             stack,
+            spinner: Spinner::new().text("Loading..."),
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -65,6 +67,7 @@ impl App for ProgressDemo {
             bar.set_theme(palette.accent, dark);
             bar.set_focused(focused);
         });
+        self.spinner.set_dark(dark);
 
         // Fake app: reports jumpy progress with stalls every 6 s. The
         // bar chases slowly and glides through the stalls.
@@ -88,14 +91,23 @@ impl App for ProgressDemo {
         self.bar.draw(scene, fonts);
 
         let top = viewport.y + 31.0;
+        let (_, stack_h) = self.stack.measure(fonts);
         self.stack.place(
             fonts,
             viewport.x + 24.0,
             top + 16.0,
             viewport.width - 48.0,
-            (viewport.height - 47.0).max(0.0),
+            stack_h,
         );
         self.stack.draw(scene, fonts, images);
+        self.spinner.place(
+            fonts,
+            viewport.x + 24.0,
+            top + 16.0 + stack_h + 24.0,
+            viewport.width - 48.0,
+            80.0,
+        );
+        self.spinner.draw(scene, fonts, images);
     }
 
     fn background(&self) -> Color {
@@ -133,7 +145,7 @@ impl App for ProgressDemo {
 }
 
 fn main() {
-    if let Err(err) = run("Progress", 900, 200, ProgressDemo::new()) {
+    if let Err(err) = run("Progress", 900, 300, ProgressDemo::new()) {
         eprintln!("error: {err}");
         std::process::exit(1);
     }
