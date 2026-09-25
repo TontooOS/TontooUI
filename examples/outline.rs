@@ -1,0 +1,134 @@
+use tontooui::elements::{
+    BasicOutlineGroup, OutlineNode, Titlebar, TrafficAction, View,
+};
+use tontooui::renderer::FontSystem;
+use tontooui::renderer::ImageLoader;
+use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
+use tontooui::theme::{ThemeMode, ThemeWatcher};
+use vello::Scene;
+use vello::peniko::Color;
+
+struct OutlineDemo {
+    bar: Titlebar,
+    tree: BasicOutlineGroup,
+    watcher: ThemeWatcher,
+    focused: bool,
+    bg: Color,
+    command: Option<WindowCommand>,
+}
+
+impl OutlineDemo {
+    fn new() -> Self {
+        // Reference file tree: open folders fade their children in.
+        let tree = BasicOutlineGroup::new(vec![
+            OutlineNode::folder("Documents")
+                .expanded(true)
+                .child(OutlineNode::file("Resume.pdf"))
+                .child(
+                    OutlineNode::folder("Projects")
+                        .expanded(true)
+                        .child(OutlineNode::file("App.swift"))
+                        .child(OutlineNode::file("Assets.xcassets"))
+                        .child(OutlineNode::file("Notes.txt")),
+                ),
+            OutlineNode::folder("Downloads")
+                .child(OutlineNode::file("Archive.zip")),
+            OutlineNode::file("README.md"),
+        ]);
+        Self {
+            bar: Titlebar::new("Outline"),
+            tree,
+            watcher: ThemeWatcher::new(),
+            focused: true,
+            bg: tontooui::renderer::window::BACKGROUND,
+            command: None,
+        }
+    }
+
+    fn selected_label(&self) -> String {
+        self.tree
+            .selected_path()
+            .and_then(|path| self.tree.node(&path).map(|node| node.label().to_string()))
+            .unwrap_or_else(|| "-".to_string())
+    }
+}
+
+impl App for OutlineDemo {
+    fn draw(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+        viewport: Viewport,
+        time_secs: f64,
+    ) {
+        self.watcher.poll(time_secs);
+        self.watcher.set_focused(self.focused, time_secs);
+        let palette = self.watcher.palette(time_secs);
+        self.bg = palette.bg;
+        let theme = self.watcher.theme();
+        let dark = theme.mode == ThemeMode::Dark;
+        let focused = self.focused;
+        self.tree.set_theme(palette.accent, dark);
+        self.tree.set_focused(focused);
+
+        self.bar.set_palette(
+            palette.titlebar_bg,
+            palette.titlebar_text,
+            palette.divider,
+        );
+        self.bar.set_title(format!("Outline — {}", self.selected_label()));
+        self.bar.set_rect(viewport.x, viewport.y, viewport.width);
+        self.bar.draw(scene, fonts);
+
+        let top = viewport.y + 31.0;
+        self.tree.place(
+            fonts,
+            viewport.x + 16.0,
+            top + 12.0,
+            viewport.width - 32.0,
+            (viewport.height - 43.0).max(0.0),
+        );
+        self.tree.draw(scene, fonts, images);
+    }
+
+    fn background(&self) -> Color {
+        self.bg
+    }
+
+    fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
+        Some(self.bar.drag_rect())
+    }
+
+    fn poll_window_command(&mut self) -> Option<WindowCommand> {
+        self.command.take()
+    }
+
+    fn mouse_down(&mut self, x: f64, y: f64) {
+        match self.bar.press(x as f32, y as f32) {
+            Some(TrafficAction::Close) => self.command = Some(WindowCommand::Close),
+            Some(TrafficAction::Minimize) => self.command = Some(WindowCommand::Minimize),
+            Some(TrafficAction::Maximize) => {
+                self.command = Some(WindowCommand::ToggleMaximize)
+            }
+            None => self.tree.mouse_down(x, y),
+        }
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        self.tree.mouse_up(x, y);
+    }
+
+    fn set_focused(&mut self, focused: bool) {
+        self.focused = focused;
+        self.bar.set_focused(focused);
+        self.tree.set_focused(focused);
+    }
+}
+
+fn main() {
+    if let Err(err) = run("Outline", 420, 560, OutlineDemo::new()) {
+        eprintln!("error: {err}");
+        std::process::exit(1);
+    }
+}

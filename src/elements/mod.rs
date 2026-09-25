@@ -23,6 +23,7 @@ pub mod scrollbar;
 pub mod scrollview;
 pub mod shapes;
 pub mod forms;
+pub mod outlines;
 pub mod sliders;
 pub mod steppers;
 pub mod tables;
@@ -144,6 +145,12 @@ pub use forms::{
     FORM_ICON_SIZE, FORM_LABEL_GAP, FORM_LABEL_SIZE, FORM_MIN_W, FORM_NOTE_GAP,
     FORM_NOTE_H, FORM_NOTE_SIZE, FORM_PAD, FORM_ROW_H, FORM_SECTION_GAP,
     FORM_TITLE_GAP, FORM_TITLE_H, FORM_TITLE_SIZE,
+};
+pub use outlines::{
+    BasicOutlineGroup, OutlineIcon, OutlineNode, OUTLINE_ACCENT, OUTLINE_ANIM_SECONDS,
+    OUTLINE_CHEV_H, OUTLINE_CHEV_SLOT, OUTLINE_CHEV_STROKE, OUTLINE_CHEV_W,
+    OUTLINE_ICON_GAP, OUTLINE_ICON_SIZE, OUTLINE_INDENT, OUTLINE_LABEL_SIZE,
+    OUTLINE_ROW_H, OUTLINE_SELECTED_ALPHA,
 };
 pub use sliders::Slider;
 pub use steppers::{

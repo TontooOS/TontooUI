@@ -29,6 +29,7 @@ theme, animation and a Vello/WGPU renderer.
 | Link | [Link.md](Link.md) | Blue link opening the default browser |
 | Label | [Label.md](Label.md) | Icon, image, styled and icon-only labels |
 | Menu | [Menu.md](Menu.md) | Simple dropdown with action rows, picker base |
+| Outline | [Outline.md](Outline.md) | File tree with fade reveal, chevrons and single-select |
 | Material | [Material.md](Material.md) | Translucent material veils in five thicknesses |
 | Renderer | [Renderer.md](Renderer.md) | Window shell, frame pipeline, backdrop blur |
 | Picker | [Picker.md](Picker.md) | Segmented, inline, menu and date pickers |
