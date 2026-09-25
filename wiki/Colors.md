@@ -93,8 +93,71 @@ let sunset = GradientPaint::vertical_system(vec![
 let brush = linear.brush(x, y, width, height, fonts.scale);
 ```
 
-See `examples/colors.rs` for the full demo (all thirteen swatches
-plus the four labeled reference bars).
+See `examples/colors.rs` for the full demo (all thirteen swatches,
+the four labeled reference bars, plus a pick button with a swatch
+and the frosted picker popup).
+
+## ColorPicker
+
+```rust
+pub struct Hsv { pub h: f32, pub s: f32, pub v: f32 }
+pub fn rgb_to_hsv(r: f32, g: f32, b: f32) -> Hsv
+pub fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (f32, f32, f32)
+pub fn color_to_hsva(color: Color) -> (Hsv, f32)
+pub fn hsva_to_color(hsv: Hsv, alpha: f32) -> Color
+pub fn new() -> Self
+pub fn on_change(self, callback: impl FnMut(Color) + 'static) -> Self
+pub fn color(self, color: Color) -> Self
+pub fn set_color(&mut self, color: Color)
+pub fn selected(&self) -> Color
+pub fn hsv_value(&self) -> Hsv
+pub fn set_theme(&mut self, mode: ThemeMode, glass: GlassAmount)
+pub fn set_focused(&mut self, focused: bool)
+pub fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32)
+pub fn show(&mut self)
+pub fn dismiss(&mut self)
+pub fn is_visible(&self) -> bool
+pub fn panel_width() -> f32
+pub fn panel_height() -> f32
+pub fn card_rect(&self) -> (f32, f32, f32, f32)
+pub fn wheel_rect(&self) -> (f32, f32, f32)
+pub fn brightness_rect(&self) -> (f32, f32, f32, f32)
+pub fn opacity_rect(&self) -> (f32, f32, f32, f32)
+pub fn point_to_hs(&self, x: f32, y: f32) -> (f32, f32)
+pub fn hs_point(&self) -> (f32, f32)
+pub fn rect(&self) -> (f32, f32, f32, f32)
+pub fn mouse_down(&mut self, x: f64, y: f64)
+pub fn mouse_move(&mut self, x: f64, y: f64)
+pub fn mouse_up(&mut self, x: f64, y: f64)
+```
+
+| Token | Value |
+|---|---|
+| `PICKER_PAD` | 16 px panel padding |
+| `PICKER_WHEEL` | 232 px wheel diameter |
+| `PICKER_GAP` | 16 px wheel-to-brightness gap |
+| `PICKER_BAR_H` | 28 px slider height |
+| `PICKER_LABEL_GAP` / `PICKER_ROW_GAP` | 8 px / 6 px label gaps |
+| `PICKER_RADIUS` | 20 px panel corner radius |
+| `PICKER_LABEL_SIZE` | 13 px label size |
+| `PICKER_PILL_W` | 64 px percent pill width |
+| `PICKER_LABEL_GRAY` | White 160 alpha label on frost |
+| `PICKER_PILL` | `#1E1E20` percent pill fill |
+| `PICKER_CHECK_A` / `PICKER_CHECK_B` | `#C0C0C0` / `#808080` checker squares |
+| `PICKER_CHECK` | 10 px checker size |
+
+- Menu-like frosted popup (`GlassType::Frosted`): hue/saturation
+  wheel with a crosshair (baked 256 px texture, white center glow),
+  brightness slider (full color into black, ring knob), opacity
+  label plus checker transparency slider (transparent left, opaque
+  right) with a percent pill. Triggered with `show` by a button or
+  the app; reports every change through `on_change`, reads back via
+  `selected`; outside clicks dismiss keeping the selection.
+- Drags track across moves with clamping; sliders map linearly.
+  Skips itself in the backdrop capture pass, so the frost samples
+  only what sits behind it — the app opts in with
+  `wants_backdrop` while visible (see the demo, like the date
+  picker).
 
 ## Cross References
 

@@ -37,7 +37,13 @@ pub use gestures::{
     GESTURE_MAGNIFY_MAX, GESTURE_MAGNIFY_MIN, GESTURE_MAGNIFY_STEP,
     GESTURE_MOVE_SLOP,
 };
-pub use colors::{GradientPaint, SystemColor, ALL_SYSTEM_COLORS};
+pub use colors::{
+    ColorPicker, GradientPaint, Hsv, SystemColor, ALL_SYSTEM_COLORS,
+    PICKER_BAR_H, PICKER_CHECK, PICKER_CHECK_A, PICKER_CHECK_B, PICKER_GAP,
+    PICKER_LABEL_GAP, PICKER_LABEL_GRAY, PICKER_LABEL_SIZE, PICKER_PAD,
+    PICKER_PILL, PICKER_PILL_W, PICKER_RADIUS, PICKER_ROW_GAP, PICKER_WHEEL,
+    color_to_hsva, hsv_to_rgb, hsva_to_color, rgb_to_hsv,
+};
 pub use groupbox::{
     BasicGroupBox, StyledGroupBox, GROUP_BG_DARK, GROUP_BG_LIGHT, GROUP_PAD,
     GROUP_RADIUS, GROUP_ROW_GAP, GROUP_ROW_SPACING, GROUP_SYMBOL_SIZE,

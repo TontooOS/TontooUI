@@ -1,11 +1,15 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use tontooui::elements::{
-    ALL_SYSTEM_COLORS, GradientPaint, Titlebar, TrafficAction,
+    ALL_SYSTEM_COLORS, Button, ButtonStyle, ColorPicker, GradientPaint,
+    Titlebar, TrafficAction, View,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::text::draw_layout;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
-use tontooui::theme::ThemeWatcher;
+use tontooui::theme::{ThemeMode, ThemeWatcher};
 use vello::Scene;
 use vello::kurbo::{Affine, RoundedRect};
 use vello::peniko::{Brush, Color, Fill};
@@ -22,6 +26,10 @@ const BAR_LABEL_SIZE: f32 = 15.0;
 
 struct ColorsDemo {
     bar: Titlebar,
+    pick_button: Button,
+    picker: ColorPicker,
+    picked: Color,
+    show_picker: Rc<RefCell<bool>>,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -30,8 +38,18 @@ struct ColorsDemo {
 
 impl ColorsDemo {
     fn new() -> Self {
+        let show_picker: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
+        let flag = show_picker.clone();
         Self {
             bar: Titlebar::new("Colors"),
+            pick_button: Button::new("Pick a color")
+                .style(ButtonStyle::BorderedProminent)
+                .on_press(move || {
+                    *flag.borrow_mut() = true;
+                }),
+            picker: ColorPicker::new().color(Color::from_rgb8(0x30, 0xb0, 0xc7)),
+            picked: Color::from_rgb8(0x30, 0xb0, 0xc7),
+            show_picker,
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -60,7 +78,7 @@ impl App for ColorsDemo {
         &mut self,
         scene: &mut Scene,
         fonts: &mut FontSystem,
-        _images: &mut ImageLoader<'_>,
+        images: &mut ImageLoader<'_>,
         viewport: Viewport,
         time_secs: f64,
     ) {
@@ -68,6 +86,18 @@ impl App for ColorsDemo {
         self.watcher.set_focused(self.focused, time_secs);
         let palette = self.watcher.palette(time_secs);
         self.bg = palette.bg;
+        let theme = self.watcher.theme();
+        let dark = theme.mode == ThemeMode::Dark;
+        let focused = self.focused;
+
+        if std::mem::replace(&mut *self.show_picker.borrow_mut(), false) {
+            self.picker.show();
+        }
+        self.pick_button.set_theme(palette.accent, dark);
+        self.pick_button.set_focused(focused);
+        self.picker.set_theme(theme.mode, theme.glass);
+        self.picker.set_focused(focused);
+        self.picked = self.picker.selected();
 
         self.bar.set_palette(
             palette.titlebar_bg,
@@ -80,6 +110,27 @@ impl App for ColorsDemo {
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
         let mut y = viewport.y + 31.0 + 24.0;
+
+        // Pick row: button plus a swatch of the selection.
+        let (bwn, bhn) = self.pick_button.measure(fonts);
+        let bx = viewport.x + ((viewport.width - (bwn + 12.0 + 40.0)) / 2.0).max(0.0);
+        self.pick_button.place(fonts, bx, y, bwn, bhn);
+        self.pick_button.draw(scene, fonts, images);
+        let swatch = RoundedRect::new(
+            px(bx + bwn + 12.0),
+            px(y),
+            px(bx + bwn + 12.0 + 40.0),
+            px(y + bhn),
+            px(10.0),
+        );
+        scene.fill(
+            Fill::NonZero,
+            Affine::IDENTITY,
+            &Brush::Solid(self.picked),
+            None,
+            &swatch,
+        );
+        y += bhn + 24.0;
 
         // Swatch grid: every system color with its name.
         let total_w = ALL_SYSTEM_COLORS.len() as f32 * CHIP
@@ -148,10 +199,21 @@ impl App for ColorsDemo {
             );
             y += BAR_H + BAR_GAP;
         }
+
+        // Frosted picker popup on top while open.
+        if self.picker.is_visible() {
+            self.picker.set_viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+            self.picker.draw(scene, fonts, images);
+        }
     }
 
     fn background(&self) -> Color {
         self.bg
+    }
+
+    fn wants_backdrop(&self) -> bool {
+        // Frosted picker needs the blur pass while open.
+        self.picker.is_visible()
     }
 
     fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
@@ -163,6 +225,11 @@ impl App for ColorsDemo {
     }
 
     fn mouse_down(&mut self, x: f64, y: f64) {
+        // Popup first while open (outside clicks dismiss it).
+        if self.picker.is_visible() {
+            self.picker.mouse_down(x, y);
+            return;
+        }
         match self.bar.press(x as f32, y as f32) {
             Some(TrafficAction::Close) => self.command = Some(WindowCommand::Close),
             Some(TrafficAction::Minimize) => {
@@ -171,12 +238,25 @@ impl App for ColorsDemo {
             Some(TrafficAction::Maximize) => {
                 self.command = Some(WindowCommand::ToggleMaximize)
             }
-            None => {}
+            None => self.pick_button.mouse_down(x, y),
         }
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        if self.picker.is_visible() {
+            self.picker.mouse_up(x, y);
+            return;
+        }
+        self.pick_button.mouse_up(x, y);
     }
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
+        if self.picker.is_visible() {
+            self.picker.mouse_move(x, y);
+        } else {
+            self.pick_button.set_hover(x as f32, y as f32);
+        }
     }
 
     fn set_focused(&mut self, focused: bool) {
