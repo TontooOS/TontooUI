@@ -1,12 +1,14 @@
 # Glass
 
 `GlassContainer`: liquid glass lens container with a clear minified center,
-a frosted edge band, liquid bevel rim (specular top light melting into bottom
-depth shade), chromatic edge split (red outside, cyan inside) and a soft drop
-shadow. Optional content draws on top. When the shell runs
-`App::wants_backdrop`, the center samples the sharp in-app capture slightly
-minified while only a narrow rim band samples the blurred capture, so content
-behind the glass shows through shrunk with frost only at the very edge.
+a frosted edge band, liquid bevel rim (Lens finish: specular top light
+melting into bottom depth shade; Frosted finish: uniform 1 px dark-gray
+rim on every side), chromatic edge split (Lens finish: red outside, cyan
+inside) and a soft drop shadow. Optional content draws on top. When the
+shell runs `App::wants_backdrop`, the center samples the sharp in-app
+capture slightly minified while only a narrow rim band samples the
+blurred capture, so content behind the glass shows through shrunk with
+frost only at the very edge.
 
 ```rust
 pub fn new() -> Self
@@ -59,8 +61,9 @@ balanced stage (it still follows dark/light mode).
 |---|---|
 | `GLASS_TINT_DARK` | white 10% |
 | `GLASS_TINT_LIGHT` | black 8% |
-| `GLASS_SPECULAR` | white 45% top light |
-| `GLASS_DEPTH` | black 18% bottom shade |
+| `GLASS_SPECULAR` | white 45% top light (Lens finish) |
+| `GLASS_DEPTH` | black 18% bottom shade (Lens finish) |
+| `GLASS_FROSTED_RIM` | dark gray (`#3A3A3C`) 1 px rim on every side (Frosted finish) |
 | `GLASS_CHROMA_RED` / `GLASS_CHROMA_CYAN` | faint rim split |
 | `GLASS_EDGE_WIDTH` / `GLASS_EDGE_WIDTH_LARGE` | 2 px rim band, 3 px once the smaller side reaches `GLASS_LARGE_MIN_SIDE` (200 px) |
 | `GLASS_ZOOM` | 0.80x lens zoom of the clear center (minify) |
@@ -75,6 +78,12 @@ body center (`fill_backdrop_lens`, `GLASS_ZOOM`), so the minifier covers
 the whole middle. Tiny bodies (smaller than twice the band) fall back to a
 full `fill_backdrop` blur. The held toggle knob and the dragged slider knob
 use the same lens via `fill_lens_glass` with a narrower 4 px rim.
+
+## Frosted
+
+No bevel and no chromatic split: a single 1 px `GLASS_FROSTED_RIM`
+stroke sits exactly on the body edge, the same dark gray on every
+side (desaturated with the palette when the window is inactive).
 
 Desktop pixels behind a transparent window still need the compositor (it
 owns those pixels); `App::transparent_body` skips the window background

@@ -14,10 +14,13 @@ use crate::theme::{GlassAmount, ThemeMode, desaturate};
 pub const GLASS_TINT_DARK: Color = Color::from_rgba8(255, 255, 255, 26);
 /// Frost tint for light mode glass (darkening over the backdrop).
 pub const GLASS_TINT_LIGHT: Color = Color::from_rgba8(0, 0, 0, 20);
-/// Specular top light running into the bevel.
+/// Specular top light running into the bevel (Lens finish only).
 pub const GLASS_SPECULAR: Color = Color::from_rgba8(255, 255, 255, 115);
-/// Depth shade pooling at the bottom of the bevel.
+/// Depth shade pooling at the bottom of the bevel (Lens finish only).
 pub const GLASS_DEPTH: Color = Color::from_rgba8(0, 0, 0, 46);
+/// Uniform dark-gray 1 px rim for the Frosted finish: no specular top
+/// light, no depth shade, the same border on every side.
+pub const GLASS_FROSTED_RIM: Color = Color::from_rgba8(0x3a, 0x3a, 0x3c, 255);
 /// Chromatic rim split, red side.
 pub const GLASS_CHROMA_RED: Color = Color::from_rgba8(255, 90, 120, 30);
 /// Chromatic rim split, cyan side.
@@ -56,7 +59,8 @@ pub enum GlassType {
 }
 
 /// Liquid glass container: clear minified lens center, frosted edge band,
-/// liquid bevel rim with specular top light and depth shade, chromatic edge
+/// liquid bevel rim with specular top light and depth shade (Lens finish;
+/// Frosted uses a uniform 1 px dark-gray rim instead), chromatic edge
 /// split and a soft shadow. Optional content draws on top.
 ///
 /// When the shell runs a backdrop pass (`App::wants_backdrop`), the center
@@ -252,9 +256,32 @@ impl GlassContainer {
             &body,
         );
 
-        // Liquid bevel: specular top light and depth shade at the bottom,
-        // transparent along the sides (long transparent mid stops so the
-        // vertical gradient leaves the flanks clean).
+        // Liquid bevel (Lens finish): specular top light and depth
+        // shade at the bottom, transparent along the sides (long
+        // transparent mid stops so the vertical gradient leaves the
+        // flanks clean). Frosted instead gets a uniform 1 px dark-gray
+        // rim on every side, without the bevel or the chromatic split.
+        if self.glass_type == GlassType::Frosted {
+            let rim = RoundedRect::new(
+                rect.x0 + 0.5 * scale,
+                rect.y0 + 0.5 * scale,
+                rect.x1 - 0.5 * scale,
+                rect.y1 - 0.5 * scale,
+                (radius - 0.5 * scale).max(0.0),
+            );
+            let rim_color = if self.focused {
+                GLASS_FROSTED_RIM
+            } else {
+                desaturate(GLASS_FROSTED_RIM)
+            };
+            scene.stroke(
+                &Stroke::new(1.0 * scale),
+                Affine::IDENTITY,
+                &Brush::Solid(rim_color),
+                None,
+                &rim,
+            );
+        } else {
         let bevel = RoundedRect::new(
             rect.x0 + 1.0 * scale,
             rect.y0 + 1.0 * scale,
@@ -321,6 +348,7 @@ impl GlassContainer {
             None,
             &cyan,
         );
+        }
 
         // Grainy black outer edge (less glass): scattered speckles outside
         // the crisp rim.
