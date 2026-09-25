@@ -91,8 +91,9 @@ pub use toggles::{
 };
 pub use glass::{GlassContainer, GlassType};
 pub use text::{
-    BasicText, ResolvedForeground, TextAlignment, TextForeground, TextStyle,
-    TEXT_TERTIARY_DARK, TEXT_TERTIARY_LIGHT,
+    BasicText, FormattedText, LabeledText, ResolvedForeground, Span, TextAlignment,
+    TextForeground, TextStyle, LABELED_GAP, TEXT_TERTIARY_DARK, TEXT_TERTIARY_LIGHT,
+    parse_markdown,
 };
 pub use toolbar::{
     BasicToolbar, ToolbarItem, ToolbarPlacement, TOOLBAR_DIVIDER_H, TOOLBAR_DIVIDER_W,

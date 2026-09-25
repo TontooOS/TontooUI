@@ -12,3 +12,16 @@ Make Sure to Run / Test new stuff
 
 
 ## IMPORTANT All TontooUI elements should have if there like movable or something a shadow  not evry but most should habe a small shadow
+
+
+AND The Colors Should be: Light Mode:
+
+Background: R: 255, G: 255, B: 255
+Text: R: 039, G: 039, B: 039
+
+Dark Mode:
+
+Background: R: 027, G: 032, B: 034
+Text: R: 216, G: 217, B: 217
+
+THIS COLORS ARE FROM MACOS 27 NEWEST VERSION
