@@ -61,7 +61,10 @@ pub use gauges::{
     LINEAR_RING_R, LINEAR_TRACK_H, LINEAR_VALUE_GAP, LINEAR_VALUE_SIZE,
 };
 pub use sliders::Slider;
-pub use list::{BasicList, LIST_DIVIDER_H, LIST_FONT_SIZE, LIST_PAD_X, LIST_ROW_H};
+pub use list::{
+    BasicList, ListRow, LIST_DIVIDER_H, LIST_FONT_SIZE, LIST_PAD_X, LIST_ROW_H,
+    LIST_SECTION_GAP,
+};
 pub use dividers::{
     DividerStyle, HorizontalDivider, VerticalDivider, DIVIDER_BLUE, DIVIDER_DARK,
     DIVIDER_FILL, DIVIDER_LIGHT, DIVIDER_PADDED_INSET, DIVIDER_RED, DIVIDER_THICK,

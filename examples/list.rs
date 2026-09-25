@@ -1,4 +1,6 @@
-use tontooui::elements::{BasicList, Titlebar, TrafficAction, View, VStack};
+use tontooui::elements::{
+    BasicList, ListRow, Titlebar, TrafficAction, View, VStack,
+};
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
@@ -17,11 +19,27 @@ struct ListDemo {
 
 impl ListDemo {
     fn new() -> Self {
-        // Like the reference: plain rows with hairlines between them.
-        let stack = VStack::new().spacing(0.0).child(BasicList::from_slice(&[
-            "Row 1", "Row 2", "Row 3", "Row 4", "Row 5", "Row 6", "Row 7", "Row 8",
-            "Row 9", "Row 10",
-        ]));
+        // Like the reference: plain rows, a grouped section and a
+        // badge list.
+        let stack = VStack::new()
+            .spacing(32.0)
+            .child(BasicList::from_slice(&[
+                "Row 1", "Row 2", "Row 3", "Row 4", "Row 5", "Row 6", "Row 7",
+                "Row 8", "Row 9", "Row 10",
+            ]))
+            .child(BasicList::from_rows(vec![
+                ListRow::item("Item 1"),
+                ListRow::item("Item 2"),
+                ListRow::section("Grouped"),
+                ListRow::item("Item 3"),
+                ListRow::item("Item 4"),
+            ]))
+            .child(BasicList::from_rows(vec![
+                ListRow::item("Inbox").badge("5"),
+                ListRow::item("Drafts").badge("12"),
+                ListRow::item("Sent"),
+                ListRow::item("Trash").badge("100"),
+            ]));
         Self {
             bar: Titlebar::new("List"),
             stack,
