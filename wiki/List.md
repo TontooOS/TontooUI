@@ -163,8 +163,92 @@ list.set_theme(palette.divider, dark);
 list.set_focused(focused);
 ```
 
+## DisclosureGroup
+
+`DisclosureGroup` in `disclosure.rs` is an expandable group: a
+header row (chevron plus title) with an indented `BasicList` below
+it, like the reference (Fruits open with Apple/Banana/Cherry/Date,
+Vegetables and Grains closed). Only a press plus release on the
+chevron box toggles the group; clicks on the title or children do
+nothing.
+
+| Token | Value |
+|---|---|
+| `DISCLOSURE_ANIM_SECONDS` | 0.25 s expand/collapse tween (`CubicOut`) |
+| `DISCLOSURE_INDENT` | 20 px default children indent |
+| `DISCLOSURE_CHEV_W` / `DISCLOSURE_CHEV_H` | 7 px / 10 px chevron glyph |
+| `DISCLOSURE_CHEV_STROKE` | 1.8 px chevron stroke |
+| `DISCLOSURE_CHEV_PAD` / `DISCLOSURE_CHEV_GAP` | 6 px pad before / 8 px gap after the chevron |
+| `DISCLOSURE_HIT_W` | 28 px generous chevron hit width |
+
+```rust
+pub fn new(title: impl Into<String>, children: Vec<ListRow>) -> Self
+pub fn from_slice(title: impl Into<String>, children: &[&str]) -> Self
+pub fn open(self, open: bool) -> Self
+pub fn indent(self, px: f32) -> Self
+pub fn title_color(self, color: Color) -> Self
+pub fn chevron_color(self, color: Color) -> Self
+pub fn disabled(self, disabled: bool) -> Self
+pub fn on_toggle(self, callback: impl FnMut(bool) + 'static) -> Self
+pub fn set_theme(&mut self, divider: Color, dark: bool)
+pub fn set_focused(&mut self, focused: bool)
+pub fn set_title(&mut self, title: impl Into<String>)
+pub fn title(&self) -> &str
+pub fn set_children(&mut self, children: Vec<ListRow>)
+pub fn children(&self) -> &[ListRow]
+pub fn push_child(&mut self, row: ListRow)
+pub fn list_mut(&mut self) -> &mut BasicList
+pub fn is_open(&self) -> bool
+pub fn progress(&self) -> f32
+pub fn set_open(&mut self, open: bool)
+pub fn toggle(&mut self)
+pub fn mouse_down(&mut self, x: f64, y: f64)
+pub fn mouse_move(&mut self, x: f64, y: f64)
+pub fn mouse_up(&mut self, x: f64, y: f64)
+```
+
+- Toggling animates: the children height tweens between 0 and full
+  while the chevron morphs from `>` to `v`, and rows below glide
+  down because `measure` follows the animated progress. Children
+  draw into a clip layer, so partially revealed rows never spill
+  outside the animated bounds. A full-bleed hairline sits below the
+  header and another closes the group after the children.
+- `toggle` flips with animation and fires `on_toggle` with the new
+  state; programmatic `set_open` animates without firing.
+  `progress` reads the animated state (0.0 closed, 1.0 open).
+- Child rows keep the full `BasicList` feature set (badges,
+  sections, row styles) via `list_mut`; `set_theme` and
+  `set_focused` forward divider, mode and focus to the children.
+- Apps forward mouse events to the group (see
+  `examples/disclosure.rs`); `View::mouse_up` forwards to the same
+  toggle path. Disabled groups ignore all input.
+
+## Usage / Example
+
+```rust
+use tontooui::elements::{DisclosureGroup, View, VStack};
+
+let stack = VStack::new().spacing(0.0)
+  .child(
+    DisclosureGroup::from_slice("Fruits", &["Apple", "Banana"])
+      .open(true),
+  )
+  .child(DisclosureGroup::from_slice("Vegetables", &["Carrot"]));
+```
+
+Wire theme and input per frame (see `examples/disclosure.rs`):
+
+```rust
+group.set_theme(palette.divider, dark);
+group.set_focused(focused);
+// in mouse handlers:
+group.mouse_down(x, y);
+group.mouse_up(x, y);
+```
+
 ## Cross References
 
 - [Divider.md](Divider.md) – shared fill extent and theme divider colors
 - [Layout.md](Layout.md) – stacks hand the list the full parent size
 - [Theme.md](Theme.md) – theme divider color and unfocused desaturation
+- [Animation.md](Animation.md) – tween driver behind the group reveal

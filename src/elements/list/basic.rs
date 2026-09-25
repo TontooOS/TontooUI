@@ -268,8 +268,7 @@ impl BasicList {
     }
 
     /// Manual row text color: wins over the theme until cleared via
-    /// `set_theme` on a non-manual list (see `apply_theme_preset`
-    /// flow: rebuild or call `clear_manual_colors`).
+    /// `clear_manual_colors`.
     pub fn text_color(mut self, color: Color) -> Self {
         self.text_color = color;
         self.text_manual = true;
@@ -371,6 +370,12 @@ impl BasicList {
     /// Push one section title row at the end.
     pub fn push_section(&mut self, title: impl Into<String>) {
         self.rows.push(ListRow::section(title));
+    }
+
+    /// Push one fully specified row (item, badge, section, style)
+    /// at the end.
+    pub fn push_list_row(&mut self, row: ListRow) {
+        self.rows.push(row);
     }
 
     /// Remove all rows.

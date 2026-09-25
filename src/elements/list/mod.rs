@@ -1,6 +1,12 @@
 pub mod basic;
+pub mod disclosure;
 
 pub use basic::{
     BasicList, ListRow, ListRowStyle, LIST_DIVIDER_H, LIST_FONT_SIZE, LIST_PAD_X,
     LIST_ROW_H, LIST_SECTION_GAP,
+};
+pub use disclosure::{
+    DisclosureGroup, DISCLOSURE_ANIM_SECONDS, DISCLOSURE_CHEV_GAP,
+    DISCLOSURE_CHEV_H, DISCLOSURE_CHEV_PAD, DISCLOSURE_CHEV_STROKE,
+    DISCLOSURE_CHEV_W, DISCLOSURE_HIT_W, DISCLOSURE_INDENT,
 };
