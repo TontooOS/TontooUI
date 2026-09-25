@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use tontooui::elements::{
     ActionAlert, AlertAction, AlertButton, BasicAlert, BasicToolbar, Button,
-    ButtonStyle, Titlebar, TrafficAction, View, VStack,
+    ButtonStyle, ConfirmationDialog, Titlebar, TrafficAction, View, VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
@@ -19,9 +19,11 @@ struct AlertDemo {
     alert_ok: BasicAlert,
     alert_both: BasicAlert,
     alert_action: ActionAlert,
+    alert_confirm: ConfirmationDialog,
     show_ok: Rc<RefCell<bool>>,
     show_both: Rc<RefCell<bool>>,
     show_action: Rc<RefCell<bool>>,
+    show_confirm: Rc<RefCell<bool>>,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -33,9 +35,11 @@ impl AlertDemo {
         let show_ok: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
         let show_both: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
         let show_action: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
+        let show_confirm: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
         let flag_ok = show_ok.clone();
         let flag_both = show_both.clone();
         let flag_action = show_action.clone();
+        let flag_confirm = show_confirm.clone();
         let stack = VStack::new()
             .spacing(16.0)
             .child(
@@ -58,6 +62,13 @@ impl AlertDemo {
                     .on_press(move || {
                         *flag_action.borrow_mut() = true;
                     }),
+            )
+            .child(
+                Button::new("Show Confirmation Dialog")
+                    .style(ButtonStyle::Bordered)
+                    .on_press(move || {
+                        *flag_confirm.borrow_mut() = true;
+                    }),
             );
         Self {
             bar: Titlebar::new("Alert"),
@@ -79,9 +90,18 @@ impl AlertDemo {
                 AlertButton::ok("Delete")
                     .color(Color::from_rgb8(0xff, 0x3b, 0x30)),
             ),
+            alert_confirm: ConfirmationDialog::new(
+                "Choose Action",
+                vec![
+                    AlertButton::ok("Option 1"),
+                    AlertButton::ok("Option 2"),
+                    AlertButton::ok("Option 3"),
+                ],
+            ),
             show_ok,
             show_both,
             show_action,
+            show_confirm,
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -104,6 +124,7 @@ impl AlertDemo {
         self.alert_ok.is_visible()
             || self.alert_both.is_visible()
             || self.alert_action.is_visible()
+            || self.alert_confirm.is_visible()
     }
 
     fn each_button(&mut self, mut f: impl FnMut(&mut Button)) {
@@ -137,17 +158,26 @@ impl App for AlertDemo {
         if std::mem::replace(&mut *self.show_ok.borrow_mut(), false) {
             self.alert_both.dismiss();
             self.alert_action.dismiss();
+            self.alert_confirm.dismiss();
             self.alert_ok.show();
         }
         if std::mem::replace(&mut *self.show_both.borrow_mut(), false) {
             self.alert_ok.dismiss();
             self.alert_action.dismiss();
+            self.alert_confirm.dismiss();
             self.alert_both.show();
         }
         if std::mem::replace(&mut *self.show_action.borrow_mut(), false) {
             self.alert_ok.dismiss();
             self.alert_both.dismiss();
+            self.alert_confirm.dismiss();
             self.alert_action.show();
+        }
+        if std::mem::replace(&mut *self.show_confirm.borrow_mut(), false) {
+            self.alert_ok.dismiss();
+            self.alert_both.dismiss();
+            self.alert_action.dismiss();
+            self.alert_confirm.show();
         }
 
         self.each_button(|button| {
@@ -163,6 +193,9 @@ impl App for AlertDemo {
         self.alert_action
             .set_theme(theme.mode, palette.accent, theme.glass);
         self.alert_action.set_focused(focused);
+        self.alert_confirm
+            .set_theme(theme.mode, palette.accent, theme.glass);
+        self.alert_confirm.set_focused(focused);
 
         self.bar.set_palette(
             palette.titlebar_bg,
@@ -193,7 +226,11 @@ impl App for AlertDemo {
 
         // Modal overlay on top of everything below the titlebar.
         if self.any_visible() {
-            if self.alert_action.is_visible() {
+            if self.alert_confirm.is_visible() {
+                let alert = &mut self.alert_confirm;
+                alert.set_viewport(viewport.x, top, viewport.width, content_h);
+                alert.draw(scene, fonts, images);
+            } else if self.alert_action.is_visible() {
                 let alert = &mut self.alert_action;
                 alert.set_viewport(viewport.x, top, viewport.width, content_h);
                 alert.draw(scene, fonts, images);
@@ -219,7 +256,9 @@ impl App for AlertDemo {
     fn mouse_down(&mut self, x: f64, y: f64) {
         // Modal: only the alert hears clicks while visible.
         if self.any_visible() {
-            if self.alert_action.is_visible() {
+            if self.alert_confirm.is_visible() {
+                self.alert_confirm.mouse_down(x, y);
+            } else if self.alert_action.is_visible() {
                 self.alert_action.mouse_down(x, y);
             } else if let Some(alert) = self.visible() {
                 alert.mouse_down(x, y);
@@ -240,7 +279,13 @@ impl App for AlertDemo {
 
     fn mouse_up(&mut self, x: f64, y: f64) {
         if self.any_visible() {
-            // The action alert reports its button as an event.
+            // Both event dialogs report their button, then close.
+            if self.alert_confirm.is_visible() {
+                if self.alert_confirm.mouse_up(x, y).is_some() {
+                    self.alert_confirm.dismiss();
+                }
+                return;
+            }
             if self.alert_action.is_visible() {
                 if self.alert_action.mouse_up(x, y).is_some() {
                     self.alert_action.dismiss();

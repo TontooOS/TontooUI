@@ -3,28 +3,31 @@
 Alerts category in `src/elements/alerts/`: `BasicAlert` in `basic.rs`
 is a modal dialog over the app with a dimmed backdrop, a frosted
 LiquidGlass card, a centered title, a message and one (OK) or two
-(Cancel + OK) action buttons, while `ActionAlert` in `action.rs` is
-the action variant with a leading-aligned title and message plus
-exactly two side-by-side buttons with custom tints (e.g. gray Cancel
-plus red Delete). Neither can be dismissed by clicking outside —
-only the buttons close them. Entrance and exit fade through an
-engine tween; the app triggers them with `show` (e.g. from its own
-buttons). The action alert reports its button as an `AlertEvent`;
-the plain `BasicAlert` reports no such event. While visible the app
-drives `Titlebar::set_modal_blocked`, which turns the red light gray
-and unclickable. Alert buttons react to clicks only: hover does
-nothing (`Button::hover_effect(false)`).
+(Cancel + OK) action buttons, `ActionAlert` in `action.rs` is the
+action variant with a leading-aligned title and message plus exactly
+two side-by-side buttons with custom tints (e.g. gray Cancel plus
+red Delete), and `ConfirmationDialog` in `confirm.rs` is the choice
+variant with only a centered title and a vertical stack of
+full-width option buttons plus a trailing cancel. None can be
+dismissed by clicking outside — only the buttons close them.
+Entrance and exit fade through an engine tween; the app triggers
+them with `show` (e.g. from its own buttons). The action variants
+report their button as an `AlertEvent`; the plain `BasicAlert`
+reports no such event. While visible the app drives
+`Titlebar::set_modal_blocked`, which turns the red light gray and
+unclickable. Alert buttons react to clicks only: hover does nothing
+(`Button::hover_effect(false)`).
 
 ## Geometry
 
 | Token | Value |
 |---|---|
-| `ALERT_WIDTH` / `ALERT_RADIUS` | 210 px card width / 12 px corner radius (compact) |
-| `ALERT_PAD` | 12 px inner padding |
-| `ALERT_TITLE_SIZE` / `ALERT_MESSAGE_SIZE` | 8.5 px semibold title / 7.5 px message, wrapping |
-| `ALERT_TITLE_GAP` / `ALERT_MESSAGE_GAP` | 4 px title gap / 10 px button gap |
-| `ALERT_BUTTON_H` / `ALERT_BUTTON_GAP` | 22 px button height / 6 px two-button gap |
-| `ALERT_FADE_SECONDS` | 0.25 s engine fade in/out (shared by both variants) |
+| `ALERT_WIDTH` / `ALERT_RADIUS` | 315 px card width / 18 px corner radius (middle size) |
+| `ALERT_PAD` | 18 px inner padding |
+| `ALERT_TITLE_SIZE` / `ALERT_MESSAGE_SIZE` | 12.75 px semibold title / 11.25 px message, wrapping |
+| `ALERT_TITLE_GAP` / `ALERT_MESSAGE_GAP` | 6 px title gap / 15 px button gap |
+| `ALERT_BUTTON_H` / `ALERT_BUTTON_GAP` | 33 px button height / 9 px button gap |
+| `ALERT_FADE_SECONDS` | 0.25 s engine fade in/out (shared by all variants) |
 | `ALERT_DIM_ALPHA` | 77 alpha black dim over the app behind the card |
 | `ALERT_TITLE_DARK` / `ALERT_TITLE_LIGHT` | White / `#272727` title text |
 | `ALERT_MESSAGE_DARK` / `ALERT_MESSAGE_LIGHT` | White 220 alpha / dark 220 alpha message text |
@@ -117,6 +120,37 @@ pub fn mouse_up(&mut self, x: f64, y: f64) -> Option<AlertEvent>
   `BasicAlert` reports no such event. Clicks outside or mid-fade are
   swallowed and return `None`.
 
+## ConfirmationDialog
+
+```rust
+pub fn new(title: impl Into<String>, options: Vec<AlertButton>) -> Self
+pub fn cancel(self, label: impl Into<String>) -> Self
+pub fn no_cancel(self) -> Self
+pub fn set_theme(&mut self, mode: ThemeMode, accent: Color, glass: GlassAmount)
+pub fn set_focused(&mut self, focused: bool)
+pub fn set_title(&mut self, title: impl Into<String>)
+pub fn defs_value(&self) -> &[AlertButton]
+pub fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32)
+pub fn show(&mut self)
+pub fn dismiss(&mut self)
+pub fn is_open(&self) -> bool
+pub fn is_visible(&self) -> bool
+pub fn opacity_value(&self) -> f32
+pub fn mouse_down(&mut self, x: f64, y: f64)
+pub fn mouse_up(&mut self, x: f64, y: f64) -> Option<AlertEvent>
+```
+
+- Same modal core as the other variants (frosted card, dim, engine
+  fade, `show`/`dismiss`, viewport centering), but with only a
+  centered title and a vertical stack of full-width option buttons
+  plus a trailing cancel — made for more than two actions.
+- Empty options fall back to a single OK; `cancel` renames the
+  trailing cancel, `no_cancel` drops it (options only).
+- The first option renders prominent blue (or its custom tint), the
+  rest render tinted gray (or their custom tint). A press returns the
+  button as an `AlertEvent` (stack index, action, label) once per
+  click; clicks outside or mid-fade are swallowed.
+
 ## Titlebar modal block
 
 ```rust
@@ -185,8 +219,9 @@ if let Some(event) = alert.mouse_up(x, y) {
 }
 ```
 
-See `examples/alert.rs` for the full demo (OK, OK/Cancel and action
-alerts over buttons plus a toolbar, gray blocked red light).
+See `examples/alert.rs` for the full demo (OK, OK/Cancel, action and
+confirmation dialogs over buttons plus a toolbar, gray blocked red
+light).
 
 ## Cross References
 
