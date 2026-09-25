@@ -1,4 +1,4 @@
-use tontooui::elements::{Gauge, Titlebar, TrafficAction, View, VStack};
+use tontooui::elements::{Gauge, LinearGauge, Titlebar, TrafficAction, View, VStack};
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
@@ -9,6 +9,7 @@ use vello::peniko::Color;
 struct GaugeDemo {
     bar: Titlebar,
     stack: VStack,
+    linear: LinearGauge,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -41,6 +42,7 @@ impl GaugeDemo {
         Self {
             bar: Titlebar::new("Gauge"),
             stack,
+            linear: LinearGauge::new(60.0, 0.0, 100.0).value_text(|v| format!("{v:.0}%")),
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -58,6 +60,7 @@ impl GaugeDemo {
             index += 1;
         }
     }
+
 }
 
 impl App for GaugeDemo {
@@ -80,6 +83,8 @@ impl App for GaugeDemo {
             gauge.set_theme(palette.accent, dark);
             gauge.set_focused(focused);
         });
+        self.linear.set_theme(palette.accent, dark);
+        self.linear.set_focused(focused);
 
         self.bar.set_palette(
             palette.titlebar_bg,
@@ -90,14 +95,23 @@ impl App for GaugeDemo {
         self.bar.draw(scene, fonts);
 
         let top = viewport.y + 31.0;
+        let (_, stack_h) = self.stack.measure(fonts);
         self.stack.place(
             fonts,
             viewport.x + 24.0,
             top + 16.0,
             viewport.width - 48.0,
-            (viewport.height - 47.0).max(0.0),
+            stack_h,
         );
         self.stack.draw(scene, fonts, images);
+        self.linear.place(
+            fonts,
+            viewport.x + 24.0,
+            top + 16.0 + stack_h + 24.0,
+            viewport.width - 48.0,
+            40.0,
+        );
+        self.linear.draw(scene, fonts, images);
     }
 
     fn background(&self) -> Color {
@@ -131,11 +145,12 @@ impl App for GaugeDemo {
         self.focused = focused;
         self.bar.set_focused(focused);
         self.each_gauge(|gauge| gauge.set_focused(focused));
+        self.linear.set_focused(focused);
     }
 }
 
 fn main() {
-    if let Err(err) = run("Gauge", 900, 320, GaugeDemo::new()) {
+    if let Err(err) = run("Gauge", 900, 420, GaugeDemo::new()) {
         eprintln!("error: {err}");
         std::process::exit(1);
     }

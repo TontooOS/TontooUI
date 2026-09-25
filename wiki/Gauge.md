@@ -2,9 +2,12 @@
 
 Gauge category in `src/elements/gauges/`: `Gauge` in `gauge.rs`
 displays a value fraction as a rounded bar with a centered title
-above it. Display-only (no mouse handling); value changes tween to
-the new fill width. The fill follows the system accent (Multicolor
-renders blue) unless the dev sets it manually with `fill`.
+above it, `LinearGauge` in `linear.rs` shows a value label left of
+a thin track line with a knob marker. Both are display-only (no
+mouse handling); value changes tween to the new position. The
+`Gauge` fill follows the system accent (Multicolor renders blue)
+unless the dev sets it manually with `fill`; `LinearGauge` stays
+monochrome in every theme.
 
 ## Geometry
 
@@ -50,11 +53,41 @@ pub fn set_focused(&mut self, focused: bool)
   palette. No mouse methods: forward nothing (see
   `examples/gauge.rs`, titlebar only).
 
+## LinearGauge
+
+```rust
+pub fn new(value: f64, min: f64, max: f64) -> Self
+pub fn title(self, title: impl Into<String>) -> Self
+pub fn value_text(self, f: impl Fn(f64) -> String + 'static) -> Self
+pub fn value(&self) -> f64
+pub fn fraction(&self) -> f32
+pub fn set_value(&mut self, value: f64)
+pub fn set_theme(&mut self, accent: Color, dark: bool)
+pub fn set_focused(&mut self, focused: bool)
+```
+
+| Token | Value |
+|---|---|
+| `LINEAR_TRACK_H` | 6 px track line |
+| `LINEAR_KNOB_R` / `LINEAR_RING_R` / `LINEAR_DOT_R` | 8 / 5.5 / 2.5 px fixed knob |
+| `LINEAR_VALUE_SIZE` / `LINEAR_VALUE_GAP` | 15 px value label / 10 px label gap |
+
+- `value_text` draws left of the track (e.g. `|v| format!("{v:.0}%")`
+  tracks the logical value); without it the gauge is just the line
+  plus knob. An optional `title` centers above like `Gauge`.
+- `set_value` clamps and tweens the knob with a 0.25 s `CubicOut`
+  tween (driven by real frame deltas, so Hz-independent).
+- Track, knob and label use the label color on the mode background
+  (black on light, white on dark); `set_theme` takes the accent for
+  API parity but the gauge stays monochrome.
+- Unfocused windows desaturate the gauge like the rest of the
+  palette. No mouse methods: forward nothing.
+
 ## Usage / Example
 
 Run `cargo run --example gauge`: green `Progress`, theme-accent,
 red `Storage` and labeled green `Temperature` (`0°`/`100°`,
-`72°`) gauges in a `VStack`.
+`72°`) gauges in a `VStack`, plus a `60%` linear gauge below.
 
 ```rust
 let mut progress = Gauge::new(0.6, 0.0, 1.0)
@@ -68,6 +101,10 @@ let mut temperature = Gauge::new(72.0, 0.0, 100.0)
     .min_label("0°")
     .max_label("100°")
     .value_text(|v| format!("{v:.0}°"));
+
+let mut level = LinearGauge::new(60.0, 0.0, 100.0).value_text(|v| format!("{v:.0}%"));
+level.set_theme(accent, true);
+level.set_value(80.0);
 ```
 
 ## Cross References
