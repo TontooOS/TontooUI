@@ -2,21 +2,23 @@ use std::any::Any;
 
 use vello::Scene;
 use vello::kurbo::{Affine, Line, Stroke};
-use vello::peniko::Brush;
+use vello::peniko::{Brush, Color};
 
 use super::super::images::SFSymbolImage;
 use super::super::layout::View;
 use super::super::text::{BasicText, TextStyle};
-use super::{LINK_BLUE, LINK_BLUE_PRESSED, LINK_ICON_GAP, LINK_ICON_SIZE};
+use super::{LINK_BLUE, LINK_ICON_GAP, LINK_ICON_SIZE};
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
 use crate::theme::desaturate;
 
-/// Open `url` in the default browser (detached process, never
-/// blocking the UI). Only `http`/`https` URLs launch; anything else
-/// reports false without side effects.
+/// Open `url` in its default handler (detached process, never
+/// blocking the UI): browsers for `http`/`https`, the mail app for
+/// `mailto` (`start` on Windows, `open` on macOS, `xdg-open`
+/// elsewhere on Unix). Anything else reports false without side
+/// effects.
 pub fn open_url(url: &str) -> bool {
-    if !(url.starts_with("http://") || url.starts_with("https://")) {
+    if !is_openable(url) {
         return false;
     }
     #[cfg(target_os = "windows")]
@@ -33,6 +35,18 @@ pub fn open_url(url: &str) -> bool {
     spawn.is_ok()
 }
 
+/// True for URLs the system can hand to an app: web pages and mail
+/// links. Pure check without side effects (launching stays in
+/// `open_url`).
+pub fn is_openable(url: &str) -> bool {
+    url.starts_with("http://") || url.starts_with("https://") || url.starts_with("mailto:")
+}
+
+fn with_alpha(color: Color, alpha: f32) -> Color {
+    let c = color.to_rgba8();
+    Color::from_rgba8(c.r, c.g, c.b, (c.a as f32 * alpha.clamp(0.0, 1.0)).round() as u8)
+}
+
 /// Basic link: blue label with an optional leading SF icon (like the
 /// reference rows: "Visit Apple", code icon plus "Swift.org").
 /// Clicking opens the URL in the default browser; hover underlines.
@@ -40,6 +54,7 @@ pub fn open_url(url: &str) -> bool {
 pub struct BasicLink {
     label: String,
     url: String,
+    color: Option<Color>,
     opener: Option<Box<dyn FnMut(&str)>>,
     text: BasicText,
     symbol: Option<SFSymbolImage>,
@@ -60,6 +75,7 @@ impl BasicLink {
             symbol: None,
             label,
             url: url.into(),
+            color: None,
             opener: None,
             hovered: false,
             pressed: false,
@@ -78,16 +94,46 @@ impl BasicLink {
         self.symbol = Some(
             SFSymbolImage::new(name.into())
                 .size(LINK_ICON_SIZE)
-                .color(LINK_BLUE),
+                .color(self.color.unwrap_or(LINK_BLUE)),
         );
         self
     }
 
+    /// Custom link color instead of blue (icon follows).
+    pub fn color(mut self, color: Color) -> Self {
+        self.color = Some(color);
+        if let Some(symbol) = self.symbol.as_mut() {
+            symbol.set_color(Some(color));
+        }
+        self.apply_colors();
+        self
+    }
+
+    /// Custom link color, or `None` back to blue.
+    pub fn set_color(&mut self, color: Option<Color>) {
+        if color != self.color {
+            self.color = color;
+            if let Some(symbol) = self.symbol.as_mut() {
+                symbol.set_color(color.or(Some(LINK_BLUE)));
+            }
+            self.apply_colors();
+        }
+    }
+
+    pub fn color_value(&self) -> Option<Color> {
+        self.color
+    }
+
     /// Custom open handler (tests, in-app routing). Without it,
-    /// clicks use the system default browser.
+    /// clicks use the system handler.
     pub fn opener(mut self, opener: impl FnMut(&str) + 'static) -> Self {
         self.opener = Some(Box::new(opener));
         self
+    }
+
+    /// Custom open handler, or `None` back to the system handler.
+    pub fn set_opener(&mut self, opener: Option<Box<dyn FnMut(&str)>>) {
+        self.opener = opener;
     }
 
     pub fn set_label(&mut self, label: impl Into<String>) {
@@ -134,10 +180,11 @@ impl BasicLink {
     }
 
     fn apply_colors(&mut self) {
+        let base = self.color.unwrap_or(LINK_BLUE);
         let base = if self.pressed {
-            LINK_BLUE_PRESSED
+            with_alpha(base, 140.0 / 255.0)
         } else {
-            LINK_BLUE
+            base
         };
         let color = if self.focused {
             base
@@ -249,11 +296,17 @@ mod tests {
     use crate::renderer::text::FontSystem;
 
     #[test]
-    fn rejects_non_http_urls() {
+    fn rejects_non_openable_urls() {
+        assert!(!is_openable("file:///etc/passwd"));
+        assert!(!is_openable("javascript:alert(1)"));
+        assert!(!is_openable(""));
+        assert!(!is_openable("notaurl"));
+        assert!(is_openable("https://apple.com"));
+        assert!(is_openable("http://example.com"));
+        assert!(is_openable("mailto:hello@example.com"));
+        // Launching itself stays out of unit tests; only the scheme
+        // gate is covered (never call `open_url` here).
         assert!(!open_url("file:///etc/passwd"));
-        assert!(!open_url("javascript:alert(1)"));
-        assert!(!open_url(""));
-        assert!(!open_url("notaurl"));
     }
 
     #[test]

@@ -47,7 +47,7 @@ pub use colors::{
     color_to_hsva, hsv_to_rgb, hsva_to_color, rgb_to_hsv,
 };
 pub use material::{Material, MaterialKind, ALL_MATERIALS, MATERIAL_RADIUS};
-pub use link::{BasicLink, LINK_BLUE, LINK_BLUE_PRESSED, LINK_ICON_GAP, LINK_ICON_SIZE, open_url};
+pub use link::{BasicLink, LinkStyle, LinkWithImage, StyledLink, LINK_BLUE, LINK_BLUE_PRESSED, LINK_ICON_GAP, LINK_ICON_SIZE, LINK_IMAGE_GAP, LINK_PILL_BG, LINK_PILL_BORDER, LINK_PILL_PAD_X, LINK_PILL_PAD_Y, LINK_PILL_RADIUS, is_openable, open_url};
 pub use groupbox::{
     BasicGroupBox, StyledGroupBox, GROUP_BG_DARK, GROUP_BG_LIGHT, GROUP_PAD,
     GROUP_RADIUS, GROUP_ROW_GAP, GROUP_ROW_SPACING, GROUP_SYMBOL_SIZE,

@@ -1,6 +1,10 @@
 pub mod basic;
+pub mod image;
+pub mod styled;
 
-pub use basic::{BasicLink, open_url};
+pub use basic::{BasicLink, is_openable, open_url};
+pub use image::{LinkWithImage, LINK_IMAGE_GAP};
+pub use styled::{LinkStyle, StyledLink, LINK_PILL_BG, LINK_PILL_BORDER, LINK_PILL_PAD_X, LINK_PILL_PAD_Y, LINK_PILL_RADIUS};
 
 use vello::peniko::Color;
 

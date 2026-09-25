@@ -134,10 +134,43 @@ impl<'a> ImageLoader<'a> {
         bytes: &[u8],
         target_px: u32,
     ) -> Option<(ImageData, u32, u32)> {
+        self.raster_tinted_inner(key, bytes, None, target_px)
+    }
+
+    /// Get `(image, width, height)` like `raster`, but painted in
+    /// `tint` (RGB replaced, alpha kept) for glyph-style artwork.
+    /// The tint is part of the cache key, so callers fold it in.
+    pub fn raster_tinted(
+        &mut self,
+        key: &str,
+        bytes: &[u8],
+        tint: Color,
+        target_px: u32,
+    ) -> Option<(ImageData, u32, u32)> {
+        self.raster_tinted_inner(key, bytes, Some(tint), target_px)
+    }
+
+    fn raster_tinted_inner(
+        &mut self,
+        key: &str,
+        bytes: &[u8],
+        tint: Option<Color>,
+        target_px: u32,
+    ) -> Option<(ImageData, u32, u32)> {
         if let Some(cached) = self.cache.map.get(key) {
             return Some((cached.image.clone(), cached.width, cached.height));
         }
         let (pixels, width, height) = decode_raster(bytes, target_px.max(1))?;
+        let pixels = match tint {
+            Some(tint) => {
+                let rgba = tint.to_rgba8();
+                pixels
+                    .chunks_exact(4)
+                    .flat_map(|px| [rgba.r, rgba.g, rgba.b, px[3]])
+                    .collect()
+            }
+            None => pixels,
+        };
         let image = self.upload_texture(&pixels, width, height);
         self.cache.map.insert(
             key.to_string(),

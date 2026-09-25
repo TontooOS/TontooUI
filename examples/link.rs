@@ -1,5 +1,6 @@
 use tontooui::elements::{
-    Align, BasicLink, Titlebar, TrafficAction, View, VStack,
+    Align, BasicLink, LinkStyle, LinkWithImage, StyledLink, Titlebar,
+    TrafficAction, View, VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
@@ -11,6 +12,9 @@ use vello::peniko::Color;
 struct LinkDemo {
     bar: Titlebar,
     stack: VStack,
+    styled: StyledLink,
+    bordered: StyledLink,
+    card: LinkWithImage,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -31,6 +35,16 @@ impl LinkDemo {
         Self {
             bar: Titlebar::new("Link"),
             stack,
+            styled: StyledLink::new("Styled Link", "https://example.com"),
+            bordered: StyledLink::new("Border Link", "https://example.com")
+                .style(LinkStyle::Border),
+            card: LinkWithImage::new(
+                "https://picsum.photos/320/200",
+                "Download App",
+                "https://example.com/download",
+                320.0,
+                200.0,
+            ),
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -62,6 +76,11 @@ impl App for LinkDemo {
         self.bg = palette.bg;
         let focused = self.focused;
         self.each_link(|link| link.set_focused(focused));
+        self.styled.set_focused(focused);
+        self.bordered.set_focused(focused);
+        self.card.image_mut().set_theme(true);
+        self.card.image_mut().set_focused(focused);
+        self.card.link_mut().set_focused(focused);
 
         self.bar.set_palette(
             palette.titlebar_bg,
@@ -76,6 +95,23 @@ impl App for LinkDemo {
         let x = viewport.x + ((viewport.width - stack_w) / 2.0).max(0.0);
         self.stack.place(fonts, x, top + 32.0, stack_w, stack_h);
         self.stack.draw(scene, fonts, images);
+        // Styled pills below the basics.
+        let (sw, sh) = self.styled.measure(fonts);
+        let sx = viewport.x + ((viewport.width - sw) / 2.0).max(0.0);
+        let mut y = top + 32.0 + stack_h + 28.0;
+        self.styled.place(fonts, sx, y, sw, sh);
+        self.styled.draw(scene, fonts, images);
+        y += sh + 16.0;
+        let (bw2, bh2) = self.bordered.measure(fonts);
+        let bx2 = viewport.x + ((viewport.width - bw2) / 2.0).max(0.0);
+        self.bordered.place(fonts, bx2, y, bw2, bh2);
+        self.bordered.draw(scene, fonts, images);
+        y += bh2 + 28.0;
+        // Image card last.
+        let (cw, ch) = self.card.measure(fonts);
+        let cx = viewport.x + ((viewport.width - cw) / 2.0).max(0.0);
+        self.card.place(fonts, cx, y, cw, ch);
+        self.card.draw(scene, fonts, images);
     }
 
     fn background(&self) -> Color {
@@ -99,17 +135,28 @@ impl App for LinkDemo {
             Some(TrafficAction::Maximize) => {
                 self.command = Some(WindowCommand::ToggleMaximize)
             }
-            None => self.each_link(|link| link.mouse_down(x, y)),
+            None => {
+                self.each_link(|link| link.mouse_down(x, y));
+                self.styled.mouse_down(x, y);
+                self.bordered.mouse_down(x, y);
+                self.card.mouse_down(x, y);
+            }
         }
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {
         self.each_link(|link| link.mouse_up(x, y));
+        self.styled.mouse_up(x, y);
+        self.bordered.mouse_up(x, y);
+        self.card.mouse_up(x, y);
     }
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
         self.each_link(|link| link.set_hover(x as f32, y as f32));
+        self.styled.set_hover(x as f32, y as f32);
+        self.bordered.set_hover(x as f32, y as f32);
+        self.card.set_hover(x as f32, y as f32);
     }
 
     fn set_focused(&mut self, focused: bool) {

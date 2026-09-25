@@ -153,9 +153,11 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
   right) with a percent pill. Triggered with `show` by a button or
   the app; reports every change through `on_change`, reads back via
   `selected`; outside clicks dismiss keeping the selection.
-- Drags track across moves with clamping; sliders map linearly.
-  Knob centers travel inset by the knob radius and the crosshair
-  clamps inside the disc, so rings never leave their bars.
+- Drags track across moves with clamping; the brightness bar runs
+  bright left into black right, the opacity bar transparent left
+  into opaque right. Knob centers travel inset by the knob radius
+  and the crosshair clamps inside the disc, so rings never leave
+  their bars.
   Skips itself in the backdrop capture pass, so the frost samples
   only what sits behind it — the app opts in with
   `wants_backdrop` while visible (see the demo, like the date

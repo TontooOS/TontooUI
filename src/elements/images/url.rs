@@ -34,6 +34,7 @@ pub struct UrlImage {
     radius: f32,
     spinner: Spinner,
     text_color: Color,
+    tint: Option<Color>,
     dark: bool,
     focused: bool,
     state: UrlState,
@@ -56,6 +57,7 @@ impl UrlImage {
             radius: IMAGE_RADIUS,
             spinner: Spinner::new(),
             text_color: Color::from_rgb8(0x9a, 0x9a, 0x9e),
+            tint: None,
             dark: true,
             focused: true,
             state: UrlState::Loading,
@@ -86,6 +88,22 @@ impl UrlImage {
     pub fn spinner_color(mut self, color: Color) -> Self {
         self.spinner = Spinner::new().color(color);
         self
+    }
+
+    /// Fixed tint for the raster (RGB replaced, alpha kept), e.g. a
+    /// blue logo. Without it the photo stays colorful as downloaded.
+    pub fn tint(mut self, color: Color) -> Self {
+        self.tint = Some(color);
+        self
+    }
+
+    /// Fixed tint, or `None` back to the colorful original.
+    pub fn set_tint(&mut self, tint: Option<Color>) {
+        self.tint = tint;
+    }
+
+    pub fn tint_value(&self) -> Option<Color> {
+        self.tint
     }
 
     /// Restart the download (e.g. after a failure or an URL change).
@@ -247,9 +265,22 @@ impl View for UrlImage {
                 let target = (self.placed_w.max(self.placed_h) * fonts.scale * 2.0)
                     .ceil()
                     .max(1.0) as u32;
-                let key = format!("url:{}", self.url);
+                let key = match self.tint {
+                    Some(tint) => {
+                        let c = tint.to_rgba8();
+                        format!(
+                            "url:{}#{:02x}{:02x}{:02x}{:02x}",
+                            self.url, c.r, c.g, c.b, c.a
+                        )
+                    }
+                    None => format!("url:{}", self.url),
+                };
                 let bytes = self.bytes.clone();
-                match images.raster(&key, &bytes, target) {
+                let loaded = match self.tint {
+                    Some(tint) => images.raster_tinted(&key, &bytes, tint, target),
+                    None => images.raster(&key, &bytes, target),
+                };
+                match loaded {
                     Some((image, iw, ih)) => {
                         let (dw, _dh, dx, dy) = fit_rect(
                             iw as f32,
