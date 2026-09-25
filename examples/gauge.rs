@@ -124,18 +124,18 @@ impl App for GaugeDemo {
         self.linear.draw(scene, fonts, images);
         self.circular.place(
             fonts,
-            viewport.x + (viewport.width - 160.0) / 2.0,
+            viewport.x + (viewport.width - 84.0) / 2.0,
             top + 16.0 + stack_h + 24.0 + 40.0 + 24.0,
-            160.0,
-            160.0,
+            84.0,
+            84.0,
         );
         self.circular.draw(scene, fonts, images);
         self.capacity.place(
             fonts,
-            viewport.x + (viewport.width - 138.0) / 2.0,
-            top + 16.0 + stack_h + 24.0 + 40.0 + 24.0 + 160.0 + 24.0,
-            138.0,
-            138.0,
+            viewport.x + (viewport.width - 73.0) / 2.0,
+            top + 16.0 + stack_h + 24.0 + 40.0 + 24.0 + 84.0 + 24.0,
+            73.0,
+            73.0,
         );
         self.capacity.draw(scene, fonts, images);
     }
@@ -178,7 +178,7 @@ impl App for GaugeDemo {
 }
 
 fn main() {
-    if let Err(err) = run("Gauge", 900, 760, GaugeDemo::new()) {
+    if let Err(err) = run("Gauge", 900, 600, GaugeDemo::new()) {
         eprintln!("error: {err}");
         std::process::exit(1);
     }

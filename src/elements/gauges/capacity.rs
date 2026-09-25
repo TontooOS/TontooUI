@@ -15,15 +15,15 @@ use crate::renderer::text::{FontSystem, draw_layout};
 use crate::theme::desaturate;
 
 /// Ring centerline radius in logical px.
-pub const CAP_RING_R: f32 = 60.0;
+pub const CAP_RING_R: f32 = 30.0;
 /// Ring stroke width in logical px.
-pub const CAP_TRACK_W: f32 = 10.0;
+pub const CAP_TRACK_W: f32 = 5.0;
 /// Arc start angle in radians (top, screen coords).
 pub const CAP_START: f64 = -0.5 * PI;
 /// Full circle sweep in radians.
 pub const CAP_SWEEP: f64 = 2.0 * PI;
 /// Value text size in logical px.
-pub const CAP_VALUE_SIZE: f32 = 30.0;
+pub const CAP_VALUE_SIZE: f32 = 15.0;
 /// Track fill for light mode.
 pub const CAP_TRACK_LIGHT: Color = Color::from_rgb8(0xe5, 0xe5, 0xe5);
 /// Track fill for dark mode.
@@ -276,7 +276,7 @@ mod tests {
     fn fixed_square_size() {
         let mut gauge = CapacityGauge::new(65.0, 0.0, 100.0);
         let mut fonts = FontSystem::new();
-        assert_eq!(gauge.measure(&mut fonts), (138.0, 138.0));
+        assert_eq!(gauge.measure(&mut fonts), (73.0, 73.0));
     }
 
     #[test]

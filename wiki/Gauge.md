@@ -99,13 +99,13 @@ pub fn set_focused(&mut self, focused: bool)
 
 | Token | Value |
 |---|---|
-| `CIRC_RING_R` / `CIRC_TRACK_W` | 70 px ring radius / 12 px stroke |
+| `CIRC_RING_R` / `CIRC_TRACK_W` | 35 px ring radius / 6 px stroke |
 | `CIRC_START` / `CIRC_SWEEP` | 135 deg start / 270 deg sweep (gap at bottom) |
-| `CIRC_VALUE_SIZE` / `CIRC_LABEL_SIZE` | 34 px value / 15 px caption |
-| `CIRC_KNOB_R` / `CIRC_KNOB_RING_R` / `CIRC_DOT_R` | 8 / 5.5 / 2.5 px fixed knob |
+| `CIRC_VALUE_SIZE` / `CIRC_LABEL_SIZE` | 17 px value / 7.5 px caption |
+| `CIRC_KNOB_R` / `CIRC_KNOB_RING_R` / `CIRC_DOT_R` | 4 / 2.75 / 1.25 px fixed knob |
 | `CIRC_FILL` | `#007AFF` manual ring fill |
 
-- The dial is a fixed 160 px square: full 270-degree arc (no gray
+- The dial is a fixed 84 px square: full 270-degree arc (no gray
   track, like the reference) with round caps, a knob marker at the
   value angle, centered value text and the caption below it inside
   the bottom gap.
@@ -135,13 +135,13 @@ pub fn set_focused(&mut self, focused: bool)
 
 | Token | Value |
 |---|---|
-| `CAP_RING_R` / `CAP_TRACK_W` | 60 px ring radius / 10 px stroke |
+| `CAP_RING_R` / `CAP_TRACK_W` | 30 px ring radius / 5 px stroke |
 | `CAP_START` / `CAP_SWEEP` | top start / full circle sweep |
-| `CAP_VALUE_SIZE` | 30 px centered value |
+| `CAP_VALUE_SIZE` | 15 px centered value |
 | `CAP_TRACK_DARK` / `CAP_TRACK_LIGHT` | `#3A3A3C` / `#E5E5E5` |
 | `CAP_FILL` | `#007AFF` manual value fill |
 
-- The dial is a fixed 138 px square: gray background track, full
+- The dial is a fixed 73 px square: gray background track, full
   circle, with the value arc sweeping clockwise from the top and
   round caps, plus centered value text. No knob, no caption, like
   the reference.

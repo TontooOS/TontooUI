@@ -14,23 +14,23 @@ use crate::renderer::text::{FontSystem, draw_layout};
 use crate::theme::desaturate;
 
 /// Ring centerline radius in logical px.
-pub const CIRC_RING_R: f32 = 70.0;
+pub const CIRC_RING_R: f32 = 35.0;
 /// Ring stroke width in logical px.
-pub const CIRC_TRACK_W: f32 = 12.0;
+pub const CIRC_TRACK_W: f32 = 6.0;
 /// Ring start angle in radians (bottom-left, screen coords).
 pub const CIRC_START: f64 = 0.75 * PI;
 /// Ring sweep in radians (270 degrees, gap at the bottom).
 pub const CIRC_SWEEP: f64 = 1.5 * PI;
 /// Value text size in logical px.
-pub const CIRC_VALUE_SIZE: f32 = 34.0;
+pub const CIRC_VALUE_SIZE: f32 = 17.0;
 /// Caption label size in logical px.
-pub const CIRC_LABEL_SIZE: f32 = 15.0;
+pub const CIRC_LABEL_SIZE: f32 = 7.5;
 /// Knob outer radius in logical px (fixed, independent of size).
-pub const CIRC_KNOB_R: f32 = 8.0;
+pub const CIRC_KNOB_R: f32 = 4.0;
 /// Knob middle ring radius in logical px (fixed).
-pub const CIRC_KNOB_RING_R: f32 = 5.5;
+pub const CIRC_KNOB_RING_R: f32 = 2.75;
 /// Knob center dot radius in logical px (fixed).
-pub const CIRC_DOT_R: f32 = 2.5;
+pub const CIRC_DOT_R: f32 = 1.25;
 /// Default ring fill (theme accent blue).
 pub const CIRC_FILL: Color = Color::from_rgb8(0x00, 0x7a, 0xff);
 
@@ -282,7 +282,7 @@ impl View for CircularGauge {
                 scene,
                 &layout,
                 cx - (tw / fonts.scale) / 2.0,
-                cy - 10.0 - (th / fonts.scale) / 2.0,
+                cy - 5.0 - (th / fonts.scale) / 2.0,
                 fonts.scale,
             );
         }
@@ -300,7 +300,7 @@ impl View for CircularGauge {
                 scene,
                 &layout,
                 cx - (tw / fonts.scale) / 2.0,
-                cy + 26.0 - (th / fonts.scale) / 2.0,
+                cy + 13.0 - (th / fonts.scale) / 2.0,
                 fonts.scale,
             );
         }
@@ -319,7 +319,7 @@ mod tests {
     fn fixed_square_size() {
         let mut gauge = CircularGauge::new(70.0, 0.0, 100.0);
         let mut fonts = FontSystem::new();
-        assert_eq!(gauge.measure(&mut fonts), (160.0, 160.0));
+        assert_eq!(gauge.measure(&mut fonts), (84.0, 84.0));
     }
 
     #[test]
