@@ -27,6 +27,7 @@ theme, animation and a Vello/WGPU renderer.
 | Scrollbar | [Scrollbar.md](Scrollbar.md) | Overlay side bar with fade, drag and page jump |
 | Slider | [Slider.md](Slider.md) | Slider with steps, labels, ticks, glass |
 | Theme | [Theme.md](Theme.md) | Live dark/light, accent, glass stage |
+| Text | [Text.md](Text.md) | Basic text with styles and foregrounds |
 | Titlebar | [Titlebar.md](Titlebar.md) | Custom decoration bar with drag region |
 | Toggle | [Toggle.md](Toggle.md) | Switch, button and checkbox styles |
 | Toolbar | [Toolbar.md](Toolbar.md) | Small clear-glass icon toolbar |

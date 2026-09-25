@@ -9,6 +9,7 @@ pub mod pickers;
 pub mod progress;
 pub mod scrollbar;
 pub mod sliders;
+pub mod text;
 pub mod titlebar;
 pub mod toggles;
 pub mod toolbar;
@@ -89,6 +90,10 @@ pub use toggles::{
     TOGGLE_SWITCH_W,
 };
 pub use glass::{GlassContainer, GlassType};
+pub use text::{
+    BasicText, ResolvedForeground, TextAlignment, TextForeground, TextStyle,
+    TEXT_TERTIARY_DARK, TEXT_TERTIARY_LIGHT,
+};
 pub use toolbar::{
     BasicToolbar, ToolbarItem, ToolbarPlacement, TOOLBAR_DIVIDER_H, TOOLBAR_DIVIDER_W,
     TOOLBAR_GAP, TOOLBAR_HEIGHT, TOOLBAR_HIT, TOOLBAR_ICON_SIZE, TOOLBAR_PAD_X,
