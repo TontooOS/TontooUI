@@ -25,6 +25,8 @@ pub fn width(self, px: f32) -> Self
 - `set_text`, `set_style`, `set_foreground`, `set_alignment`,
   `set_width(Option<f32>)`, `set_theme(ThemeMode)`,
   `set_focused(bool)` update live and mark the layout dirty.
+  The cached layout is also rebuilt automatically when the window
+  scale factor changes (DPI move), so glyphs stay sharp.
 - No mouse handling: display-only.
 
 ```rust

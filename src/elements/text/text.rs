@@ -44,6 +44,7 @@ pub struct BasicText {
     width: f32,
     height: f32,
     layout: Option<Layout<SolidBrush>>,
+    layout_scale: f32,
     dirty: bool,
 }
 
@@ -62,6 +63,7 @@ impl BasicText {
             width: 0.0,
             height: 0.0,
             layout: None,
+            layout_scale: 0.0,
             dirty: true,
         }
     }
@@ -178,7 +180,7 @@ impl BasicText {
     }
 
     fn ensure_layout(&mut self, fonts: &mut FontSystem) {
-        if !self.dirty && self.layout.is_some() {
+        if !self.dirty && self.layout.is_some() && self.layout_scale == fonts.scale {
             return;
         }
         // Bake the solid color into the layout; gradients paint white
@@ -205,6 +207,7 @@ impl BasicText {
             );
         }
         self.layout = Some(layout);
+        self.layout_scale = fonts.scale;
         self.dirty = false;
     }
 
@@ -290,7 +293,8 @@ pub(crate) fn gradient_brush(
 }
 
 /// Same glyph loop as `draw_layout`, but every run paints `brush`
-/// instead of its baked solid color.
+/// instead of its baked solid color. Origin snapped to physical
+/// pixels and hinting enabled, same as `draw_layout`.
 pub(crate) fn draw_with_brush(
     scene: &mut Scene,
     layout: &Layout<SolidBrush>,
@@ -299,18 +303,21 @@ pub(crate) fn draw_with_brush(
     scale: f32,
     brush: &Brush,
 ) {
+    let ox = (x * scale).round();
+    let oy = (y * scale).round();
     for line in layout.lines() {
         for item in line.items() {
             if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
                 let run = glyph_run.run();
                 let glyphs = glyph_run.positioned_glyphs().map(|glyph| vello::Glyph {
                     id: glyph.id,
-                    x: x * scale + glyph.x,
-                    y: y * scale + glyph.y,
+                    x: ox + glyph.x,
+                    y: oy + glyph.y,
                 });
                 scene
                     .draw_glyphs(run.font())
                     .font_size(run.font_size())
+                    .hint(true)
                     .brush(brush)
                     .draw(Fill::NonZero, glyphs);
             }

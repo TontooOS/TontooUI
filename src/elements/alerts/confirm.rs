@@ -51,6 +51,7 @@ pub struct ConfirmationDialog {
     placed_w: f32,
     placed_h: f32,
     title_layout: Option<Layout<SolidBrush>>,
+    layout_scale: f32,
     dirty: bool,
 }
 
@@ -92,6 +93,7 @@ impl ConfirmationDialog {
             placed_w: 0.0,
             placed_h: 0.0,
             title_layout: None,
+            layout_scale: 0.0,
             dirty: true,
         };
         dialog.rebuild_buttons();
@@ -267,7 +269,7 @@ impl ConfirmationDialog {
     }
 
     fn ensure_layout(&mut self, fonts: &mut FontSystem) {
-        if !self.dirty && self.title_layout.is_some() {
+        if !self.dirty && self.title_layout.is_some() && self.layout_scale == fonts.scale {
             return;
         }
         let max = (ALERT_WIDTH - ALERT_PAD * 2.0).max(0.0);
@@ -283,6 +285,7 @@ impl ConfirmationDialog {
             600.0,
             Some(max),
         ));
+        self.layout_scale = fonts.scale;
         self.dirty = false;
     }
 

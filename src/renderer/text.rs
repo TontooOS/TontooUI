@@ -55,6 +55,11 @@ impl FontSystem {
 
     /// Lay out `content` with an explicit font weight (400 regular, 600
     /// semibold, ...).
+    ///
+    /// `size` and `max_width` are logical px. The builder receives the
+    /// window display scale so Parley quantizes glyph positions to
+    /// physical pixel boundaries (crisp text, no blur). Line breaking
+    /// still takes physical px, hence `max_width * scale`.
     pub fn layout_text_weighted(
         &mut self,
         content: &str,
@@ -63,14 +68,13 @@ impl FontSystem {
         weight: f32,
         max_width: Option<f32>,
     ) -> Layout<SolidBrush> {
-        let px = size * self.scale;
         let mut builder =
             self.layout_cx
-                .ranged_builder(&mut self.font_cx, content, 1.0, true);
+                .ranged_builder(&mut self.font_cx, content, self.scale, true);
         builder.push_default(StyleProperty::Brush(SolidBrush { color }));
         builder.push_default(GenericFamily::SystemUi);
         builder.push_default(LineHeight::FontSizeRelative(1.25));
-        builder.push_default(StyleProperty::FontSize(px));
+        builder.push_default(StyleProperty::FontSize(size));
         builder.push_default(StyleProperty::FontWeight(FontWeight::new(weight)));
         let mut layout = builder.build(content);
         layout.break_all_lines(max_width.map(|w| w * self.scale));
@@ -78,7 +82,8 @@ impl FontSystem {
         layout
     }
 
-    /// Logical width/height of a finished layout.
+    /// Physical width/height of a finished layout. Divide by
+    /// `FontSystem::scale` for logical px.
     pub fn layout_size(layout: &Layout<SolidBrush>) -> (f32, f32) {
         (layout.width(), layout.height())
     }
@@ -97,14 +102,13 @@ impl FontSystem {
         max_width: Option<f32>,
         spans: &[RichSpan],
     ) -> Layout<SolidBrush> {
-        let px = size * self.scale;
         let mut builder =
             self.layout_cx
-                .ranged_builder(&mut self.font_cx, content, 1.0, true);
+                .ranged_builder(&mut self.font_cx, content, self.scale, true);
         builder.push_default(StyleProperty::Brush(SolidBrush { color }));
         builder.push_default(GenericFamily::SystemUi);
         builder.push_default(LineHeight::FontSizeRelative(1.25));
-        builder.push_default(StyleProperty::FontSize(px));
+        builder.push_default(StyleProperty::FontSize(size));
         builder.push_default(StyleProperty::FontWeight(FontWeight::new(400.0)));
         for span in spans {
             let start = span.range.start.min(content.len());
@@ -180,7 +184,15 @@ impl Default for FontSystem {
 }
 
 /// Draw a finished layout into `scene` at logical position (`x`, `y`).
+///
+/// The origin is snapped to physical pixels first: Parley quantizes
+/// glyphs to the pixel grid, and a fractional draw offset would push
+/// every glyph off-grid again (blurry text, esp. at fractional window
+/// scales like 125%/150%). Hinting is enabled so small glyphs stay
+/// sharp like native (DirectWrite/ClearType) text.
 pub fn draw_layout(scene: &mut Scene, layout: &Layout<SolidBrush>, x: f32, y: f32, scale: f32) {
+    let ox = (x * scale).round();
+    let oy = (y * scale).round();
     for line in layout.lines() {
         for item in line.items() {
             if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
@@ -188,12 +200,13 @@ pub fn draw_layout(scene: &mut Scene, layout: &Layout<SolidBrush>, x: f32, y: f3
                 let brush = Brush::Solid(glyph_run.style().brush.color);
                 let glyphs = glyph_run.positioned_glyphs().map(|glyph| vello::Glyph {
                     id: glyph.id,
-                    x: x * scale + glyph.x,
-                    y: y * scale + glyph.y,
+                    x: ox + glyph.x,
+                    y: oy + glyph.y,
                 });
                 scene
                     .draw_glyphs(run.font())
                     .font_size(run.font_size())
+                    .hint(true)
                     .brush(brush)
                     .draw(Fill::NonZero, glyphs);
             }

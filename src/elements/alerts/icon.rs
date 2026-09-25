@@ -59,6 +59,7 @@ pub struct IconAlert {
     placed_h: f32,
     title_layout: Option<Layout<SolidBrush>>,
     message_layout: Option<Layout<SolidBrush>>,
+    layout_scale: f32,
     dirty: bool,
 }
 
@@ -115,6 +116,7 @@ impl IconAlert {
             placed_h: 0.0,
             title_layout: None,
             message_layout: None,
+            layout_scale: 0.0,
             dirty: true,
         };
         alert.rebuild_buttons();
@@ -333,7 +335,11 @@ impl IconAlert {
     }
 
     fn ensure_layout(&mut self, fonts: &mut FontSystem) {
-        if !self.dirty && self.title_layout.is_some() && self.message_layout.is_some() {
+        if !self.dirty
+            && self.title_layout.is_some()
+            && self.message_layout.is_some()
+            && self.layout_scale == fonts.scale
+        {
             return;
         }
         let max = self.text_width();
@@ -352,6 +358,7 @@ impl IconAlert {
             400.0,
             Some(max),
         ));
+        self.layout_scale = fonts.scale;
         self.dirty = false;
     }
 

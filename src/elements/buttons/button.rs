@@ -76,6 +76,7 @@ pub struct Button {
     on_press: Option<Box<dyn FnMut()>>,
     layout: Option<Layout<SolidBrush>>,
     layout_color: Color,
+    layout_scale: f32,
     dirty: bool,
 }
 
@@ -103,6 +104,7 @@ impl Button {
             on_press: None,
             layout: None,
             layout_color: Color::WHITE,
+            layout_scale: 0.0,
             dirty: true,
         }
     }
@@ -257,7 +259,11 @@ impl Button {
     }
 
     fn ensure_layout(&mut self, fonts: &mut FontSystem, text: Color) {
-        if self.dirty || self.layout.is_none() || text != self.layout_color {
+        if self.dirty
+            || self.layout.is_none()
+            || text != self.layout_color
+            || self.layout_scale != fonts.scale
+        {
             self.layout = Some(fonts.layout_text(
                 &self.label,
                 BUTTON_FONT_SIZE,
@@ -265,6 +271,7 @@ impl Button {
                 None,
             ));
             self.layout_color = text;
+            self.layout_scale = fonts.scale;
             self.dirty = false;
         }
     }

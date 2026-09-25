@@ -301,7 +301,7 @@ impl FormattedText {
     }
 
     fn ensure_layout(&mut self, fonts: &mut FontSystem) {
-        if !self.dirty && self.layout.is_some() {
+        if !self.dirty && self.layout.is_some() && self.scale == fonts.scale {
             return;
         }
         let spans = self.active_spans();
@@ -446,6 +446,11 @@ impl FormattedText {
         let block = self.wrap_width.unwrap_or(self.intrinsic.0);
         let ox = self.origin_x(block).max(self.x);
         let oy = self.y;
+        // Snap to physical pixels like `draw_layout`: Parley
+        // quantizes glyphs to the pixel grid, a fractional offset
+        // would push them off-grid (blurry text).
+        let pox = (ox * scale).round();
+        let poy = (oy * scale).round();
         let layout = self.layout.as_ref().expect("layout built");
         let limit = self.line_limit.unwrap_or(usize::MAX);
         let explicit = self.explicit_ranges();
@@ -471,15 +476,16 @@ impl FormattedText {
                     let glyphs =
                         glyph_run.positioned_glyphs().map(|glyph| vello::Glyph {
                             id: glyph.id,
-                            x: ox * scale + glyph.x,
-                            y: oy * scale + glyph.y,
+                            x: pox + glyph.x,
+                            y: poy + glyph.y,
                         });
                     scene
                         .draw_glyphs(run.font())
                         .font_size(run.font_size())
+                        .hint(true)
                         .brush(brush)
                         .draw(Fill::NonZero, glyphs);
-                    self.draw_decorations(scene, &glyph_run, ox, oy, scale);
+                    self.draw_decorations(scene, &glyph_run, pox, poy);
                 }
             }
         }
@@ -489,17 +495,16 @@ impl FormattedText {
         &self,
         scene: &mut Scene,
         glyph_run: &parley::GlyphRun<'_, SolidBrush>,
-        ox: f32,
-        oy: f32,
-        scale: f32,
+        px: f32,
+        py: f32,
     ) {
         let metrics = glyph_run.run().metrics();
-        let x0 = (ox * scale + glyph_run.offset()) as f64;
+        let x0 = (px + glyph_run.offset()) as f64;
         let x1 = x0 + glyph_run.advance() as f64;
         if x1 <= x0 {
             return;
         }
-        let base = (oy * scale + glyph_run.baseline()) as f64;
+        let base = (py + glyph_run.baseline()) as f64;
         let style = glyph_run.style();
         if let Some(underline) = &style.underline {
             let size = underline

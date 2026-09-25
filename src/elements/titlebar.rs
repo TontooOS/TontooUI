@@ -80,6 +80,7 @@ pub struct Titlebar {
     text_color: Color,
     divider_color: Color,
     layout: Option<Layout<SolidBrush>>,
+    layout_scale: f32,
     dirty: bool,
 }
 
@@ -98,6 +99,7 @@ impl Titlebar {
             text_color: TITLEBAR_TEXT_DARK,
             divider_color: TITLEBAR_DIVIDER_DARK,
             layout: None,
+            layout_scale: 0.0,
             dirty: true,
         }
     }
@@ -214,7 +216,7 @@ impl Titlebar {
     }
 
     fn ensure_layout(&mut self, fonts: &mut FontSystem) {
-        if self.dirty || self.layout.is_none() {
+        if self.dirty || self.layout.is_none() || self.layout_scale != fonts.scale {
             self.layout = Some(fonts.layout_text_weighted(
                 &self.title,
                 13.0,
@@ -222,6 +224,7 @@ impl Titlebar {
                 600.0,
                 None,
             ));
+            self.layout_scale = fonts.scale;
             self.dirty = false;
         }
     }

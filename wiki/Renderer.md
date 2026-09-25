@@ -237,7 +237,9 @@ pub struct FontSystem {
 
 Wraps a Parley `FontContext` (system fonts, so SF Pro resolves on TontooOS)
 and a `LayoutContext`. `scale` is the window scale factor set by the loop;
-layouts are built in physical pixels so glyphs stay crisp.
+it is passed to Parley as the display scale so glyph positions quantize to
+physical pixel boundaries, and layouts are built in physical pixels so
+glyphs stay crisp.
 
 ```rust
 pub fn layout_text(&mut self, content: &str, size: f32, color: Color, max_width: Option<f32>) -> Layout<SolidBrush>
@@ -258,8 +260,11 @@ for logical units.
 pub fn draw_layout(scene: &mut Scene, layout: &Layout<SolidBrush>, x: f32, y: f32, scale: f32)
 ```
 
-Draws a finished layout at logical position (`x`, `y`). Iterates glyph runs
-and records them with `Scene::draw_glyphs`. Only glyph runs are drawn;
+Draws a finished layout at logical position (`x`, `y`). The origin is
+snapped to physical pixels first (a fractional offset would push the
+quantized glyphs off-grid and blur the text, esp. at fractional window
+scales like 125%/150%), then glyph runs are recorded with
+`Scene::draw_glyphs` and hinting enabled. Only glyph runs are drawn;
 inline boxes are skipped.
 
 ## Images
