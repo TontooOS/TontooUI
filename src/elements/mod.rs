@@ -3,6 +3,7 @@ pub mod dividers;
 pub mod animation;
 pub mod alerts;
 pub mod gestures;
+pub mod groupbox;
 pub mod sheets;
 pub mod unavailable;
 pub mod gauges;
@@ -34,6 +35,9 @@ pub use gestures::{
     GestureArea, GESTURE_DOUBLE_TAP_SECONDS, GESTURE_LONG_PRESS_SECONDS,
     GESTURE_MAGNIFY_MAX, GESTURE_MAGNIFY_MIN, GESTURE_MAGNIFY_STEP,
     GESTURE_MOVE_SLOP,
+};
+pub use groupbox::{
+    BasicGroupBox, GROUP_BG_DARK, GROUP_BG_LIGHT, GROUP_PAD, GROUP_RADIUS,
 };
 pub use unavailable::{
     ContentUnavailable, CustomContentUnavailable, SearchEmpty,

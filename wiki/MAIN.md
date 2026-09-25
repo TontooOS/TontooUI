@@ -21,6 +21,7 @@ theme, animation and a Vello/WGPU renderer.
 | Gauge | [Gauge.md](Gauge.md) | Basic, linear, circular and capacity gauges |
 | Glass | [Glass.md](Glass.md) | Liquid glass container and backdrop blur |
 | Gestures | [Gestures.md](Gestures.md) | Tap, long press, drag and magnify areas |
+| Groupbox | [Groupbox.md](Groupbox.md) | Basic group box with centered text |
 | Images | [Images.md](Images.md) | SF Symbol, app resource, URL and overlay card |
 | Layout | [Layout.md](Layout.md) | VStack, HStack, ZStack, modifiers, `View` |
 | List | [List.md](List.md) | Static text list with row dividers |
