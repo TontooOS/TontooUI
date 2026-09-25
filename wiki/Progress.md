@@ -64,10 +64,10 @@ pub fn set_dark(&mut self, dark: bool)
 
 | Token | Value |
 |---|---|
-| `SPINNER_SPOKES` | 12 spokes, one revolution per second |
-| `SPINNER_R_OUT` / `SPINNER_R_IN` | 16 px outer / 9 px inner spoke radius |
-| `SPINNER_SPOKE_W` | 3.5 px rounded spokes |
-| `SPINNER_STEP_SECONDS` | 1/12 s per spoke step |
+| `SPINNER_SPOKES` | 8 spokes, one rough revolution per second |
+| `SPINNER_R_OUT` / `SPINNER_R_IN` | 12 px outer / 7 px inner spoke radius |
+| `SPINNER_SPOKE_W` | 3 px rounded spokes |
+| `SPINNER_STEP_SECONDS` | 1/8 s per spoke step |
 | `SPINNER_TAIL_ALPHA` | 0.15 lightest trail spoke |
 | `SPINNER_TEXT_SIZE` / `SPINNER_TEXT_GAP` | 13 px caption / 8 px caption gap |
 | `SPINNER_GRAY` | `#8E8E93` default spoke color |

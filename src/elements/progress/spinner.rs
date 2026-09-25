@@ -10,14 +10,14 @@ use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, draw_layout};
 
 /// Spoke count around the dial.
-pub const SPINNER_SPOKES: usize = 12;
+pub const SPINNER_SPOKES: usize = 8;
 /// Outer spoke radius in logical px.
-pub const SPINNER_R_OUT: f32 = 16.0;
+pub const SPINNER_R_OUT: f32 = 12.0;
 /// Inner spoke radius in logical px.
-pub const SPINNER_R_IN: f32 = 9.0;
+pub const SPINNER_R_IN: f32 = 7.0;
 /// Spoke line width in logical px.
-pub const SPINNER_SPOKE_W: f32 = 3.5;
-/// Seconds per spoke step (one revolution per second).
+pub const SPINNER_SPOKE_W: f32 = 3.0;
+/// Seconds per spoke step (one rougher revolution per second).
 pub const SPINNER_STEP_SECONDS: f64 = 1.0 / SPINNER_SPOKES as f64;
 /// Lightest trail alpha (head spoke is fully opaque).
 pub const SPINNER_TAIL_ALPHA: f32 = 0.15;
@@ -28,8 +28,8 @@ pub const SPINNER_TEXT_GAP: f32 = 8.0;
 /// Default spoke color (always gray, never the accent).
 pub const SPINNER_GRAY: Color = Color::from_rgb8(0x8e, 0x8e, 0x93);
 
-/// Indeterminate spinner: twelve spokes rotating with a fade trail
-/// behind the head spoke, like the reference, plus an optional
+/// Indeterminate spinner: eight spokes stepping round with a fade
+/// trail behind the head spoke, like Apple, plus an optional
 /// caption (`"Loading..."`) below. Display-only (no mouse handling,
 /// no accent on purpose): the spokes stay gray unless the dev sets
 /// a color by hand.
@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn trail_fades_behind_head() {
         assert_eq!(Spinner::trail_alpha(0), 1.0);
-        assert!((Spinner::trail_alpha(11) - SPINNER_TAIL_ALPHA).abs() < 1e-6);
+        assert!((Spinner::trail_alpha(SPINNER_SPOKES - 1) - SPINNER_TAIL_ALPHA).abs() < 1e-6);
         let mut last = 2.0;
         for age in 0..SPINNER_SPOKES {
             let a = Spinner::trail_alpha(age);
@@ -223,7 +223,7 @@ mod tests {
         spinner.advance(t0 + Duration::from_secs_f64(SPINNER_STEP_SECONDS * 3.0));
         assert_eq!(spinner.head(), 3);
         // Full revolution wraps around.
-        spinner.advance(t0 + Duration::from_secs_f64(SPINNER_STEP_SECONDS * 12.0));
+        spinner.advance(t0 + Duration::from_secs_f64(SPINNER_STEP_SECONDS * SPINNER_SPOKES as f64));
         assert_eq!(spinner.head(), 0);
     }
 
