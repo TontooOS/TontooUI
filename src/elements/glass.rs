@@ -2,7 +2,7 @@ use std::any::Any;
 
 use vello::Scene;
 use super::layout::View;
-use vello::kurbo::{Affine, Point, RoundedRect, Stroke};
+use vello::kurbo::{Affine, BezPath, Point, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
 use crate::renderer::backdrop::{fill_frosted_glass, fill_lens_glass};
@@ -21,6 +21,15 @@ pub const GLASS_DEPTH: Color = Color::from_rgba8(0, 0, 0, 46);
 /// Uniform dark-gray 1 px rim for the Frosted finish: no specular top
 /// light, no depth shade, the same border on every side.
 pub const GLASS_FROSTED_RIM: Color = Color::from_rgba8(0x3a, 0x3a, 0x3c, 255);
+/// Top edge sheen core (both finishes): subtle white, strongest in the
+/// middle of the edge, fading out toward the corners.
+pub const GLASS_SHEEN_TOP: Color = Color::from_rgba8(255, 255, 255, 64);
+/// Top edge sheen glow (both finishes): wider and fainter halo under the core.
+pub const GLASS_SHEEN_TOP_GLOW: Color = Color::from_rgba8(255, 255, 255, 20);
+/// Bottom edge sheen core (both finishes): much fainter counterpart.
+pub const GLASS_SHEEN_BOTTOM: Color = Color::from_rgba8(255, 255, 255, 26);
+/// Bottom edge sheen glow (both finishes).
+pub const GLASS_SHEEN_BOTTOM_GLOW: Color = Color::from_rgba8(255, 255, 255, 10);
 /// Chromatic rim split, red side.
 pub const GLASS_CHROMA_RED: Color = Color::from_rgba8(255, 90, 120, 30);
 /// Chromatic rim split, cyan side.
@@ -60,8 +69,9 @@ pub enum GlassType {
 
 /// Liquid glass container: clear minified lens center, frosted edge band,
 /// liquid bevel rim with specular top light and depth shade (Lens finish;
-/// Frosted uses a uniform 1 px dark-gray rim instead), chromatic edge
-/// split and a soft shadow. Optional content draws on top.
+/// Frosted uses a uniform 1 px dark-gray rim instead), top/bottom edge
+/// sheen brightest in the middle (both finishes), chromatic edge split
+/// (Lens finish) and a soft shadow. Optional content draws on top.
 ///
 /// When the shell runs a backdrop pass (`App::wants_backdrop`), the center
 /// samples the sharp in-app capture slightly minified so content behind
@@ -194,6 +204,77 @@ impl GlassContainer {
 
     pub fn child_mut<T: View + 'static>(&mut self) -> Option<&mut T> {
         self.child.as_mut()?.as_any_mut().downcast_mut::<T>()
+    }
+
+    /// Edge sheen: a 1 px line along the straight top (or bottom) edge,
+    /// brightest in the middle and fading out toward the corners. A
+    /// wider faint halo under it softens the line, like the reference
+    /// menu highlight.
+    fn draw_edge_sheen(
+        &self,
+        scene: &mut Scene,
+        rect: vello::kurbo::Rect,
+        radius: f64,
+        scale: f64,
+        top: bool,
+    ) {
+        let y = if top {
+            rect.y0 + 1.5 * scale
+        } else {
+            rect.y1 - 1.5 * scale
+        };
+        let x0 = rect.x0 + radius;
+        let x1 = rect.x1 - radius;
+        if x1 <= x0 {
+            return;
+        }
+        let (core, glow) = if top {
+            (GLASS_SHEEN_TOP, GLASS_SHEEN_TOP_GLOW)
+        } else {
+            (GLASS_SHEEN_BOTTOM, GLASS_SHEEN_BOTTOM_GLOW)
+        };
+        let falloff = |color: Color| {
+            Gradient::new_linear(Point::new(x0, y), Point::new(x1, y)).with_stops([
+                ColorStop {
+                    offset: 0.0,
+                    color: Color::TRANSPARENT.into(),
+                },
+                ColorStop {
+                    offset: 0.18,
+                    color: color.into(),
+                },
+                ColorStop {
+                    offset: 0.5,
+                    color: color.into(),
+                },
+                ColorStop {
+                    offset: 0.82,
+                    color: color.into(),
+                },
+                ColorStop {
+                    offset: 1.0,
+                    color: Color::TRANSPARENT.into(),
+                },
+            ])
+        };
+        let mut line = BezPath::new();
+        line.move_to((x0, y));
+        line.line_to((x1, y));
+        // Wide faint halo first, crisp 1 px core on top.
+        scene.stroke(
+            &Stroke::new(3.0 * scale),
+            Affine::IDENTITY,
+            &Brush::Gradient(falloff(glow)),
+            None,
+            &line,
+        );
+        scene.stroke(
+            &Stroke::new(1.0 * scale),
+            Affine::IDENTITY,
+            &Brush::Gradient(falloff(core)),
+            None,
+            &line,
+        );
     }
 
     fn render(
@@ -349,6 +430,12 @@ impl GlassContainer {
             &cyan,
         );
         }
+
+        // Edge sheen for both finishes: subtle top light, brightest in
+        // the middle and fading toward the corners, with a much
+        // fainter counterpart at the bottom.
+        self.draw_edge_sheen(scene, rect, radius, scale, true);
+        self.draw_edge_sheen(scene, rect, radius, scale, false);
 
         // Grainy black outer edge (less glass): scattered speckles outside
         // the crisp rim.
