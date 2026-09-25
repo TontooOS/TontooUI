@@ -90,8 +90,9 @@ pub use toggles::{
 };
 pub use glass::{GlassContainer, GlassType};
 pub use toolbar::{
-    BasicToolbar, ToolbarPlacement, TOOLBAR_GAP, TOOLBAR_HEIGHT, TOOLBAR_HIT,
-    TOOLBAR_ICON_SIZE, TOOLBAR_PAD_X, TOOLBAR_RADIUS,
+    BasicToolbar, ToolbarItem, ToolbarPlacement, TOOLBAR_DIVIDER_H, TOOLBAR_DIVIDER_W,
+    TOOLBAR_GAP, TOOLBAR_HEIGHT, TOOLBAR_HIT, TOOLBAR_ICON_SIZE, TOOLBAR_PAD_X,
+    TOOLBAR_RADIUS,
 };
 pub use layout::{Align, Background, Frame, HStack, Padding, Spacer, View, VStack, ZStack};
 pub use titlebar::{Titlebar, TitlebarHeight, TrafficAction};

@@ -2,9 +2,10 @@
 
 Toolbar category in `src/elements/toolbar/`: `BasicToolbar` in
 `basic.rs` is a small capsule toolbar in the clear (`Lens`) glass
-finish holding icon buttons. Icons come from CoreIcon
-(`COREICON_ASSETS_DIR` override or the system resources on TontooOS);
-a missing icon draws an empty cell that still fires its action.
+finish holding icon buttons with optional vertical dividers. Icons
+come from CoreIcon (`COREICON_ASSETS_DIR` override or the system
+resources on TontooOS); a missing icon draws an empty cell that still
+fires its action.
 
 > **Note:** the toolbar never uses the `Frosted` finish. The body is
 > always `GlassType::Lens` (clear minified center, blur only on the
@@ -20,6 +21,8 @@ a missing icon draws an empty cell that still fires its action.
 | `TOOLBAR_PAD_X` | `8.0` |
 | `TOOLBAR_GAP` | `4.0` between cells |
 | `TOOLBAR_HIT` | `28.0` square cell |
+| `TOOLBAR_DIVIDER_W` | `9.0` divider cell |
+| `TOOLBAR_DIVIDER_H` | `20.0` divider line |
 
 ```rust
 pub const TOOLBAR_HEIGHT: f32;    // 36.0, kept small on purpose
@@ -28,7 +31,34 @@ pub const TOOLBAR_ICON_SIZE: f32; // 18.0
 pub const TOOLBAR_PAD_X: f32;     // 8.0
 pub const TOOLBAR_GAP: f32;       // 4.0
 pub const TOOLBAR_HIT: f32;       // 28.0
+pub const TOOLBAR_DIVIDER_W: f32; // 9.0
+pub const TOOLBAR_DIVIDER_H: f32; // 20.0
 ```
+
+## Items
+
+```rust
+pub enum ToolbarItem {
+    Icon(String),
+    Divider,
+}
+```
+
+`Icon` is an SF Symbol button, `Divider` is a thin vertical line
+between icons. Dividers are display-only: they never hover, never
+press and never fire `on_action` (which reports the item index, so
+icons after a divider keep their position index).
+
+```rust
+pub fn from_items(items: Vec<ToolbarItem>) -> Self
+pub fn items(self, items: Vec<ToolbarItem>) -> Self
+pub fn item(self, item: ToolbarItem) -> Self
+pub fn divider(self) -> Self
+pub fn set_items(&mut self, items: Vec<ToolbarItem>)
+```
+
+The `from_icons` / `icons` / `icon` / `set_icons` helpers build
+icon-only toolbars.
 
 ## Placement
 
@@ -83,11 +113,12 @@ the icon color like the rest of the palette.
 ## Usage / Example
 
 ```rust
-use tontooui::elements::{BasicToolbar, ToolbarPlacement, View};
+use tontooui::elements::{BasicToolbar, ToolbarItem, ToolbarPlacement, View};
 
-let mut bar = BasicToolbar::from_icons(vec![
-    "chevron.left".to_string(),
-    "line.3.horizontal".to_string(),
+let mut bar = BasicToolbar::from_items(vec![
+    ToolbarItem::icon("chevron.left"),
+    ToolbarItem::divider(),
+    ToolbarItem::icon("chevron.right"),
 ])
 .placement(ToolbarPlacement::Leading)
 .on_action(|index| println!("toolbar tap {index}"));

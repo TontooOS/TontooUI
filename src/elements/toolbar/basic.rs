@@ -4,6 +4,7 @@ use vello::Scene;
 use vello::kurbo::{Affine, RoundedRect};
 use vello::peniko::{Brush, Color, Fill};
 
+use super::super::dividers::{DIVIDER_DARK, DIVIDER_LIGHT};
 use super::super::glass::{GlassContainer, GlassType};
 use super::super::layout::View;
 use crate::renderer::images::ImageLoader;
@@ -22,6 +23,10 @@ pub const TOOLBAR_PAD_X: f32 = 8.0;
 pub const TOOLBAR_GAP: f32 = 4.0;
 /// Square hit target per icon in logical px.
 pub const TOOLBAR_HIT: f32 = 28.0;
+/// Divider cell width in logical px (1 px line plus air on both sides).
+pub const TOOLBAR_DIVIDER_W: f32 = 9.0;
+/// Divider line height in logical px, centered in the pill.
+pub const TOOLBAR_DIVIDER_H: f32 = 20.0;
 /// Icon color in dark mode.
 pub const TOOLBAR_ICON_DARK: Color = Color::from_rgb8(0xf5, 0xf5, 0xf7);
 /// Icon color in light mode.
@@ -39,17 +44,38 @@ pub enum ToolbarPlacement {
     Trailing,
 }
 
+/// One toolbar cell: an icon button or a display-only vertical divider.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ToolbarItem {
+    /// SF Symbol icon button (e.g. `"chevron.left"`, `"heart"`).
+    Icon(String),
+    /// Thin vertical divider between icons. Display-only: never hovered,
+    /// never pressed, never fires `on_action`.
+    Divider,
+}
+
+impl ToolbarItem {
+    pub fn icon(name: impl Into<String>) -> Self {
+        Self::Icon(name.into())
+    }
+
+    pub fn divider() -> Self {
+        Self::Divider
+    }
+}
+
 /// Basic toolbar: a small capsule in the clear (`Lens`) glass finish
-/// holding icon buttons (SF Symbols from CoreIcon). Each icon is a
+/// holding icon buttons (SF Symbols from CoreIcon) with optional
+/// vertical dividers between them. Each icon is a
 /// normal button action: hover tints the icon cell, pressing fires
-/// `on_action` with the icon index.
+/// `on_action` with the item index.
 ///
 /// The toolbar never uses the `Frosted` finish: the body is always
 /// `GlassType::Lens` (clear minified center, blur only on the rim).
 /// Hover lightens the cell in dark mode and darkens it in light mode;
 /// pressing deepens the same tint.
 pub struct BasicToolbar {
-    icons: Vec<String>,
+    items: Vec<ToolbarItem>,
     placement: ToolbarPlacement,
     dark: bool,
     focused: bool,
@@ -71,7 +97,7 @@ impl BasicToolbar {
     pub fn new() -> Self {
         let glass = GlassContainer::new().glass_type(GlassType::Lens);
         Self {
-            icons: Vec::new(),
+            items: Vec::new(),
             placement: ToolbarPlacement::Leading,
             dark: true,
             focused: true,
@@ -94,19 +120,44 @@ impl BasicToolbar {
         Self::new().icons(icons)
     }
 
+    pub fn from_items(items: Vec<ToolbarItem>) -> Self {
+        Self::new().items(items)
+    }
+
     pub fn icons(mut self, icons: Vec<String>) -> Self {
-        self.icons = icons;
+        self.items = icons.into_iter().map(ToolbarItem::Icon).collect();
+        self
+    }
+
+    pub fn items(mut self, items: Vec<ToolbarItem>) -> Self {
+        self.items = items;
         self
     }
 
     /// Push one SF Symbol icon (e.g. `"chevron.left"`, `"heart"`).
     pub fn icon(mut self, name: impl Into<String>) -> Self {
-        self.icons.push(name.into());
+        self.items.push(ToolbarItem::Icon(name.into()));
+        self
+    }
+
+    /// Push a vertical divider after the previous item.
+    pub fn divider(mut self) -> Self {
+        self.items.push(ToolbarItem::Divider);
+        self
+    }
+
+    /// Push any item (icon or divider).
+    pub fn item(mut self, item: ToolbarItem) -> Self {
+        self.items.push(item);
         self
     }
 
     pub fn set_icons(&mut self, icons: Vec<String>) {
-        self.icons = icons;
+        self.items = icons.into_iter().map(ToolbarItem::Icon).collect();
+    }
+
+    pub fn set_items(&mut self, items: Vec<ToolbarItem>) {
+        self.items = items;
     }
 
     /// Icon placement inside the toolbar rect.
@@ -119,7 +170,8 @@ impl BasicToolbar {
         self.placement = placement;
     }
 
-    /// Normal button action: fires with the icon index on click.
+    /// Normal button action: fires with the item index on icon click.
+    /// Divider cells never fire.
     pub fn on_action(mut self, callback: impl FnMut(usize) + 'static) -> Self {
         self.on_action = Some(Box::new(callback));
         self
@@ -157,13 +209,19 @@ impl BasicToolbar {
         self.glass.set_focused(focused);
     }
 
+    fn item_width(item: &ToolbarItem) -> f32 {
+        match item {
+            ToolbarItem::Icon(_) => TOOLBAR_HIT,
+            ToolbarItem::Divider => TOOLBAR_DIVIDER_W,
+        }
+    }
+
     fn content_width(&self) -> f32 {
-        if self.icons.is_empty() {
+        if self.items.is_empty() {
             return TOOLBAR_PAD_X * 2.0;
         }
-        TOOLBAR_PAD_X * 2.0
-            + self.icons.len() as f32 * TOOLBAR_HIT
-            + (self.icons.len() as f32 - 1.0) * TOOLBAR_GAP
+        let cells: f32 = self.items.iter().map(Self::item_width).sum();
+        TOOLBAR_PAD_X * 2.0 + cells + (self.items.len() as f32 - 1.0) * TOOLBAR_GAP
     }
 
     fn layout_cells(&mut self) {
@@ -178,18 +236,29 @@ impl BasicToolbar {
                 self.x + self.width - TOOLBAR_PAD_X - content
             }
         };
-        let cy = self.y + (self.height - TOOLBAR_HIT) / 2.0;
+        let icon_y = self.y + (self.height - TOOLBAR_HIT) / 2.0;
+        let divider_y = self.y + (self.height - TOOLBAR_DIVIDER_H) / 2.0;
         let mut cx = start_x;
-        for _ in self.icons.iter() {
-            self.cells.push((cx, cy, TOOLBAR_HIT, TOOLBAR_HIT));
-            cx += TOOLBAR_HIT + TOOLBAR_GAP;
+        for item in self.items.iter() {
+            match item {
+                ToolbarItem::Icon(_) => {
+                    self.cells.push((cx, icon_y, TOOLBAR_HIT, TOOLBAR_HIT));
+                    cx += TOOLBAR_HIT + TOOLBAR_GAP;
+                }
+                ToolbarItem::Divider => {
+                    self.cells.push((cx, divider_y, TOOLBAR_DIVIDER_W, TOOLBAR_DIVIDER_H));
+                    cx += TOOLBAR_DIVIDER_W + TOOLBAR_GAP;
+                }
+            }
         }
     }
 
+    /// Hit index of the icon cell at `(x, y)`. Divider cells never hit.
     fn cell_at(&self, x: f32, y: f32) -> Option<usize> {
         self.cells
             .iter()
             .enumerate()
+            .filter(|(index, _)| matches!(self.items.get(*index), Some(ToolbarItem::Icon(_))))
             .find(|(_, (cx, cy, cw, ch))| {
                 x >= *cx && x <= *cx + *cw && y >= *cy && y <= *cy + *ch
             })
@@ -236,7 +305,8 @@ impl BasicToolbar {
         }
     }
 
-    /// Click handling. Returns the icon index when hit, otherwise `None`.
+    /// Click handling. Returns the item index when an icon was hit,
+    /// otherwise `None` (dividers never hit).
     pub fn press(&mut self, x: f32, y: f32) -> Option<usize> {
         if self.disabled {
             return None;
@@ -290,40 +360,74 @@ impl BasicToolbar {
 
         let scale = fonts.scale as f64;
         let mut icon_color = self.icon_color;
+        let mut divider_color = if self.dark { DIVIDER_DARK } else { DIVIDER_LIGHT };
         if !self.focused {
             icon_color = desaturate(icon_color);
+            divider_color = desaturate(divider_color);
         }
         if self.disabled {
             let c = icon_color.to_rgba8();
             icon_color =
                 Color::from_rgba8(c.r, c.g, c.b, (c.a as f32 * 0.4).round() as u8);
+            let d = divider_color.to_rgba8();
+            divider_color =
+                Color::from_rgba8(d.r, d.g, d.b, (d.a as f32 * 0.4).round() as u8);
         }
 
-        for (index, (cx, cy, cw, ch)) in self.cells.clone().iter().enumerate() {
-            let hovered = self.hovered == Some(index);
-            let pressed = self.pressed == Some(index) && self.armed;
-            if let Some(tint) = self.state_tint(hovered, pressed) {
-                let cell = RoundedRect::new(
-                    (*cx as f64) * scale,
-                    (*cy as f64) * scale,
-                    ((cx + cw) as f64) * scale,
-                    ((cy + ch) as f64) * scale,
-                    (TOOLBAR_HIT / 2.0 as f32) as f64 * scale,
-                );
-                scene.fill(Fill::NonZero, Affine::IDENTITY, &Brush::Solid(tint), None, &cell);
-            }
-            if let Some(name) = self.icons.get(index).cloned() {
-                let target =
-                    (TOOLBAR_ICON_SIZE * fonts.scale * 2.0).ceil().max(1.0) as u32;
-                if let Some((image, iw, ih)) = images.get(&name, icon_color, target) {
-                    let s = (TOOLBAR_ICON_SIZE / iw as f32)
-                        .min(TOOLBAR_ICON_SIZE / ih as f32);
-                    let ix = cx + (cw - iw as f32 * s) / 2.0;
-                    let iy = cy + (ch - ih as f32 * s) / 2.0;
-                    let transform =
-                        Affine::translate((ix as f64 * scale, iy as f64 * scale))
-                            * Affine::scale(s as f64 * scale);
-                    scene.draw_image(&image, transform);
+        for (index, item) in self.items.clone().iter().enumerate() {
+            let (cx, cy, cw, ch) = self.cells[index];
+            match item {
+                ToolbarItem::Divider => {
+                    // 1 px vertical line centered in the divider cell.
+                    let lx = (cx + cw / 2.0) as f64 * scale;
+                    let line = RoundedRect::new(
+                        lx - 0.5 * scale,
+                        cy as f64 * scale,
+                        lx + 0.5 * scale,
+                        (cy + ch) as f64 * scale,
+                        0.5 * scale,
+                    );
+                    scene.fill(
+                        Fill::NonZero,
+                        Affine::IDENTITY,
+                        &Brush::Solid(divider_color),
+                        None,
+                        &line,
+                    );
+                    continue;
+                }
+                ToolbarItem::Icon(name) => {
+                    let name = name.clone();
+                    let hovered = self.hovered == Some(index);
+                    let pressed = self.pressed == Some(index) && self.armed;
+                    if let Some(tint) = self.state_tint(hovered, pressed) {
+                        let cell = RoundedRect::new(
+                            (cx as f64) * scale,
+                            (cy as f64) * scale,
+                            ((cx + cw) as f64) * scale,
+                            ((cy + ch) as f64) * scale,
+                            (TOOLBAR_HIT / 2.0 as f32) as f64 * scale,
+                        );
+                        scene.fill(
+                            Fill::NonZero,
+                            Affine::IDENTITY,
+                            &Brush::Solid(tint),
+                            None,
+                            &cell,
+                        );
+                    }
+                    let target =
+                        (TOOLBAR_ICON_SIZE * fonts.scale * 2.0).ceil().max(1.0) as u32;
+                    if let Some((image, iw, ih)) = images.get(&name, icon_color, target) {
+                        let s = (TOOLBAR_ICON_SIZE / iw as f32)
+                            .min(TOOLBAR_ICON_SIZE / ih as f32);
+                        let ix = cx + (cw - iw as f32 * s) / 2.0;
+                        let iy = cy + (ch - ih as f32 * s) / 2.0;
+                        let transform =
+                            Affine::translate((ix as f64 * scale, iy as f64 * scale))
+                                * Affine::scale(s as f64 * scale);
+                        scene.draw_image(&image, transform);
+                    }
                 }
             }
         }
@@ -426,5 +530,34 @@ mod tests {
         bar.mouse_down((cx + cw / 2.0) as f64, (cy + ch / 2.0) as f64);
         bar.mouse_up((cx + cw / 2.0) as f64, (cy + ch / 2.0) as f64);
         assert_eq!(fired.get(), 1);
+    }
+
+    #[test]
+    fn divider_sizes_and_never_hits() {
+        let mut bar = BasicToolbar::from_items(vec![
+            ToolbarItem::icon("chevron.left"),
+            ToolbarItem::divider(),
+            ToolbarItem::icon("chevron.right"),
+        ])
+        .on_action(|_| {});
+        let mut fonts = FontSystem::new();
+        let (w, h) = bar.measure(&mut fonts);
+        assert_eq!(h, TOOLBAR_HEIGHT);
+        assert_eq!(
+            w,
+            TOOLBAR_PAD_X * 2.0
+                + 2.0 * TOOLBAR_HIT
+                + TOOLBAR_DIVIDER_W
+                + 2.0 * TOOLBAR_GAP
+        );
+        bar.place(&mut fonts, 0.0, 0.0, 300.0, TOOLBAR_HEIGHT);
+        // Divider cell keeps the divider line rect.
+        assert_eq!(bar.cells[1].2, TOOLBAR_DIVIDER_W);
+        assert_eq!(bar.cells[1].3, TOOLBAR_DIVIDER_H);
+        // Divider center never hits; icons keep item indices.
+        let (dx, dy, dw, dh) = bar.cells[1];
+        assert_eq!(bar.press(dx + dw / 2.0, dy + dh / 2.0), None);
+        let (cx, cy, cw, ch) = bar.cells[2];
+        assert_eq!(bar.press(cx + cw / 2.0, cy + ch / 2.0), Some(2));
     }
 }

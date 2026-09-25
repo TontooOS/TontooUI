@@ -1,5 +1,6 @@
 use tontooui::elements::{
-    Align, BasicToolbar, Titlebar, ToolbarPlacement, TrafficAction, View, VStack,
+    Align, BasicToolbar, Titlebar, ToolbarItem, ToolbarPlacement, TrafficAction, View,
+    VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
@@ -22,9 +23,10 @@ impl ToolbarDemo {
             .spacing(16.0)
             .align(Align::Center)
             .child(
-                BasicToolbar::from_icons(vec![
-                    "chevron.left".to_string(),
-                    "line.3.horizontal".to_string(),
+                BasicToolbar::from_items(vec![
+                    ToolbarItem::icon("chevron.left"),
+                    ToolbarItem::divider(),
+                    ToolbarItem::icon("chevron.right"),
                 ])
                 .placement(ToolbarPlacement::Leading)
                 .on_action(|index| println!("basic toolbar action {index}")),
