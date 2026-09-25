@@ -21,6 +21,7 @@ theme, animation and a Vello/WGPU renderer.
 | Renderer | [Renderer.md](Renderer.md) | Window shell, frame pipeline, backdrop blur |
 | Picker | [Picker.md](Picker.md) | Segmented, inline, menu and date pickers |
 | Progress | [Progress.md](Progress.md) | Linear progress bar with chase buffer |
+| Scrollbar | [Scrollbar.md](Scrollbar.md) | Overlay side bar with fade, drag and page jump |
 | Slider | [Slider.md](Slider.md) | Slider with steps, labels, ticks, glass |
 | Theme | [Theme.md](Theme.md) | Live dark/light, accent, glass stage |
 | Titlebar | [Titlebar.md](Titlebar.md) | Custom decoration bar with drag region |
