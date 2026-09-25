@@ -1,19 +1,20 @@
 # Gestures
 
 Gestures category in `src/elements/gestures/`: `GestureArea<V>` in
-`area.rs` wraps any child element and tracks tap, long press, drag
-and magnify (mouse wheel) inside its placed rect, reporting them
-through callbacks back to the app. The child fills the area; with
-`draggable` it follows the drag offset and with `zoomable` it scales
-around the center. Display-only otherwise (the wrapper draws just
-its child).
+`area.rs` wraps any child element and tracks tap, double tap, long
+press, drag and magnify (mouse wheel) inside its placed rect,
+reporting them through callbacks back to the app. The child fills
+the area; with `draggable` it follows the drag offset and with
+`zoomable` it scales around the center. Display-only otherwise (the
+wrapper draws just its child).
 
 ## Geometry
 
 | Token | Value |
 |---|---|
 | `GESTURE_LONG_PRESS_SECONDS` | 0.6 s hold time for a long press (mirrors context menus) |
-| `GESTURE_MOVE_SLOP` | 10 px wander allowance: moving further cancels tap/long press, starts a drag |
+| `GESTURE_DOUBLE_TAP_SECONDS` | 0.4 s window for the second tap of a double tap |
+| `GESTURE_MOVE_SLOP` | 10 px wander allowance: moving further cancels taps and long press, starts a drag |
 | `GESTURE_MAGNIFY_STEP` | 0.005 zoom factor per wheel notch (logical px delta scaled by this) |
 | `GESTURE_MAGNIFY_MIN` / `GESTURE_MAGNIFY_MAX` | 0.25 / 4.0 zoom clamp |
 
@@ -22,6 +23,7 @@ its child).
 ```rust
 pub fn new(child: V) -> Self
 pub fn on_tap(self, callback: impl FnMut() + 'static) -> Self
+pub fn on_double_tap(self, callback: impl FnMut() + 'static) -> Self
 pub fn on_long_press(self, callback: impl FnMut() + 'static) -> Self
 pub fn on_drag(self, callback: impl FnMut(f32, f32) + 'static) -> Self
 pub fn on_magnify(self, callback: impl FnMut(f32) + 'static) -> Self
@@ -40,10 +42,12 @@ pub fn mouse_wheel(&mut self, dx: f64, dy: f64)
 
 - Presses outside the placed rect are ignored. Tap is a quick
   release inside without wandering and without a long press having
-  fired. Long press fires once while holding past the hold time
-  (polled every draw, so no release is needed); wandering past the
-  slop cancels it and starts a drag instead, which also suppresses
-  the tap.
+  fired. Double tap is a second tap within the window and slop: each
+  release still fires `on_tap`, the second additionally fires
+  `on_double_tap`. Long press fires once while holding past the hold
+  time (polled every draw, so no release is needed); wandering past
+  the slop cancels it and starts a drag instead, which also
+  suppresses the tap.
 - Drag reports the total `(dx, dy)` offset from the press start in
   logical px on every move past the slop. Magnify needs a hover
   first (`mouse_move` tracks it) and reports the clamped scale,

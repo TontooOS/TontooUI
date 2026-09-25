@@ -118,9 +118,15 @@ impl ContentUnavailable {
         self
     }
 
-    /// Live theme for texts and the refresh button.
+    /// Live theme for texts and the refresh button. Rebuilds only
+    /// on change, so per-frame calls never wipe a running press
+    /// (continuous redraw would drop it between down and up).
     pub fn set_theme(&mut self, mode: ThemeMode, accent: Color) {
-        self.dark = mode == ThemeMode::Dark;
+        let dark = mode == ThemeMode::Dark;
+        if dark == self.dark && accent == self.accent {
+            return;
+        }
+        self.dark = dark;
         self.accent = accent;
         self.rebuild();
     }
@@ -141,8 +147,11 @@ impl ContentUnavailable {
     }
 
     pub fn set_refresh(&mut self, enabled: bool) {
-        self.refresh_label = enabled.then(|| "Refresh".to_string());
-        self.rebuild();
+        let label = enabled.then(|| "Refresh".to_string());
+        if label != self.refresh_label {
+            self.refresh_label = label;
+            self.rebuild();
+        }
     }
 
     /// True while a refresh is in flight (set by `take_refreshed`,
@@ -368,6 +377,35 @@ mod tests {
         assert!(!view.take_refreshed());
         view.finish_refresh();
         assert!(!view.is_refreshing());
+    }
+
+    #[test]
+    fn per_frame_theme_keeps_running_press() {
+        use vello::peniko::Color;
+
+        use crate::theme::ThemeMode;
+
+        // Regression test: the demo calls `set_theme` every frame and
+        // the shell redraws continuously. Rebuilding the buttons on
+        // every call wiped `pressed` between down and up, so refresh
+        // never fired.
+        let mut view = view();
+        let mut fonts = FontSystem::new();
+        let (w, h) = view.measure(&mut fonts);
+        view.place(&mut fonts, 0.0, 0.0, w.max(400.0), h);
+        let mut target = None;
+        for index in 0..view.stack.len() {
+            if let Some(button) = view.stack.child_mut::<Button>(index) {
+                target = Some(button.rect());
+            }
+        }
+        let (bx, by, bw, bh) = target.expect("refresh button");
+        let (cx, cy) = (bx + bw / 2.0, by + bh / 2.0);
+        view.mouse_down(cx as f64, cy as f64);
+        // Same values as the defaults: must not rebuild.
+        view.set_theme(ThemeMode::Dark, Color::from_rgb8(0x00, 0x7a, 0xff));
+        view.mouse_up(cx as f64, cy as f64);
+        assert!(view.take_refreshed());
     }
 
     #[test]

@@ -4,6 +4,8 @@ pub use area::GestureArea;
 
 /// Hold time for a long press in seconds (mirrors context menus).
 pub const GESTURE_LONG_PRESS_SECONDS: f64 = 0.6;
+/// Window for the second tap of a double tap in seconds.
+pub const GESTURE_DOUBLE_TAP_SECONDS: f64 = 0.4;
 /// Wander allowance during press tracking in logical px: moving
 /// further cancels tap and long press and starts a drag.
 pub const GESTURE_MOVE_SLOP: f32 = 10.0;

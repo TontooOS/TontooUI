@@ -17,6 +17,7 @@ struct GesturesDemo {
     stack: VStack,
     taps: Rc<RefCell<u32>>,
     longs: Rc<RefCell<u32>>,
+    doubles: Rc<RefCell<u32>>,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -27,15 +28,21 @@ impl GesturesDemo {
     fn new() -> Self {
         let taps: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
         let longs: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
+        let doubles: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
         let tap_count = taps.clone();
         let long_count = longs.clone();
-        // Tap pad: quick press and release counts up.
+        let double_count = doubles.clone();
+        // Tap pad: quick press and release counts up; a quick pair
+        // additionally doubles.
         let tap = GestureArea::new(
             Rectangle::new(220.0, 110.0)
                 .fill(Color::from_rgb8(0x00, 0x7a, 0xff)),
         )
         .on_tap(move || {
             *tap_count.borrow_mut() += 1;
+        })
+        .on_double_tap(move || {
+            *double_count.borrow_mut() += 1;
         });
         // Long-press pad: hold without wandering.
         let long = GestureArea::new(
@@ -68,7 +75,7 @@ impl GesturesDemo {
                         VStack::new()
                             .align(Align::Center)
                             .spacing(8.0)
-                            .child(BasicText::new("Tap"))
+                            .child(BasicText::new("Tap / double tap"))
                             .child(tap),
                     )
                     .child(
@@ -104,6 +111,7 @@ impl GesturesDemo {
             stack,
             taps,
             longs,
+            doubles,
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -181,8 +189,9 @@ impl App for GesturesDemo {
             }
         }
         let status = format!(
-            "taps {}   longs {}{} {}",
+            "taps {}   doubles {}   longs {}{} {}",
             self.taps.borrow(),
+            self.doubles.borrow(),
             self.longs.borrow(),
             if drag_text.is_empty() {
                 String::new()

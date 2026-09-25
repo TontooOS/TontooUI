@@ -5,8 +5,8 @@ use vello::Scene;
 
 use super::super::layout::View;
 use super::{
-    GESTURE_LONG_PRESS_SECONDS, GESTURE_MAGNIFY_MAX, GESTURE_MAGNIFY_MIN,
-    GESTURE_MAGNIFY_STEP, GESTURE_MOVE_SLOP,
+    GESTURE_DOUBLE_TAP_SECONDS, GESTURE_LONG_PRESS_SECONDS, GESTURE_MAGNIFY_MAX,
+    GESTURE_MAGNIFY_MIN, GESTURE_MAGNIFY_STEP, GESTURE_MOVE_SLOP,
 };
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
@@ -20,12 +20,14 @@ use crate::renderer::text::FontSystem;
 pub struct GestureArea<V> {
     child: V,
     on_tap: Option<Box<dyn FnMut()>>,
+    on_double_tap: Option<Box<dyn FnMut()>>,
     on_long_press: Option<Box<dyn FnMut()>>,
     on_drag: Option<Box<dyn FnMut(f32, f32)>>,
     on_magnify: Option<Box<dyn FnMut(f32)>>,
     draggable: bool,
     zoomable: bool,
     pressed: Option<(Instant, f32, f32)>,
+    last_tap: Option<(Instant, f32, f32)>,
     long_fired: bool,
     dragging: bool,
     drag: (f32, f32),
@@ -42,12 +44,14 @@ impl<V: View> GestureArea<V> {
         Self {
             child,
             on_tap: None,
+            on_double_tap: None,
             on_long_press: None,
             on_drag: None,
             on_magnify: None,
             draggable: false,
             zoomable: false,
             pressed: None,
+            last_tap: None,
             long_fired: false,
             dragging: false,
             drag: (0.0, 0.0),
@@ -63,6 +67,14 @@ impl<V: View> GestureArea<V> {
     /// Quick press-and-release inside the area.
     pub fn on_tap(mut self, callback: impl FnMut() + 'static) -> Self {
         self.on_tap = Some(Box::new(callback));
+        self
+    }
+
+    /// Two taps inside the area within the double-tap window and
+    /// slop. Each tap still fires `on_tap` on release; the double
+    /// fires additionally on the second release.
+    pub fn on_double_tap(mut self, callback: impl FnMut() + 'static) -> Self {
+        self.on_double_tap = Some(Box::new(callback));
         self
     }
 
@@ -121,6 +133,7 @@ impl<V: View> GestureArea<V> {
         self.drag = (0.0, 0.0);
         self.scale = 1.0;
         self.pressed = None;
+        self.last_tap = None;
         self.long_fired = false;
         self.dragging = false;
     }
@@ -151,17 +164,25 @@ impl<V: View> GestureArea<V> {
     }
 
     pub fn mouse_down(&mut self, x: f64, y: f64) {
-        let (x, y) = (x as f32, y as f32);
+        self.press(x as f32, y as f32, Instant::now());
+    }
+
+    /// Press handling at `now` (pure helper for tests).
+    pub(crate) fn press(&mut self, x: f32, y: f32, now: Instant) {
         if !self.hit(x, y) {
             return;
         }
-        self.pressed = Some((Instant::now(), x, y));
+        self.pressed = Some((now, x, y));
         self.long_fired = false;
         self.dragging = false;
     }
 
     pub fn mouse_up(&mut self, x: f64, y: f64) {
-        let (x, y) = (x as f32, y as f32);
+        self.release(x as f32, y as f32, Instant::now());
+    }
+
+    /// Release handling at `now` (pure helper for tests).
+    pub(crate) fn release(&mut self, x: f32, y: f32, now: Instant) {
         let press = self.pressed.take();
         let was_dragging = self.dragging;
         let long_fired = self.long_fired;
@@ -170,11 +191,29 @@ impl<V: View> GestureArea<V> {
         // sets `dragging` in `mouse_move`) and without a long press
         // having fired.
         if let Some((start, _, _)) = press {
-            let quick = start.elapsed().as_secs_f64() < GESTURE_LONG_PRESS_SECONDS;
+            let quick = now.saturating_duration_since(start).as_secs_f64()
+                < GESTURE_LONG_PRESS_SECONDS;
             if !long_fired && !was_dragging && quick && self.hit(x, y) {
                 if let Some(callback) = self.on_tap.as_mut() {
                     callback();
                 }
+                // Double tap: this release lands near the previous tap
+                // inside the window.
+                let double = match self.last_tap {
+                    Some((prev, px, py)) => {
+                        now.saturating_duration_since(prev).as_secs_f64()
+                            < GESTURE_DOUBLE_TAP_SECONDS
+                            && (x - px).abs() <= GESTURE_MOVE_SLOP
+                            && (y - py).abs() <= GESTURE_MOVE_SLOP
+                    }
+                    None => false,
+                };
+                if double {
+                    if let Some(callback) = self.on_double_tap.as_mut() {
+                        callback();
+                    }
+                }
+                self.last_tap = Some((now, x, y));
             }
         }
     }
@@ -289,8 +328,7 @@ mod tests {
     }
 
     #[test]
-    fn tap_ignored_outside() {
-        use std::cell::RefCell;
+    fn tap_ignored_outside() {        use std::cell::RefCell;
         use std::rc::Rc;
 
         let count: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
@@ -303,6 +341,78 @@ mod tests {
         area.mouse_down(50.0, 50.0);
         area.mouse_up(500.0, 500.0);
         assert_eq!(*count.borrow(), 0);
+    }
+
+    #[test]
+    fn double_tap_fires_on_quick_pair() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+        use std::time::Duration;
+
+        let taps: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
+        let doubles: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
+        let t = taps.clone();
+        let d = doubles.clone();
+        let mut area = placed()
+            .on_tap(move || {
+                *t.borrow_mut() += 1;
+            })
+            .on_double_tap(move || {
+                *d.borrow_mut() += 1;
+            });
+        let t0 = Instant::now();
+        area.mouse_down(50.0, 50.0);
+        area.release(50.0, 50.0, t0 + Duration::from_secs_f64(0.1));
+        area.mouse_down(52.0, 51.0);
+        area.release(52.0, 51.0, t0 + Duration::from_secs_f64(0.3));
+        // Each release taps; the second additionally doubles.
+        assert_eq!(*taps.borrow(), 2);
+        assert_eq!(*doubles.borrow(), 1);
+    }
+
+    #[test]
+    fn slow_pair_stays_two_singles() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+        use std::time::Duration;
+
+        let taps: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
+        let doubles: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
+        let t = taps.clone();
+        let d = doubles.clone();
+        let mut area = placed()
+            .on_tap(move || {
+                *t.borrow_mut() += 1;
+            })
+            .on_double_tap(move || {
+                *d.borrow_mut() += 1;
+            });
+        let t0 = Instant::now();
+        area.press(50.0, 50.0, t0);
+        area.release(50.0, 50.0, t0 + Duration::from_secs_f64(0.1));
+        area.press(50.0, 50.0, t0 + Duration::from_secs_f64(5.0));
+        area.release(50.0, 50.0, t0 + Duration::from_secs_f64(5.1));
+        assert_eq!(*taps.borrow(), 2);
+        assert_eq!(*doubles.borrow(), 0);
+    }
+
+    #[test]
+    fn far_pair_stays_two_singles() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+        use std::time::Duration;
+
+        let doubles: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
+        let d = doubles.clone();
+        let mut area = placed().on_double_tap(move || {
+            *d.borrow_mut() += 1;
+        });
+        let t0 = Instant::now();
+        area.mouse_down(50.0, 50.0);
+        area.release(50.0, 50.0, t0 + Duration::from_secs_f64(0.1));
+        area.mouse_down(150.0, 50.0);
+        area.release(150.0, 50.0, t0 + Duration::from_secs_f64(0.2));
+        assert_eq!(*doubles.borrow(), 0);
     }
 
     #[test]
