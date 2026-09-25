@@ -397,6 +397,12 @@ impl View for Button {
         self.finish_press(x, y);
     }
 
+    fn mouse_down(&mut self, x: f64, y: f64) {
+        if !self.disabled && self.hit(x as f32, y as f32) {
+            self.pressed = true;
+        }
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }

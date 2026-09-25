@@ -33,6 +33,7 @@ pub trait View {
         fonts: &mut FontSystem,
         images: &mut ImageLoader<'_>,
     );
+    fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_up(&mut self, _x: f64, _y: f64) {}
     /// Share of remaining space. Zero means fixed intrinsic size.
     fn flex(&self) -> f32 {

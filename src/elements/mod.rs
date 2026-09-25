@@ -2,6 +2,7 @@ pub mod buttons;
 pub mod dividers;
 pub mod animation;
 pub mod alerts;
+pub mod sheets;
 pub mod gauges;
 pub mod glass;
 pub mod images;
@@ -26,6 +27,11 @@ pub use buttons::{
 pub use animation::{
     Animated, Anchor, AnimSpec, Keyframe, Phase, Spin, Timeline, Transform,
     ANIM_CLIP_MARGIN, ANIM_DEFAULT_SECONDS,
+};
+pub use sheets::{
+    BasicSheet, SheetSize, SHEET_BG_DARK, SHEET_BG_LIGHT, SHEET_BORDER_DARK,
+    SHEET_BORDER_LIGHT, SHEET_DIM_ALPHA, SHEET_FADE_SECONDS, SHEET_RADIUS,
+    SHEET_SHADOW, SHEET_SHADOW_BLUR, SHEET_SHADOW_DY,
 };
 pub use alerts::{
     ActionAlert, AlertAction, AlertButton, AlertEvent, BasicAlert,
