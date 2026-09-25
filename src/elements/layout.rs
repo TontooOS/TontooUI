@@ -35,6 +35,7 @@ pub trait View {
     );
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_up(&mut self, _x: f64, _y: f64) {}
+    fn set_hover(&mut self, _x: f32, _y: f32) {}
     /// Share of remaining space. Zero means fixed intrinsic size.
     fn flex(&self) -> f32 {
         0.0
@@ -306,6 +307,12 @@ impl View for VStack {
         }
     }
 
+    fn set_hover(&mut self, x: f32, y: f32) {
+        for child in self.children.iter_mut() {
+            child.set_hover(x, y);
+        }
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -381,6 +388,12 @@ impl View for HStack {
     fn mouse_up(&mut self, x: f64, y: f64) {
         for child in self.children.iter_mut() {
             child.mouse_up(x, y);
+        }
+    }
+
+    fn set_hover(&mut self, x: f32, y: f32) {
+        for child in self.children.iter_mut() {
+            child.set_hover(x, y);
         }
     }
 
@@ -490,6 +503,10 @@ impl View for Padding {
         self.child.mouse_up(x, y);
     }
 
+    fn set_hover(&mut self, x: f32, y: f32) {
+        self.child.set_hover(x, y);
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -538,6 +555,10 @@ impl View for Background {
         self.child.mouse_up(x, y);
     }
 
+    fn set_hover(&mut self, x: f32, y: f32) {
+        self.child.set_hover(x, y);
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -568,6 +589,10 @@ impl View for Frame {
 
     fn mouse_up(&mut self, x: f64, y: f64) {
         self.child.mouse_up(x, y);
+    }
+
+    fn set_hover(&mut self, x: f32, y: f32) {
+        self.child.set_hover(x, y);
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -626,6 +651,12 @@ impl View for ZStack {
     fn mouse_up(&mut self, x: f64, y: f64) {
         for child in self.children.iter_mut() {
             child.mouse_up(x, y);
+        }
+    }
+
+    fn set_hover(&mut self, x: f32, y: f32) {
+        for child in self.children.iter_mut() {
+            child.set_hover(x, y);
         }
     }
 

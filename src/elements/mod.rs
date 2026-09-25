@@ -37,7 +37,8 @@ pub use gestures::{
     GESTURE_MOVE_SLOP,
 };
 pub use groupbox::{
-    BasicGroupBox, GROUP_BG_DARK, GROUP_BG_LIGHT, GROUP_PAD, GROUP_RADIUS,
+    BasicGroupBox, StyledGroupBox, GROUP_BG_DARK, GROUP_BG_LIGHT, GROUP_PAD,
+    GROUP_RADIUS, GROUP_ROW_GAP, GROUP_ROW_SPACING, GROUP_SYMBOL_SIZE,
 };
 pub use unavailable::{
     ContentUnavailable, CustomContentUnavailable, SearchEmpty,

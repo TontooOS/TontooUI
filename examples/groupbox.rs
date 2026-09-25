@@ -1,5 +1,6 @@
 use tontooui::elements::{
-    Align, BasicGroupBox, Titlebar, TrafficAction, View, VStack,
+    Align, BasicGroupBox, StyledGroupBox, Titlebar, Toggle, TrafficAction,
+    View, VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
@@ -11,6 +12,7 @@ use vello::peniko::Color;
 struct GroupBoxDemo {
     bar: Titlebar,
     stack: VStack,
+    styled: StyledGroupBox,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -31,6 +33,14 @@ impl GroupBoxDemo {
         Self {
             bar: Titlebar::new("GroupBox"),
             stack,
+            // Reference settings rows: checkboxes plus a switch and
+            // an icon row.
+            styled: StyledGroupBox::new()
+                .check_row("Notifications", true)
+                .check_row("Dark Mode", false)
+                .check_row("Location Services", true)
+                .toggle_row("Wi-Fi", true)
+                .symbol_row("wifi", "Network"),
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -66,6 +76,16 @@ impl App for GroupBoxDemo {
             group.set_theme(theme.mode);
             group.set_focused(focused);
         });
+        // Styled rows: box and labels follow the theme; leading
+        // toggles and icons keep their own wiring.
+        self.styled.set_theme(theme.mode);
+        self.styled.set_focused(focused);
+        for index in 0..self.styled.row_len() {
+            if let Some(toggle) = self.styled.row_leading_mut::<Toggle>(index) {
+                toggle.set_theme(palette.accent, theme.mode == ThemeMode::Dark);
+                toggle.set_focused(focused);
+            }
+        }
 
         self.bar.set_palette(
             palette.titlebar_bg,
@@ -80,6 +100,11 @@ impl App for GroupBoxDemo {
         let x = viewport.x + ((viewport.width - stack_w) / 2.0).max(0.0);
         self.stack.place(fonts, x, top + 20.0, stack_w, stack_h);
         self.stack.draw(scene, fonts, images);
+        // Styled box below the basics, same centering.
+        let (bw, bh) = self.styled.measure(fonts);
+        let bx = viewport.x + ((viewport.width - bw) / 2.0).max(0.0);
+        self.styled.place(fonts, bx, top + 20.0 + stack_h + 24.0, bw, bh);
+        self.styled.draw(scene, fonts, images);
     }
 
     fn background(&self) -> Color {
@@ -103,12 +128,17 @@ impl App for GroupBoxDemo {
             Some(TrafficAction::Maximize) => {
                 self.command = Some(WindowCommand::ToggleMaximize)
             }
-            None => {}
+            None => self.styled.mouse_down(x, y),
         }
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        self.styled.mouse_up(x, y);
     }
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
+        self.styled.set_hover(x as f32, y as f32);
     }
 
     fn set_focused(&mut self, focused: bool) {

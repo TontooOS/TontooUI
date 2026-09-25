@@ -408,6 +408,10 @@ impl View for Button {
         }
     }
 
+    fn set_hover(&mut self, x: f32, y: f32) {
+        self.hovered = self.hover_effect && self.hit(x, y);
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }

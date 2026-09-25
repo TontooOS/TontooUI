@@ -1,6 +1,10 @@
 pub mod basic;
+pub mod styled;
 
 pub use basic::BasicGroupBox;
+pub use styled::{
+    StyledGroupBox, GROUP_ROW_GAP, GROUP_ROW_SPACING, GROUP_SYMBOL_SIZE,
+};
 
 use vello::peniko::Color;
 

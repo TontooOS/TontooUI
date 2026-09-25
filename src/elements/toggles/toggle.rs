@@ -902,6 +902,28 @@ impl View for Toggle {
         self.finish_up(x, y);
     }
 
+    fn mouse_down(&mut self, x: f64, y: f64) {
+        if self.disabled {
+            return;
+        }
+        let (x, y) = (x as f32, y as f32);
+        if self.style == ToggleStyle::Switch && self.switch_hit(x, y) {
+            self.dragging = true;
+            self.down_x = x;
+            self.dragged = false;
+            self.committed = false;
+            self.armed = true;
+            self.anim = None;
+            self.down_at = Some(Instant::now());
+        } else if self.hit(x, y) {
+            self.armed = true;
+        }
+    }
+
+    fn set_hover(&mut self, x: f32, y: f32) {
+        self.hovered = self.hit(x, y);
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
