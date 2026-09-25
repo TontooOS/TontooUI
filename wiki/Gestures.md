@@ -2,11 +2,11 @@
 
 Gestures category in `src/elements/gestures/`: `GestureArea<V>` in
 `area.rs` wraps any child element and tracks tap, double tap, long
-press, drag and magnify (mouse wheel) inside its placed rect,
-reporting them through callbacks back to the app. The child fills
-the area; with `draggable` it follows the drag offset and with
-`zoomable` it scales around the center. Display-only otherwise (the
-wrapper draws just its child).
+press, drag, magnify (mouse wheel) and hover inside its placed
+rect, reporting them through callbacks back to the app. The child
+fills the area; with `draggable` it follows the drag offset and
+with `zoomable` it scales around the center. Display-only
+otherwise (the wrapper draws just its child).
 
 ## Geometry
 
@@ -27,11 +27,13 @@ pub fn on_double_tap(self, callback: impl FnMut() + 'static) -> Self
 pub fn on_long_press(self, callback: impl FnMut() + 'static) -> Self
 pub fn on_drag(self, callback: impl FnMut(f32, f32) + 'static) -> Self
 pub fn on_magnify(self, callback: impl FnMut(f32) + 'static) -> Self
+pub fn on_hover(self, callback: impl FnMut(bool) + 'static) -> Self
 pub fn draggable(self, enabled: bool) -> Self
 pub fn zoomable(self, enabled: bool) -> Self
 pub fn child_mut(&mut self) -> &mut V
 pub fn drag_offset(&self) -> (f32, f32)
 pub fn scale_value(&self) -> f32
+pub fn is_hovered(&self) -> bool
 pub fn reset(&mut self)
 pub fn rect(&self) -> (f32, f32, f32, f32)
 pub fn mouse_down(&mut self, x: f64, y: f64)
@@ -52,6 +54,11 @@ pub fn mouse_wheel(&mut self, dx: f64, dy: f64)
   logical px on every move past the slop. Magnify needs a hover
   first (`mouse_move` tracks it) and reports the clamped scale,
   starting at 1.0.
+- Hover fires `on_hover(true)` when the pointer enters the placed
+  rect and `on_hover(false)` when it leaves, edge triggered (no
+  repeats while resting). `is_hovered` reads the live state, e.g.
+  for status lines. Nested areas track through `View::set_hover`
+  as well as `mouse_move`.
 - `draggable` shifts the child's placed origin by the drag offset;
   `zoomable` scales its placed size around the area center.
   Rect-filling children scale truly; baked glyphs keep their size
@@ -71,6 +78,7 @@ let pad = GestureArea::new(Rectangle::new(220.0, 110.0).fill(Color::from_rgb8(0x
   .on_long_press(|| println!("long"))
   .on_drag(|dx, dy| println!("drag {dx} {dy}"))
   .on_magnify(|s| println!("zoom {s}"))
+  .on_hover(|inside| println!("hover {inside}"))
   .draggable(true)
   .zoomable(true);
 ```

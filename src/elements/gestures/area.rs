@@ -11,12 +11,12 @@ use super::{
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
 
-/// Gesture area over any child element: tracks tap, long press, drag
-/// and magnify (mouse wheel) inside the placed rect and reports them
-/// through callbacks, like an action back to the app. The child fills
-/// the area; with `draggable` the child follows the drag offset and
-/// with `zoomable` it scales around the center, so pads can move and
-/// zoom their content directly.
+/// Gesture area over any child element: tracks tap, long press, drag,
+/// magnify (mouse wheel) and hover inside the placed rect and reports
+/// them through callbacks, like an action back to the app. The child
+/// fills the area; with `draggable` the child follows the drag offset
+/// and with `zoomable` it scales around the center, so pads can move
+/// and zoom their content directly.
 pub struct GestureArea<V> {
     child: V,
     on_tap: Option<Box<dyn FnMut()>>,
@@ -24,6 +24,7 @@ pub struct GestureArea<V> {
     on_long_press: Option<Box<dyn FnMut()>>,
     on_drag: Option<Box<dyn FnMut(f32, f32)>>,
     on_magnify: Option<Box<dyn FnMut(f32)>>,
+    on_hover: Option<Box<dyn FnMut(bool)>>,
     draggable: bool,
     zoomable: bool,
     pressed: Option<(Instant, f32, f32)>,
@@ -48,6 +49,7 @@ impl<V: View> GestureArea<V> {
             on_long_press: None,
             on_drag: None,
             on_magnify: None,
+            on_hover: None,
             draggable: false,
             zoomable: false,
             pressed: None,
@@ -100,6 +102,14 @@ impl<V: View> GestureArea<V> {
         self
     }
 
+    /// Pointer hover state: fires with `true` when the pointer
+    /// enters the placed rect and `false` when it leaves, edge
+    /// triggered (no repeats while resting inside or outside).
+    pub fn on_hover(mut self, callback: impl FnMut(bool) + 'static) -> Self {
+        self.on_hover = Some(Box::new(callback));
+        self
+    }
+
     /// The child follows the drag offset (its placed origin shifts).
     pub fn draggable(mut self, enabled: bool) -> Self {
         self.draggable = enabled;
@@ -126,6 +136,11 @@ impl<V: View> GestureArea<V> {
     /// Current zoom scale (starts at 1.0).
     pub fn scale_value(&self) -> f32 {
         self.scale
+    }
+
+    /// Whether the pointer is currently inside the placed rect.
+    pub fn is_hovered(&self) -> bool {
+        self.hovered
     }
 
     /// Reset drag offset and zoom scale to rest.
@@ -218,9 +233,22 @@ impl<V: View> GestureArea<V> {
         }
     }
 
+    /// Hover transition at a point: updates the state and fires
+    /// `on_hover` on enter/exit edges only. Shared by `mouse_move`
+    /// and the `View::set_hover` path so nested areas track too.
+    fn update_hover(&mut self, x: f32, y: f32) {
+        let inside = self.hit(x, y);
+        if inside != self.hovered {
+            self.hovered = inside;
+            if let Some(callback) = self.on_hover.as_mut() {
+                callback(inside);
+            }
+        }
+    }
+
     pub fn mouse_move(&mut self, x: f64, y: f64) {
         let (x, y) = (x as f32, y as f32);
-        self.hovered = self.hit(x, y);
+        self.update_hover(x, y);
         if let Some((_, sx, sy)) = self.pressed {
             if (x - sx).abs() > GESTURE_MOVE_SLOP || (y - sy).abs() > GESTURE_MOVE_SLOP {
                 self.dragging = true;
@@ -288,6 +316,10 @@ impl<V: View + 'static> View for GestureArea<V> {
             self.place_child(fonts);
         }
         self.child.draw(scene, fonts, images);
+    }
+
+    fn set_hover(&mut self, x: f32, y: f32) {
+        self.update_hover(x, y);
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -502,6 +534,57 @@ mod tests {
         assert_eq!(area.scale_value(), GESTURE_MAGNIFY_MIN);
         area.mouse_wheel(0.0, 100000.0);
         assert_eq!(area.scale_value(), GESTURE_MAGNIFY_MAX);
+    }
+
+    #[test]
+    fn hover_fires_enter_and_exit_edges_only() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let states: Rc<RefCell<Vec<bool>>> = Rc::new(RefCell::new(Vec::new()));
+        let seen = states.clone();
+        let mut area = placed().on_hover(move |inside| {
+            seen.borrow_mut().push(inside);
+        });
+        assert!(!area.is_hovered());
+        area.mouse_move(500.0, 500.0);
+        assert!(!area.is_hovered());
+        area.mouse_move(50.0, 50.0);
+        assert!(area.is_hovered());
+        area.mouse_move(60.0, 60.0);
+        area.mouse_move(50.0, 50.0);
+        area.mouse_move(500.0, 500.0);
+        assert!(!area.is_hovered());
+        area.mouse_move(600.0, 600.0);
+        area.mouse_move(50.0, 50.0);
+        assert_eq!(*states.borrow(), vec![true, false, true]);
+    }
+
+    #[test]
+    fn hover_tracks_through_set_hover() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let states: Rc<RefCell<Vec<bool>>> = Rc::new(RefCell::new(Vec::new()));
+        let seen = states.clone();
+        let mut area = placed().on_hover(move |inside| {
+            seen.borrow_mut().push(inside);
+        });
+        area.set_hover(50.0, 50.0);
+        assert!(area.is_hovered());
+        area.set_hover(500.0, 500.0);
+        assert!(!area.is_hovered());
+        assert_eq!(*states.borrow(), vec![true, false]);
+    }
+
+    #[test]
+    fn hover_state_tracks_without_callback() {
+        let mut area = placed();
+        assert!(!area.is_hovered());
+        area.mouse_move(50.0, 50.0);
+        assert!(area.is_hovered());
+        area.mouse_move(500.0, 500.0);
+        assert!(!area.is_hovered());
     }
 
     #[test]

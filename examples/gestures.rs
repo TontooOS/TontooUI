@@ -18,6 +18,7 @@ struct GesturesDemo {
     taps: Rc<RefCell<u32>>,
     longs: Rc<RefCell<u32>>,
     doubles: Rc<RefCell<u32>>,
+    hovers: Rc<RefCell<u32>>,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -29,9 +30,11 @@ impl GesturesDemo {
         let taps: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
         let longs: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
         let doubles: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
+        let hovers: Rc<RefCell<u32>> = Rc::new(RefCell::new(0));
         let tap_count = taps.clone();
         let long_count = longs.clone();
         let double_count = doubles.clone();
+        let hover_count = hovers.clone();
         // Tap pad: quick press and release counts up; a quick pair
         // additionally doubles.
         let tap = GestureArea::new(
@@ -64,6 +67,16 @@ impl GesturesDemo {
                 .color(Color::from_rgb8(0xff, 0x9f, 0x0a)),
         )
         .zoomable(true);
+        // Hover pad: entering the rect counts up (exit passes false).
+        let hover = GestureArea::new(
+            Rectangle::new(160.0, 90.0)
+                .fill(Color::from_rgb8(0x30, 0xb0, 0xc7)),
+        )
+        .on_hover(move |inside| {
+            if inside {
+                *hover_count.borrow_mut() += 1;
+            }
+        });
         let stack = VStack::new()
             .align(Align::Center)
             .spacing(20.0)
@@ -105,6 +118,18 @@ impl GesturesDemo {
                             .child(zoom),
                     ),
             )
+            .child(
+                HStack::new()
+                    .align(Align::Center)
+                    .spacing(32.0)
+                    .child(
+                        VStack::new()
+                            .align(Align::Center)
+                            .spacing(8.0)
+                            .child(BasicText::new("Hover me"))
+                            .child(hover),
+                    ),
+            )
             .child(BasicText::new(""));
         Self {
             bar: Titlebar::new("Gestures"),
@@ -112,6 +137,7 @@ impl GesturesDemo {
             taps,
             longs,
             doubles,
+            hovers,
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -189,10 +215,11 @@ impl App for GesturesDemo {
             }
         }
         let status = format!(
-            "taps {}   doubles {}   longs {}{} {}",
+            "taps {}   doubles {}   longs {}   hovers {}{} {}",
             self.taps.borrow(),
             self.doubles.borrow(),
             self.longs.borrow(),
+            self.hovers.borrow(),
             if drag_text.is_empty() {
                 String::new()
             } else {
@@ -326,7 +353,7 @@ impl GesturesDemo {
 }
 
 fn main() {
-    if let Err(err) = run("Gestures", 900, 760, GesturesDemo::new()) {
+    if let Err(err) = run("Gestures", 900, 900, GesturesDemo::new()) {
         eprintln!("error: {err}");
         std::process::exit(1);
     }
