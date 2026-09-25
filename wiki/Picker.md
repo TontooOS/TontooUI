@@ -44,6 +44,10 @@ reference) instead.
 | `MENU_PANEL_GAP` | 4 px button-to-panel gap |
 | `MENU_SHADOW_BLUR` | 24 px heavy edge shadow |
 | `MENU_ACCENT` | `#007AFF` default hover fill |
+| `DATE_FIELD_H` / `DATE_FIELD_RADIUS` | 24 px field button, 6 px radius |
+| `DATE_FIELD_FONT_SIZE` / `DATE_FIELD_PAD_X` | 13 px field and label / 10 px text padding |
+| `DATE_FIELD_CHEV_W` / `DATE_FIELD_CHEV_GAP` | 12 px chevron box / 8 px text-to-chevron gap |
+| `DATE_FIELD_GAP` / `DATE_PANEL_GAP` | 9 px label-to-field gap / 4 px field-to-panel gap |
 | `DATE_CELL_W` / `DATE_CELL_H` | 32 px by 28 px day cells, 7 columns, 6 rows |
 | `DATE_HEADER_H` / `DATE_WEEK_H` | 32 px title bar / 20 px weekday row |
 | `DATE_PAD` / `DATE_RADIUS` | 8 px panel padding / 9 px panel radius |
@@ -190,14 +194,20 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
 
 ```rust
 pub fn new() -> Self
+pub fn label(self, label: impl Into<String>) -> Self
 pub fn selected(self, year: i32, month: u32, day: u32) -> Self
 pub fn accent(self, color: Color) -> Self
 pub fn hover_fill(self, color: Color) -> Self
 pub fn disabled(self, disabled: bool) -> Self
 pub fn on_select(self, callback: impl FnMut(i32, u32, u32) + 'static) -> Self
+pub fn is_open(&self) -> bool
+pub fn open(&mut self)
+pub fn close(&mut self)
+pub fn formatted(&self) -> String
 pub fn selected_date(&self) -> (i32, u32, u32)
 pub fn viewed(&self) -> (i32, u32)
 pub fn set_selected(&mut self, year: i32, month: u32, day: u32)
+pub fn set_label(&mut self, label: impl Into<String>)
 pub fn step_month(&mut self, delta: i32)
 pub fn set_theme(&mut self, accent: Color, dark: bool)
 pub fn set_glass(&mut self, mode: ThemeMode, glass: GlassAmount)
@@ -210,29 +220,37 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
 pub fn mouse_wheel(&mut self, dx: f64, dy: f64)
 ```
 
-- The frosted glass panel shows a 7-column Monday-first grid with a
-  fixed 6-row height (no resize jitter across months), gray weekday
-  header and blank cells outside the month. Clicking a day selects
-  it with a filled circle (`set_selected` clamps the day and fires
-  `on_select` when the date changed).
+- The closed field button (current date as `"16 July 2026"` plus
+  up/down chevrons, optional leading label) has no hover state, like
+  `MenuPicker`. A click (press plus release) on it opens the
+  calendar; clicking it again closes it. The button keeps a stable
+  width (`"30 September 3000"`), so opening never resizes the layout.
+- The open calendar is a `Frosted` glass panel floating above the
+  background (heavy 24 px edge shadow). It prefers below the field,
+  falls back above it and is always clamped into the `set_viewport`
+  bounds, so the glass never samples outside the window.
+- The panel shows a 7-column Monday-first grid with a fixed 6-row
+  height (no resize jitter across months), gray weekday header and
+  blank cells outside the month. Clicking a day selects it
+  (`set_selected` clamps the day and fires `on_select` when the date
+  changed) and closes the calendar, like a menu row click.
 - The header shows the month and the year as two menus plus
-  `<`/`>` steppers that move one month (wrapping years). Clicking
-  the month opens all twelve months; clicking the year opens years
-  `DATE_YEAR_MIN` to `DATE_YEAR_MAX` (1-3000) with the current year
-  visible on open. Lists show 8 rows with a scrollbar, hover in the
-  accent fill (or the fixed `hover_fill`) and a checkmark on the
-  current entry; a row click picks it, header taps switch lists,
-  anything else (or `Escape`) closes. Both lists clamp into the
-  viewport like the menu.
+  `<`/`>` steppers that move one month (wrapping years) and keep the
+  calendar open. Clicking the month opens all twelve months;
+  clicking the year opens years `DATE_YEAR_MIN` to `DATE_YEAR_MAX`
+  (1-3000) with the current year visible on open. Lists show 8 rows
+  with a scrollbar, hover in the accent fill (or the fixed
+  `hover_fill`) and a checkmark on the current entry; a row click
+  picks it and keeps the calendar open, header taps switch lists,
+  anything else closes the whole calendar (or `Escape` closes the
+  list first, then the calendar).
 - Hovering a day, the month/year zones or the steppers tints them
-  with the accent color.
+  with the accent color. Hover only exists inside the open calendar.
 - Date math is dependency-free (civil algorithms, Gregorian leap
   rule); the default selection is today from the system clock.
-- Like the menu, the panels clamp into the `set_viewport` bounds so
-  the glass never samples outside the window. Apps must call
-  `set_viewport` every frame, forward `mouse_wheel` (year scrolling)
-  and return true from `App::wants_backdrop` (the calendar is always
-  glass).
+- Apps must call `set_viewport` every frame, forward `mouse_wheel`
+  (year scrolling) and return `is_open()` from `App::wants_backdrop`
+  so the shell runs the blur pass while the calendar is open.
 
 ```rust
 pub fn days_in_month(year: i32, month: u32) -> u32
@@ -270,10 +288,12 @@ color.set_theme(accent, true);
 color.set_glass(ThemeMode::Dark, GlassAmount::Glass);
 ```
 
-Run `cargo run --example date`: July 2026 calendar defaulting to
+Run `cargo run --example date`: `"Date"` pop-up field defaulting to
 today (16 July 2026 in the reference) with a `Selected: ...`
-caption. Click the month or year for popup lists (scroll the years
-with the wheel), use `<`/`>` to step months, click a day to select.
+caption. Click the field to float the calendar above the caption and
+sample text (frost blur test), click the month or year for popup
+lists (scroll the years with the wheel), use `<`/`>` to step months,
+click a day to select and close.
 
 ## Cross References
 

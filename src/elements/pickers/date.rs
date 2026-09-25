@@ -5,6 +5,7 @@ use vello::Scene;
 use vello::kurbo::{Affine, BezPath, Cap, Circle, Join, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, Fill};
 
+use super::super::buttons::{BUTTON_BG_DARK, BUTTON_BG_LIGHT};
 use super::super::glass::{GlassContainer, GlassType};
 use super::super::layout::View;
 use super::menu::{MENU_CHECK_H, MENU_CHECK_W};
@@ -65,6 +66,22 @@ pub const DATE_YEAR_MAX: i32 = 3000;
 pub const DATE_ACCENT: Color = Color::from_rgb8(0x00, 0x7a, 0xff);
 /// Calendar edge shadow blur in logical px (heavy, like the menu).
 pub const DATE_SHADOW_BLUR: f32 = 24.0;
+/// Closed field button height in logical px (menu parity).
+pub const DATE_FIELD_H: f32 = 24.0;
+/// Closed field button corner radius in logical px.
+pub const DATE_FIELD_RADIUS: f32 = 6.0;
+/// Closed field button and leading label size in logical px.
+pub const DATE_FIELD_FONT_SIZE: f32 = 13.0;
+/// Horizontal text padding inside the field button in logical px.
+pub const DATE_FIELD_PAD_X: f32 = 10.0;
+/// Chevron box width inside the field button in logical px.
+pub const DATE_FIELD_CHEV_W: f32 = 12.0;
+/// Gap between field text and chevron in logical px.
+pub const DATE_FIELD_CHEV_GAP: f32 = 8.0;
+/// Gap between the leading label and the field button in logical px.
+pub const DATE_FIELD_GAP: f32 = 9.0;
+/// Gap between field button and calendar panel in logical px.
+pub const DATE_PANEL_GAP: f32 = 4.0;
 
 /// Full English month names, January first.
 pub const DATE_MONTHS: [&str; 12] = [
@@ -165,21 +182,34 @@ enum Armed {
     Header(HeaderZone),
 }
 
-/// Date picker: frosted glass calendar with a header bar. The header
+/// Date picker: a pop-up field button like `MenuPicker`. The closed
+/// field shows the selected date (`"16 July 2026"`) plus up/down
+/// chevrons and has no hover state. A click (press plus release) on
+/// the field opens a frosted glass calendar floating above the
+/// background: it prefers below the field, falls back above it and
+/// is always clamped into the `set_viewport` bounds so the glass
+/// never samples outside the window.
+///
+/// The open calendar keeps the old month grid behavior: the header
 /// shows the month and the year as two menus plus `<`/`>` month
 /// steppers. Clicking the month opens all twelve months; clicking
 /// the year opens a scrollable year list (`DATE_YEAR_MIN` to
 /// `DATE_YEAR_MAX`, current year visible on open). Clicking a day
-/// selects it with a filled circle, like the reference.
+/// selects it with a filled circle and closes the calendar, like a
+/// menu row click. Steppers and month/year navigation keep the
+/// calendar open; anything else (outside click, field toggle,
+/// `Escape`) closes it.
 ///
-/// Panels are always clamped into the `set_viewport` bounds so the
-/// glass never samples outside the window. Apps must call
-/// `set_viewport` every frame and forward `mouse_wheel` (see
-/// `examples/date.rs`).
+/// Apps must call `set_viewport` every frame, forward `mouse_wheel`
+/// (see `examples/date.rs`) and return `is_open()` from
+/// `App::wants_backdrop` so the shell runs the blur pass while the
+/// calendar is open.
 pub struct DatePicker {
+    label: String,
     view_year: i32,
     view_month: u32,
     selected: (i32, u32, u32),
+    open: bool,
     popup: Popup,
     list_offset: f32,
     hovered_row: Option<usize>,
@@ -223,7 +253,14 @@ pub struct DatePicker {
     vp_y: f32,
     vp_w: f32,
     vp_h: f32,
+    field_x: f32,
+    field_y: f32,
+    field_w: f32,
+    label_x: f32,
+    label_y: f32,
     armed: Option<Armed>,
+    armed_field: bool,
+    armed_outside: bool,
     disabled: bool,
     focused: bool,
     on_select: Option<Box<dyn FnMut(i32, u32, u32)>>,
@@ -237,9 +274,11 @@ impl DatePicker {
         let mut glass_pop = GlassContainer::new();
         glass_pop.set_glass_type(GlassType::Frosted);
         Self {
+            label: String::new(),
             view_year: y,
             view_month: m,
             selected: (y, m, d),
+            open: false,
             popup: Popup::None,
             list_offset: 0.0,
             hovered_row: None,
@@ -283,11 +322,24 @@ impl DatePicker {
             vp_y: 0.0,
             vp_w: f32::MAX,
             vp_h: f32::MAX,
+            field_x: 0.0,
+            field_y: 0.0,
+            field_w: 0.0,
+            label_x: 0.0,
+            label_y: 0.0,
             armed: None,
+            armed_field: false,
+            armed_outside: false,
             disabled: false,
             focused: true,
             on_select: None,
         }
+    }
+
+    /// Optional leading label, like `MenuPicker`.
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.label = label.into();
+        self
     }
 
     /// Initial selection without firing `on_select`. The viewed month
@@ -382,6 +434,45 @@ impl DatePicker {
         (self.view_year, self.view_month)
     }
 
+    /// Whether the floating calendar is open.
+    pub fn is_open(&self) -> bool {
+        self.open
+    }
+
+    /// Open the floating calendar (no-op when disabled).
+    pub fn open(&mut self) {
+        if !self.disabled {
+            self.open = true;
+            self.armed_field = false;
+            self.armed_outside = false;
+            self.position_panel();
+        }
+    }
+
+    /// Close the calendar and any month/year list.
+    pub fn close(&mut self) {
+        self.open = false;
+        self.popup = Popup::None;
+        self.hovered_row = None;
+        self.hovered_day = None;
+        self.hovered_zone = None;
+        self.hovered_nav = None;
+        self.armed_row = None;
+        self.armed = None;
+        self.armed_field = false;
+        self.armed_outside = false;
+    }
+
+    pub fn set_label(&mut self, label: impl Into<String>) {
+        self.label = label.into();
+    }
+
+    /// Closed field text, e.g. `"16 July 2026"`.
+    pub fn formatted(&self) -> String {
+        let (y, m, d) = self.selected;
+        format!("{d} {} {y}", DATE_MONTHS[(m.clamp(1, 12) - 1) as usize])
+    }
+
     /// Set the selection (clamped to the month). Fires `on_select`
     /// when the date changed.
     pub fn set_selected(&mut self, year: i32, month: u32, day: u32) {
@@ -429,21 +520,104 @@ impl DatePicker {
         color
     }
 
+    fn button_bg(&self) -> Color {
+        if self.dark {
+            BUTTON_BG_DARK
+        } else {
+            BUTTON_BG_LIGHT
+        }
+    }
+
+    fn label_size(&self, fonts: &mut FontSystem) -> (f32, f32) {
+        if self.label.is_empty() {
+            return (0.0, 0.0);
+        }
+        let layout = fonts.layout_text(&self.label, DATE_FIELD_FONT_SIZE, Color::WHITE, None);
+        let (tw, th) = FontSystem::layout_size(&layout);
+        (tw / fonts.scale, th / fonts.scale)
+    }
+
+    fn field_text_w(&self, fonts: &mut FontSystem, text: &str) -> f32 {
+        let layout = fonts.layout_text(text, DATE_FIELD_FONT_SIZE, Color::WHITE, None);
+        FontSystem::layout_size(&layout).0 / fonts.scale
+    }
+
+    /// Stable field width: wide enough for the longest date
+    /// (`"30 September 3000"`), so opening the calendar never
+    /// resizes the button — like `MenuPicker`.
+    fn field_w(&self, fonts: &mut FontSystem) -> f32 {
+        self.field_text_w(fonts, "30 September 3000")
+            + DATE_FIELD_PAD_X * 2.0
+            + DATE_FIELD_CHEV_GAP
+            + DATE_FIELD_CHEV_W
+    }
+
+    fn field_hit(&self, x: f32, y: f32) -> bool {
+        x >= self.field_x
+            && x <= self.field_x + self.field_w
+            && y >= self.field_y
+            && y <= self.field_y + DATE_FIELD_H
+    }
+
+    fn panel_in(&self, x: f32, y: f32) -> bool {
+        self.open
+            && x >= self.panel_x
+            && x <= self.panel_x + self.panel_w
+            && y >= self.panel_y
+            && y <= self.panel_y + self.panel_h
+    }
+
     fn layout_panel(&mut self, fonts: &mut FontSystem) {
+        // Month zone fits the longest name, year zone a 4-digit year.
+        let mut month_w: f32 = 0.0;
+        for name in DATE_MONTHS {
+            month_w = month_w.max(self.text_w(fonts, name, DATE_TITLE_SIZE));
+        }
+        // Cache popup content widths (fonts available here) so the
+        // popup can lay out on clicks without fonts.
+        let mut months: f32 = 0.0;
+        for name in DATE_MONTHS {
+            months = months.max(self.text_w(fonts, name, DATE_LIST_SIZE));
+        }
+        self.pop_month_w = months + DATE_LIST_CHECK_COL + DATE_LIST_TEXT_GAP + DATE_SCROLL_W;
+        self.pop_year_w = self.text_w(fonts, "3000", DATE_LIST_SIZE)
+            + DATE_LIST_CHECK_COL
+            + DATE_LIST_TEXT_GAP
+            + DATE_SCROLL_W;
+        // Title geometry needs the panel width first.
+        let w = (self.panel_content_w() + DATE_PAD * 2.0).min(self.vp_w).max(0.0);
+        let title_w = (w - DATE_PAD * 2.0 - DATE_NAV_W * 2.0).max(0.0);
+        self.month_w = month_w;
+        // `title_x` is set by `position_panel`; derive zones here so
+        // both paths share one formula.
+        self.month_x = self.title_x;
+        self.year_x = self.month_x + month_w + DATE_TITLE_GAP;
+        self.year_w = (title_w - month_w - DATE_TITLE_GAP).max(0.0);
+        self.title_w = title_w;
+        self.position_panel();
+        // Zones depend on the final panel origin.
+        self.month_x = self.title_x;
+        self.year_x = self.month_x + self.month_w + DATE_TITLE_GAP;
+        self.year_w = (self.title_w - self.month_w - DATE_TITLE_GAP).max(0.0);
+        self.layout_popup();
+    }
+
+    /// Calendar rect under/above the field, clamped into the
+    /// viewport. Font-free so `open()` can reposition without fonts.
+    fn position_panel(&mut self) {
         let w = (self.panel_content_w() + DATE_PAD * 2.0).min(self.vp_w).max(0.0);
         let h = (self.panel_content_h() + DATE_PAD * 2.0).min(self.vp_h).max(0.0);
-        // Keep the panel inside the placed rect when it fits, else
-        // clamp into the viewport.
-        let mut x = self.x;
-        let mut y = self.y;
+        let mut x = self.field_x;
         if x + w > self.vp_x + self.vp_w {
             x = self.vp_x + self.vp_w - w;
         }
-        if y + h > self.vp_y + self.vp_h {
-            y = self.vp_y + self.vp_h - h;
-        }
         if x < self.vp_x {
             x = self.vp_x;
+        }
+        let below = self.field_y + DATE_FIELD_H + DATE_PANEL_GAP;
+        let mut y = below;
+        if y + h > self.vp_y + self.vp_h {
+            y = self.field_y - DATE_PANEL_GAP - h;
         }
         if y < self.vp_y {
             y = self.vp_y;
@@ -459,26 +633,6 @@ impl DatePicker {
         self.title_x = x + DATE_PAD;
         self.title_y = y + DATE_PAD;
         self.title_w = (w - DATE_PAD * 2.0 - DATE_NAV_W * 2.0).max(0.0);
-        // Month zone fits the longest name, year zone a 4-digit year.
-        let mut month_w: f32 = 0.0;
-        for name in DATE_MONTHS {
-            month_w = month_w.max(self.text_w(fonts, name, DATE_TITLE_SIZE));
-        }
-        self.month_x = self.title_x;
-        self.month_w = month_w;
-        self.year_x = self.month_x + month_w + DATE_TITLE_GAP;
-        self.year_w = (self.title_w - month_w - DATE_TITLE_GAP).max(0.0);
-        // Cache popup content widths (fonts available here) so the
-        // popup can lay out on clicks without fonts.
-        let mut months: f32 = 0.0;
-        for name in DATE_MONTHS {
-            months = months.max(self.text_w(fonts, name, DATE_LIST_SIZE));
-        }
-        self.pop_month_w = months + DATE_LIST_CHECK_COL + DATE_LIST_TEXT_GAP + DATE_SCROLL_W;
-        self.pop_year_w = self.text_w(fonts, "3000", DATE_LIST_SIZE)
-            + DATE_LIST_CHECK_COL
-            + DATE_LIST_TEXT_GAP
-            + DATE_SCROLL_W;
         self.layout_popup();
     }
 
@@ -692,27 +846,53 @@ impl DatePicker {
             return;
         }
         let (x, y) = (x as f32, y as f32);
+        if !self.open {
+            // Closed field: arm the button, like `MenuPicker`.
+            self.armed_field = self.field_hit(x, y);
+            return;
+        }
+        // Open calendar: field press arms the toggle, panel presses
+        // arm the calendar control, everything else arms an outside
+        // close.
+        if self.field_hit(x, y) {
+            self.armed_field = true;
+            self.armed = None;
+            self.armed_row = None;
+            self.armed_outside = false;
+            return;
+        }
+        self.armed_field = false;
         if self.popup != Popup::None {
-            // Open popup: arm the row under the pointer, if any.
+            // Open month/year list: arm the row under the pointer.
             self.armed = None;
             self.armed_row = self.pop_row_at(x, y);
+            self.armed_outside = false;
             return;
         }
         if let Some(day) = self.cell_at(x, y) {
             self.armed = Some(Armed::Day(day));
+            self.armed_outside = false;
         } else if let Some(delta) = self.nav_hit(x, y) {
             self.armed = Some(Armed::Nav(delta));
+            self.armed_outside = false;
         } else if let Some(zone) = self.zone_at(x, y) {
             self.armed = Some(Armed::Header(zone));
+            self.armed_outside = false;
         } else {
             self.armed = None;
+            self.armed_row = None;
+            self.armed_outside = true;
         }
     }
 
-    /// Hover in accent color: popup rows when open, otherwise the
-    /// day cell, header zone and nav chevron under the pointer.
+    /// Hover only exists inside the open calendar; the closed field
+    /// never highlights, like macOS and `MenuPicker`.
     pub fn mouse_move(&mut self, x: f64, y: f64) {
-        if self.disabled {
+        if self.disabled || !self.open {
+            self.hovered_row = None;
+            self.hovered_day = None;
+            self.hovered_zone = None;
+            self.hovered_nav = None;
             return;
         }
         let (x, y) = (x as f32, y as f32);
@@ -738,10 +918,29 @@ impl DatePicker {
             return;
         }
         let (x, y) = (x as f32, y as f32);
+        if !self.open {
+            // Click (press + release) on the field opens the calendar.
+            if self.armed_field && self.field_hit(x, y) {
+                self.open();
+            }
+            self.armed_field = false;
+            return;
+        }
+        // Field toggle closes without changing the selection.
+        if self.armed_field {
+            self.armed_field = false;
+            self.armed = None;
+            self.armed_row = None;
+            self.armed_outside = false;
+            self.close();
+            return;
+        }
         if self.popup != Popup::None {
             let armed = self.armed_row.take();
+            self.armed_outside = false;
             if let Some(row) = armed {
-                // Press + release on the same row picks it.
+                // Press + release on the same row picks it and keeps
+                // the calendar open.
                 if self.pop_row_at(x, y) == Some(row) {
                     match self.popup {
                         Popup::Months => {
@@ -756,24 +955,29 @@ impl DatePicker {
                     return;
                 }
             }
-            // Header taps switch lists, everything else closes.
+            // Header taps switch lists, everything else closes the
+            // whole calendar.
             match self.zone_at(x, y) {
                 Some(HeaderZone::Month) => self.open_months(),
                 Some(HeaderZone::Year) => self.open_years(),
-                None => self.close_popup(),
+                None => self.close(),
             }
             return;
         }
         match self.armed.take() {
             Some(Armed::Day(day)) => {
+                // Day click selects and closes, like a menu row.
                 if self.cell_at(x, y) == Some(day) {
                     self.set_selected(self.view_year, self.view_month, day);
+                    self.close();
                 }
+                self.armed_outside = false;
             }
             Some(Armed::Nav(delta)) => {
                 if self.nav_hit(x, y) == Some(delta) {
                     self.step_month(delta);
                 }
+                self.armed_outside = false;
             }
             Some(Armed::Header(zone)) => {
                 if self.zone_at(x, y) == Some(zone) {
@@ -782,14 +986,23 @@ impl DatePicker {
                         HeaderZone::Year => self.open_years(),
                     }
                 }
+                self.armed_outside = false;
             }
-            None => {}
+            None => {
+                if self.armed_outside {
+                    self.armed_outside = false;
+                    // Outside release closes without changing.
+                    if !self.panel_in(x, y) {
+                        self.close();
+                    }
+                }
+            }
         }
     }
 
-    /// Scroll the open popup list (`dy` in logical px, down positive).
+    /// Scroll the open month/year list (`dy` in logical px, down positive).
     pub fn mouse_wheel(&mut self, _dx: f64, dy: f64) {
-        if self.popup == Popup::None || self.disabled {
+        if !self.open || self.popup == Popup::None || self.disabled {
             return;
         }
         self.list_offset = (self.list_offset - dy as f32).clamp(0.0, self.max_offset());
@@ -800,7 +1013,11 @@ impl DatePicker {
             return;
         }
         if key == Key::Escape {
-            self.close_popup();
+            if self.popup != Popup::None {
+                self.close_popup();
+            } else {
+                self.close();
+            }
         }
     }
 
@@ -830,6 +1047,30 @@ impl DatePicker {
         stroke.join = Join::Round;
         scene.stroke(&stroke, Affine::IDENTITY, &Brush::Solid(color), None, &path);
     }
+
+    fn draw_field_chevron(&self, scene: &mut Scene, x: f32, cy: f32, scale: f32, color: Color) {
+        // Up/down chevron pair, like the macOS pop-up button.
+        let px = |v: f32| v as f64 * scale as f64;
+        let w = 7.0;
+        let h = 4.0;
+        let gap = 2.0;
+        let cx = x + DATE_FIELD_CHEV_W / 2.0;
+        let mut up = BezPath::new();
+        up.move_to((px(cx - w / 2.0), px(cy - gap / 2.0)));
+        up.line_to((px(cx), px(cy - gap / 2.0 - h)));
+        up.line_to((px(cx + w / 2.0), px(cy - gap / 2.0)));
+        let mut down = BezPath::new();
+        down.move_to((px(cx - w / 2.0), px(cy + gap / 2.0)));
+        down.line_to((px(cx), px(cy + gap / 2.0 + h)));
+        down.line_to((px(cx + w / 2.0), px(cy + gap / 2.0)));
+        let mut stroke = Stroke::new(1.5 * scale as f64);
+        stroke.start_cap = Cap::Round;
+        stroke.end_cap = Cap::Round;
+        stroke.join = Join::Round;
+        for path in [&up, &down] {
+            scene.stroke(&stroke, Affine::IDENTITY, &Brush::Solid(color), None, path);
+        }
+    }
 }
 
 impl Default for DatePicker {
@@ -839,10 +1080,16 @@ impl Default for DatePicker {
 }
 
 impl View for DatePicker {
-    fn measure(&mut self, _fonts: &mut FontSystem) -> (f32, f32) {
+    fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
+        let (label_w, label_h) = self.label_size(fonts);
+        let label_part = if label_w > 0.0 {
+            label_w + DATE_FIELD_GAP
+        } else {
+            0.0
+        };
         (
-            self.panel_content_w() + DATE_PAD * 2.0,
-            self.panel_content_h() + DATE_PAD * 2.0,
+            label_part + self.field_w(fonts),
+            DATE_FIELD_H.max(label_h),
         )
     }
 
@@ -851,17 +1098,119 @@ impl View for DatePicker {
         self.y = y;
         self.width = w;
         self.height = h;
+        let (label_w, label_h) = self.label_size(fonts);
+        self.label_x = x;
+        self.label_y = y + (h - label_h) / 2.0;
+        self.field_x = if label_w > 0.0 {
+            x + label_w + DATE_FIELD_GAP
+        } else {
+            x
+        };
+        self.field_y = y + (h - DATE_FIELD_H) / 2.0;
+        self.field_w = self.field_w(fonts).min((w - (self.field_x - x)).max(0.0));
         self.layout_panel(fonts);
     }
 
     fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, images: &mut ImageLoader<'_>) {
+        // Capture pass: the glass skips itself so the blur sees only
+        // what sits behind the panel; the calendar must skip too.
         if images.is_capture_pass() {
             return;
         }
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
+        // Viewport may change between frames: re-clamp every draw.
         self.layout_panel(fonts);
 
+        if !self.label.is_empty() {
+            let layout = fonts.layout_text_weighted(
+                &self.label,
+                DATE_FIELD_FONT_SIZE,
+                self.eff(self.text_color),
+                400.0,
+                None,
+            );
+            draw_layout(scene, &layout, self.label_x, self.label_y, fonts.scale);
+        }
+
+        // Pop-up field button (no hover state, like `MenuPicker`).
+        let button = RoundedRect::new(
+            px(self.field_x),
+            px(self.field_y),
+            px(self.field_x + self.field_w),
+            px(self.field_y + DATE_FIELD_H),
+            px(DATE_FIELD_RADIUS),
+        );
+        scene.fill(
+            Fill::NonZero,
+            Affine::IDENTITY,
+            &Brush::Solid(self.eff(self.button_bg())),
+            None,
+            &button,
+        );
+        if self.armed_field && !self.disabled {
+            let press = if self.dark {
+                Color::from_rgba8(255, 255, 255, 24)
+            } else {
+                Color::from_rgba8(0, 0, 0, 24)
+            };
+            scene.fill(
+                Fill::NonZero,
+                Affine::IDENTITY,
+                &Brush::Solid(self.eff(press)),
+                None,
+                &button,
+            );
+        }
+        let current = self.formatted();
+        let layout = fonts.layout_text_weighted(
+            &current,
+            DATE_FIELD_FONT_SIZE,
+            self.eff(self.text_color),
+            400.0,
+            None,
+        );
+        let (_, th) = FontSystem::layout_size(&layout);
+        draw_layout(
+            scene,
+            &layout,
+            self.field_x + DATE_FIELD_PAD_X,
+            self.field_y + (DATE_FIELD_H - th / fonts.scale) / 2.0,
+            fonts.scale,
+        );
+        self.draw_field_chevron(
+            scene,
+            self.field_x + self.field_w - DATE_FIELD_PAD_X - DATE_FIELD_CHEV_W,
+            self.field_y + DATE_FIELD_H / 2.0,
+            fonts.scale,
+            self.eff(self.text_dim),
+        );
+
+        if !self.open {
+            return;
+        }
+        self.draw_calendar(scene, fonts, images);
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        self.finish_up(x, y);
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+impl DatePicker {
+    /// Floating frosted calendar panel above the background.
+    fn draw_calendar(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+    ) {
+        let scale = fonts.scale as f64;
+        let px = |v: f32| v as f64 * scale;
         // Frosted glass panel (opaque finish, no clear background).
         let rect = vello::kurbo::Rect::new(
             px(self.panel_x),
@@ -1034,16 +1383,6 @@ impl View for DatePicker {
         }
     }
 
-    fn mouse_up(&mut self, x: f64, y: f64) {
-        self.finish_up(x, y);
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-}
-
-impl DatePicker {
     /// Open frosted popup list with hover rows, current checkmark and
     /// a scrollbar when content exceeds the visible rows.
     fn draw_popup(
@@ -1214,48 +1553,62 @@ mod tests {
     }
 
     #[test]
-    fn click_day_selects_on_release_inside() {
-        let mut p = DatePicker::new().selected(2026, 7, 1);
-        let mut fonts = FontSystem::new();
-        p.set_viewport(0.0, 0.0, 800.0, 600.0);
-        let (w, h) = p.measure(&mut fonts);
-        p.place(&mut fonts, 0.0, 0.0, w, h);
+    fn click_day_selects_and_closes() {
+        let (mut p, _) = placed_picker();
+        assert!(!p.is_open());
         // Release without press does nothing.
         p.mouse_up(1000.0, 1000.0);
+        assert!(!p.is_open());
         assert_eq!(p.selected_date(), (2026, 7, 1));
-        // Press + release on the 16th selects it.
+        // Click on the field opens the floating calendar.
+        field_click(&mut p);
+        assert!(p.is_open());
+        // Press + release on the 16th selects it and closes.
         let (cx, cy) = p.cell_center(16).expect("16 visible");
         p.mouse_down(cx as f64, cy as f64);
         p.mouse_up(cx as f64, cy as f64);
         assert_eq!(p.selected_date(), (2026, 7, 16));
-        // Press on a day, release outside keeps the selection.
+        assert!(!p.is_open());
+    }
+
+    #[test]
+    fn day_press_release_outside_keeps_open_without_select() {
+        let (mut p, _) = placed_picker();
+        field_click(&mut p);
+        assert!(p.is_open());
+        let (cx, cy) = p.cell_center(16).expect("16 visible");
         p.mouse_down(cx as f64, cy as f64);
         p.mouse_up(700.0, 500.0);
-        assert_eq!(p.selected_date(), (2026, 7, 16));
+        assert_eq!(p.selected_date(), (2026, 7, 1));
+        assert!(p.is_open());
     }
 
     #[test]
     fn blank_cells_never_select() {
-        let mut p = DatePicker::new().selected(2026, 7, 1);
-        let mut fonts = FontSystem::new();
-        p.set_viewport(0.0, 0.0, 800.0, 600.0);
-        let (w, h) = p.measure(&mut fonts);
-        p.place(&mut fonts, 0.0, 0.0, w, h);
+        let (mut p, _) = placed_picker();
+        field_click(&mut p);
         // Top-left cell is blank for July 2026 (starts Wednesday).
         let x = (p.grid_x + DATE_CELL_W / 2.0) as f64;
         let y = (p.grid_y + DATE_CELL_H / 2.0) as f64;
         p.mouse_down(x, y);
         p.mouse_up(x, y);
         assert_eq!(p.selected_date(), (2026, 7, 1));
+        assert!(p.is_open());
     }
 
     fn placed_picker() -> (DatePicker, FontSystem) {
-        let mut p = DatePicker::new().selected(2026, 7, 16);
+        let mut p = DatePicker::new().selected(2026, 7, 1);
         let mut fonts = FontSystem::new();
         p.set_viewport(0.0, 0.0, 800.0, 600.0);
         let (w, h) = p.measure(&mut fonts);
         p.place(&mut fonts, 0.0, 0.0, w, h);
         (p, fonts)
+    }
+
+    fn field_click(p: &mut DatePicker) {
+        let x = (p.field_x + p.field_w / 2.0) as f64;
+        let y = (p.field_y + DATE_FIELD_H / 2.0) as f64;
+        click(p, x, y);
     }
 
     fn click(p: &mut DatePicker, x: f64, y: f64) {
@@ -1283,8 +1636,29 @@ mod tests {
     }
 
     #[test]
+    fn closed_field_has_no_hover() {
+        let (mut p, _) = placed_picker();
+        let bx = (p.field_x + p.field_w / 2.0) as f64;
+        let by = (p.field_y + DATE_FIELD_H / 2.0) as f64;
+        p.mouse_move(bx, by);
+        assert_eq!(p.hovered_day, None);
+        assert_eq!(p.hovered_zone, None);
+        assert_eq!(p.hovered_nav, None);
+    }
+
+    #[test]
+    fn field_toggle_opens_and_closes() {
+        let (mut p, _) = placed_picker();
+        field_click(&mut p);
+        assert!(p.is_open());
+        field_click(&mut p);
+        assert!(!p.is_open());
+    }
+
+    #[test]
     fn month_menu_opens_and_picks() {
         let (mut p, _) = placed_picker();
+        field_click(&mut p);
         // Click the month zone opens all twelve months.
         month_click(&mut p);
         assert_eq!(p.popup, Popup::Months);
@@ -1296,13 +1670,15 @@ mod tests {
         click(&mut p, rx, ry);
         assert_eq!(p.popup, Popup::None);
         assert_eq!(p.viewed(), (2026, 3));
-        // Selection untouched by month navigation.
-        assert_eq!(p.selected_date(), (2026, 7, 16));
+        // Calendar stays open, selection untouched by navigation.
+        assert!(p.is_open());
+        assert_eq!(p.selected_date(), (2026, 7, 1));
     }
 
     #[test]
     fn year_menu_shows_current_and_scrolls() {
         let (mut p, _) = placed_picker();
+        field_click(&mut p);
         // Click the year zone opens the 1-3000 list at 2026.
         year_click(&mut p);
         assert_eq!(p.popup, Popup::Years);
@@ -1326,23 +1702,30 @@ mod tests {
     #[test]
     fn popup_outside_click_and_escape_close() {
         let (mut p, _) = placed_picker();
+        field_click(&mut p);
         month_click(&mut p);
         assert_eq!(p.popup, Popup::Months);
-        // Outside press + release closes without changing.
+        // Outside press + release closes the whole calendar.
         p.mouse_down(700.0, 500.0);
         p.mouse_up(700.0, 500.0);
         assert_eq!(p.popup, Popup::None);
+        assert!(!p.is_open());
         assert_eq!(p.viewed(), (2026, 7));
-        // Escape closes too.
+        // Escape closes the list first, then the calendar.
+        field_click(&mut p);
         year_click(&mut p);
         assert_eq!(p.popup, Popup::Years);
         p.key(Key::Escape);
         assert_eq!(p.popup, Popup::None);
+        assert!(p.is_open());
+        p.key(Key::Escape);
+        assert!(!p.is_open());
     }
 
     #[test]
     fn header_tap_switches_lists() {
         let (mut p, _) = placed_picker();
+        field_click(&mut p);
         month_click(&mut p);
         assert_eq!(p.popup, Popup::Months);
         // Tapping the year zone while open switches lists.
@@ -1353,6 +1736,7 @@ mod tests {
     #[test]
     fn hover_uses_accent_everywhere() {
         let (mut p, _) = placed_picker();
+        field_click(&mut p);
         p.set_theme(Color::from_rgb8(0xff, 0x2d, 0x55), true);
         // Day, zone and nav hover all resolve to the accent.
         let (cx, cy) = p.cell_center(16).expect("16 visible");
@@ -1366,12 +1750,9 @@ mod tests {
     }
 
     #[test]
-    fn nav_chevrons_step_month() {
-        let mut p = DatePicker::new().selected(2026, 7, 16);
-        let mut fonts = FontSystem::new();
-        p.set_viewport(0.0, 0.0, 800.0, 600.0);
-        let (w, h) = p.measure(&mut fonts);
-        p.place(&mut fonts, 0.0, 0.0, w, h);
+    fn nav_chevrons_step_month_and_stay_open() {
+        let (mut p, _) = placed_picker();
+        field_click(&mut p);
         let right = p.panel_x + p.panel_w - DATE_PAD;
         let prev = (right - DATE_NAV_W * 1.5) as f64;
         let next = (right - DATE_NAV_W * 0.5) as f64;
@@ -1384,6 +1765,22 @@ mod tests {
         p.mouse_down(prev, y);
         p.mouse_up(prev, y);
         assert_eq!(p.viewed(), (2026, 6));
+        assert!(p.is_open());
+    }
+
+    #[test]
+    fn calendar_stays_inside_viewport() {
+        let mut p = DatePicker::new().selected(2026, 7, 16);
+        let mut fonts = FontSystem::new();
+        // Tiny window with the field at the bottom-right corner.
+        p.set_viewport(0.0, 0.0, 200.0, 120.0);
+        let (w, h) = p.measure(&mut fonts);
+        p.place(&mut fonts, 150.0, 90.0, w, h);
+        p.open();
+        assert!(p.panel_x >= 0.0);
+        assert!(p.panel_y >= 0.0);
+        assert!(p.panel_x + p.panel_w <= 200.0);
+        assert!(p.panel_y + p.panel_h <= 120.0);
     }
 
     #[test]

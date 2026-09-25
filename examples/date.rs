@@ -15,6 +15,7 @@ struct DateDemo {
     bg: Color,
     text: Color,
     caption: String,
+    calendar_open: bool,
     command: Option<WindowCommand>,
 }
 
@@ -31,6 +32,7 @@ impl DateDemo {
             bg: tontooui::renderer::window::BACKGROUND,
             text: Color::WHITE,
             caption: "16 July 2026".to_string(),
+            calendar_open: false,
             command: None,
         }
     }
@@ -50,6 +52,7 @@ impl DateDemo {
         if let Some(first) = self.stack.child_mut::<DatePicker>(0) {
             let (y, m, d) = first.selected_date();
             self.caption = format!("{d} {} {y}", DATE_MONTHS[(m - 1) as usize]);
+            self.calendar_open = first.is_open();
         }
     }
 }
@@ -88,14 +91,31 @@ impl App for DateDemo {
         self.bar.draw(scene, fonts);
         self.bar.set_title(format!("Date — {}", self.caption));
 
-        // Caption under the calendar, like the reference screenshots.
+        // Caption under the field; the open calendar floats above
+        // it, like the menu example.
         let text = format!("Selected: {}", self.caption);
         let layout = fonts.layout_text_weighted(&text, 17.0, self.text, 600.0, None);
         let (tw, _) = FontSystem::layout_size(&layout);
         let cx = viewport.x + (viewport.width - tw / fonts.scale) / 2.0;
         let top = viewport.y + 31.0;
-        let cy = top + 16.0 + 236.0 + 16.0;
+        let cy = top + 8.0 + 24.0 + 8.0;
         draw_layout(scene, &layout, cx, cy, fonts.scale);
+
+        // Sample text under the picker: opening the calendar blurs
+        // these lines through the frosted glass (glass test).
+        let sample = [
+            "Lorem ipsum dolor sit amet,",
+            "consectetur adipiscing elit,",
+            "sed do eiusmod tempor incididunt,",
+            "ut labore et dolore magna aliqua.",
+            "The quick brown fox jumps over the lazy dog.",
+        ];
+        let mut ly = top + 64.0;
+        for line in sample {
+            let layout = fonts.layout_text_weighted(line, 13.0, self.text, 400.0, None);
+            draw_layout(scene, &layout, viewport.x + 24.0, ly, fonts.scale);
+            ly += 22.0;
+        }
 
         self.stack.place(
             fonts,
@@ -120,8 +140,8 @@ impl App for DateDemo {
     }
 
     fn wants_backdrop(&self) -> bool {
-        // Glass calendar always on screen.
-        true
+        // Glass calendar needs the blur pass while open.
+        self.calendar_open
     }
 
     fn mouse_down(&mut self, x: f64, y: f64) {
