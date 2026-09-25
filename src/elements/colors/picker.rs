@@ -418,7 +418,8 @@ impl ColorPicker {
         } else if Self::in_rect(x, y, self.brightness_rect()) {
             self.drag = Some(DragTarget::Brightness);
             let (bx, _, bw, _) = self.brightness_rect();
-            self.hsv.v = Self::slider_t(bx, bw, x);
+            // Bar runs bright left into black right.
+            self.hsv.v = 1.0 - Self::slider_t(bx, bw, x);
             self.fire();
         } else if Self::in_rect(x, y, self.opacity_rect()) {
             self.drag = Some(DragTarget::Opacity);
@@ -442,7 +443,7 @@ impl ColorPicker {
             }
             Some(DragTarget::Brightness) => {
                 let (bx, _, bw, _) = self.brightness_rect();
-                self.hsv.v = Self::slider_t(bx, bw, x);
+                self.hsv.v = 1.0 - Self::slider_t(bx, bw, x);
                 self.fire();
             }
             Some(DragTarget::Opacity) => {
@@ -596,7 +597,7 @@ impl View for ColorPicker {
             None,
             &bar,
         );
-        knob(scene, scale, Self::slider_x(bx, bw, self.hsv.v), by + bh / 2.0, bh / 2.0 - 2.0);
+        knob(scene, scale, Self::slider_x(bx, bw, 1.0 - self.hsv.v), by + bh / 2.0, bh / 2.0 - 2.0);
 
         // Opacity label and checker transparency bar with percent pill.
         self.ensure_labels(fonts);
@@ -784,6 +785,19 @@ mod tests {
         let (ox, oy, ow, oh) = picker.opacity_rect();
         picker.mouse_down((ox + ow / 2.0) as f64, (oy + oh / 2.0) as f64);
         assert!((picker.selected().to_rgba8().a as f32 - 255.0 * 0.5).abs() < 2.0);
+    }
+
+    #[test]
+    fn brightness_runs_bright_left_into_black_right() {
+        let mut picker = ColorPicker::new();
+        picker.set_viewport(0.0, 0.0, 800.0, 600.0);
+        picker.show();
+        let (bx, by, bw, bh) = picker.brightness_rect();
+        let cy = by + bh / 2.0;
+        picker.mouse_down((bx + 1.0) as f64, cy as f64);
+        assert!((picker.hsv_value().v - 1.0).abs() < 1e-6);
+        picker.mouse_down((bx + bw - 1.0) as f64, cy as f64);
+        assert!(picker.hsv_value().v.abs() < 1e-6);
     }
 
     #[test]
