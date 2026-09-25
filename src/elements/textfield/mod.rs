@@ -73,6 +73,20 @@ struct UndoState {
     sel: bool,
 }
 
+/// Cached parley line ranges for multiline geometry. Line breaks
+/// only move when the text, size, wrap or scale change, so frames
+/// reuse them instead of re-laying-out every draw (the old code
+/// laid the whole text out per frame, which lagged past ~1K chars).
+#[derive(Clone, Default)]
+struct LinesCache {
+    text: String,
+    size: f32,
+    wrap: f32,
+    scale: f32,
+    lines: Vec<(usize, usize, f32)>,
+    valid: bool,
+}
+
 /// Shared single-line editing core behind the field variants:
 /// text plus caret (always a char boundary), placeholder, selection
 /// and accent. `masked` echoes bullets (secure fields), `multiline`
@@ -105,6 +119,7 @@ pub(crate) struct FieldCore {
     press_time: Option<Instant>,
     undo: Vec<UndoState>,
     redo: Vec<UndoState>,
+    lines_cache: LinesCache,
     on_change: Option<Box<dyn FnMut(&str)>>,
     layout: Option<Layout<SolidBrush>>,
     layout_text: String,
@@ -137,6 +152,7 @@ impl FieldCore {
             press_time: None,
             undo: Vec::new(),
             redo: Vec::new(),
+            lines_cache: LinesCache::default(),
             on_change: None,
             layout: None,
             layout_text: String::new(),
@@ -487,6 +503,38 @@ impl FieldCore {
         self.release();
     }
 
+    /// Parley line ranges for the current text, cached across
+    /// frames: rebuilt only when text, size, wrap or scale changed.
+    /// Glyph color never affects breaks, so it is not part of the
+    /// key. Returns an owned copy (a few dozen triples).
+    pub(crate) fn cached_editor_lines(
+        &mut self,
+        fonts: &mut FontSystem,
+        size: f32,
+        color: Color,
+        wrap: f32,
+    ) -> Vec<(usize, usize, f32)> {
+        let cache = &self.lines_cache;
+        if cache.valid
+            && cache.text == self.text
+            && cache.size == size
+            && cache.wrap == wrap
+            && cache.scale == fonts.scale
+        {
+            return cache.lines.clone();
+        }
+        let lines = editor_lines(fonts, &self.text, size, color, wrap);
+        self.lines_cache = LinesCache {
+            text: self.text.clone(),
+            size,
+            wrap,
+            scale: fonts.scale,
+            lines: lines.clone(),
+            valid: true,
+        };
+        lines
+    }
+
     pub(crate) fn set_text(&mut self, text: String) {
         if text != self.text {
             self.text = text;
@@ -714,7 +762,9 @@ pub(crate) fn word_range(text: &str, caret: usize) -> (usize, usize) {
 }
 
 /// Byte index at `goal_x` (text-origin coords) in single-line
-/// `echo`: nearest advance boundary, clamped to both ends.
+/// `echo`: nearest advance boundary (ties to the earlier one),
+/// clamped to both ends. Binary searches over char boundaries, so
+/// huge lines need O(log n) layouts, not O(n).
 pub(crate) fn single_line_caret(
     fonts: &mut FontSystem,
     echo: &str,
@@ -725,15 +775,34 @@ pub(crate) fn single_line_caret(
     if goal_x <= 0.0 || echo.is_empty() {
         return 0;
     }
-    let mut x = 0.0;
-    let mut at = 0;
+    let mut bounds = vec![0usize];
     for (i, ch) in echo.char_indices() {
-        let adv = advance_of(fonts, &echo[i..i + ch.len_utf8()], size, color);
-        if x + adv / 2.0 >= goal_x {
-            return i;
+        bounds.push(i + ch.len_utf8());
+    }
+    let goal = goal_x;
+    let advance_at = |k: usize, fonts: &mut FontSystem| -> f32 {
+        match echo.get(..bounds[k]) {
+            Some(slice) => advance_of(fonts, slice, size, color),
+            None => 0.0,
         }
-        x += adv;
-        at = i + ch.len_utf8();
+    };
+    let mut lo = 0usize;
+    let mut hi = bounds.len() - 1;
+    while lo < hi {
+        let mid = (lo + hi + 1) / 2;
+        if advance_at(mid, fonts) <= goal {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    let mut at = bounds[lo];
+    if lo + 1 < bounds.len() {
+        let a0 = advance_at(lo, fonts);
+        let a1 = advance_at(lo + 1, fonts);
+        if goal > (a0 + a1) / 2.0 {
+            at = bounds[lo + 1];
+        }
     }
     at
 }
@@ -767,9 +836,40 @@ pub(crate) fn selection_brush(core: &FieldCore) -> Color {
     Color::from_rgba8(c.r, c.g, c.b, (c.a as f32 * TEXTFIELD_SELECTION_ALPHA).round() as u8)
 }
 
-/// Caret line index plus goal x in logical px. The caret belongs to
-/// the first line spanning it; a caret exactly at a line end before
-/// `\n` stays on its line (documented v1 behavior).
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn word_range_covers_word_chars_only() {
+        assert_eq!(word_range("hello world", 3), (0, 5));
+        assert_eq!(word_range("hello world", 5), (0, 5));
+        assert_eq!(word_range("hello world", 6), (6, 11));
+        assert_eq!(word_range("foo_bar baz", 4), (0, 7));
+        assert_eq!(word_range("hi", 99), (0, 2));
+        assert_eq!(word_range("", 0), (0, 0));
+    }
+
+    #[test]
+    fn single_line_caret_maps_ends_and_middle() {
+        let mut fonts = FontSystem::new();
+        let color = Color::WHITE;
+        let echo = "hello";
+        assert_eq!(single_line_caret(&mut fonts, echo, 13.0, color, -10.0), 0);
+        assert_eq!(single_line_caret(&mut fonts, echo, 13.0, color, 10000.0), 5);
+        let hel_x = advance_of(&mut fonts, "hel", 13.0, color);
+        let middle = single_line_caret(&mut fonts, echo, 13.0, color, hel_x);
+        assert_eq!(middle, 3);
+        assert_eq!(single_line_caret(&mut fonts, "", 13.0, color, 50.0), 0);
+    }
+}
+
+/// Caret line index plus goal x in logical px. A caret exactly on a
+/// line start belongs to that line, so carets after an empty line
+/// land on the next line instead of inside the gap; otherwise the
+/// first line spanning the caret wins. The x advance comes from a
+/// single layout of the line prefix (not per-char probes), so long
+/// lines stay cheap.
 pub(crate) fn editor_caret_pos(
     fonts: &mut FontSystem,
     text: &str,
@@ -778,36 +878,43 @@ pub(crate) fn editor_caret_pos(
     color: Color,
     lines: &[(usize, usize, f32)],
 ) -> (usize, f32) {
+    if lines.is_empty() {
+        return (0, 0.0);
+    }
     let caret = caret.min(text.len());
     let mut line = lines.len().saturating_sub(1);
-    for (index, (start, end, _)) in lines.iter().enumerate() {
-        if caret >= *start && caret <= *end {
+    let mut found = false;
+    for (index, (start, _, _)) in lines.iter().enumerate() {
+        if caret == *start {
             line = index;
+            found = true;
             break;
+        }
+    }
+    if !found {
+        for (index, (start, end, _)) in lines.iter().enumerate() {
+            if caret >= *start && caret <= *end {
+                line = index;
+                break;
+            }
         }
     }
     let (start, end, _) = lines[line];
     let end = end.min(text.len());
-    let mut x = 0.0;
-    let mut at = start.min(end);
-    while at < caret.min(end) {
-        let next = text[at..]
-            .char_indices()
-            .nth(1)
-            .map(|(i, _)| at + i)
-            .unwrap_or(end);
-        x += advance_of(fonts, &text[at..next.min(end)], size, color);
-        at = next.min(end);
-        if at >= end {
-            break;
-        }
-    }
+    let start = start.min(end);
+    let at = caret.min(end).max(start);
+    let x = match text.get(start..at) {
+        Some(slice) => advance_of(fonts, slice, size, color),
+        None => 0.0,
+    };
     (line, x)
 }
 
-/// Byte index in `line` at column `goal_x` (nearest advance). A
+/// Byte index in `line` at column `goal_x` (nearest advance, ties
+/// to the earlier boundary, like the old half-advance walk). A
 /// trailing newline belongs to the break, not the walk. Past the
-/// last line end lands at the very end.
+/// last line end lands at the very end. Binary searches over char
+/// boundaries, so long lines need O(log n) layouts, not O(n).
 pub(crate) fn editor_column(
     fonts: &mut FontSystem,
     text: &str,
@@ -823,28 +930,59 @@ pub(crate) fn editor_column(
     let line = line.min(lines.len().saturating_sub(1));
     let (start, end, _) = lines[line];
     let end = end.min(text.len());
-    let walk_end = if text[start.min(end)..end].ends_with('\n') {
-        end.saturating_sub(1).max(start.min(end))
-    } else {
-        end
+    let start = start.min(end);
+    let walk_end = match text.get(start..end) {
+        Some(slice) if slice.ends_with('\n') => end.saturating_sub(1).max(start),
+        _ => end,
     };
-    let mut x = 0.0;
-    let mut at = start.min(walk_end);
+    // Char boundaries in the walk range (no layouts here).
+    let mut bounds = vec![start];
+    let mut at = start;
     while at < walk_end {
-        let next = text[at..]
-            .char_indices()
-            .nth(1)
-            .map(|(i, _)| at + i)
-            .unwrap_or(walk_end);
-        let adv = advance_of(fonts, &text[at..next.min(walk_end)], size, color);
-        if x + adv / 2.0 >= goal_x {
-            break;
+        match text[at..].chars().next() {
+            Some(c) => {
+                at = (at + c.len_utf8()).min(walk_end);
+                bounds.push(at);
+                if at >= walk_end {
+                    break;
+                }
+            }
+            None => break,
         }
-        x += adv;
-        at = next.min(walk_end);
     }
-    if line == lines.len().saturating_sub(1) && goal_x >= x {
-        return text.len();
+    let goal = goal_x.max(0.0);
+    let advance_at = |k: usize, fonts: &mut FontSystem| -> f32 {
+        match text.get(start..bounds[k]) {
+            Some(slice) => advance_of(fonts, slice, size, color),
+            None => 0.0,
+        }
+    };
+    let mut lo = 0usize;
+    let mut hi = bounds.len().saturating_sub(1);
+    while lo < hi {
+        let mid = (lo + hi + 1) / 2;
+        if advance_at(mid, fonts) <= goal {
+            lo = mid;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    let mut at = bounds[lo];
+    if lo + 1 < bounds.len() {
+        let a0 = advance_at(lo, fonts);
+        let a1 = advance_at(lo + 1, fonts);
+        if (a0 + a1) / 2.0 < goal {
+            at = bounds[lo + 1];
+        }
+    }
+    if line == lines.len().saturating_sub(1) {
+        let ax = match text.get(start..at) {
+            Some(slice) => advance_of(fonts, slice, size, color),
+            None => 0.0,
+        };
+        if goal >= ax {
+            return text.len();
+        }
     }
     at
 }
@@ -941,7 +1079,7 @@ pub(crate) fn draw_editor_multiline(
     // then track, then paint text and caret at the new scroll.
     let content = core.text.clone();
     let caret = core.caret;
-    let lines = editor_lines(fonts, &content, metrics.font_size, text, iw.max(0.0));
+    let lines = core.cached_editor_lines(fonts, metrics.font_size, text, iw.max(0.0));
     let (cx, cy, ch) = editor_caret_geometry(
         fonts,
         &content,

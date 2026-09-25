@@ -6,8 +6,8 @@ use vello::peniko::Color;
 
 use super::super::layout::View;
 use super::{
-    EditorMetrics, FieldCore, draw_editor_multiline, editor_caret_pos,
-    editor_column, editor_lines, field_colors,
+    EditorMetrics, FieldCore, draw_editor_multiline, editor_caret_geometry,
+    editor_caret_pos, editor_column, editor_lines, field_colors,
 };
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
@@ -192,7 +192,7 @@ impl TextEditor {
         let before = self.core.caret;
         let was_sel = self.core.sel;
         let (_, _, text) = field_colors(&self.core);
-        let lines = editor_lines(fonts, &self.core.text, EDITOR_FONT_SIZE, text, wrap);
+        let lines = self.core.cached_editor_lines(fonts, EDITOR_FONT_SIZE, text, wrap);
         let (line, goal_x) = editor_caret_pos(
             fonts,
             &self.core.text,
@@ -237,7 +237,7 @@ impl TextEditor {
     fn caret_at_point(&mut self, fonts: &mut FontSystem, qx: f32, qy: f32) -> usize {
         let (_, _, text) = field_colors(&self.core);
         let iw = self.inner_width().max(0.0);
-        let lines = editor_lines(fonts, &self.core.text, EDITOR_FONT_SIZE, text, iw);
+        let lines = self.core.cached_editor_lines(fonts, EDITOR_FONT_SIZE, text, iw);
         let rel_y = (qy - self.y - EDITOR_PAD + self.scroll_y).max(0.0);
         let mut line = lines.len().saturating_sub(1);
         let mut acc = 0.0;
@@ -468,6 +468,101 @@ mod tests {
         assert_eq!(editor.text_value(), "");
         assert!(editor.key(&mut fonts, Key::Paste));
         assert_eq!(editor.text_value(), "one\ntwo");
+    }
+
+    #[test]
+    fn caret_after_empty_line_lands_on_next_line() {
+        let mut editor = editor();
+        let mut fonts = FontSystem::new();
+        editor.place(&mut fonts, 0.0, 0.0, 400.0, 300.0);
+        editor.mouse_down(10.0, 10.0);
+        editor.type_text("a\n\nb");
+        let (_, _, text) = field_colors(&editor.core);
+        let wrap = 300.0;
+        let lines = editor_lines(&mut fonts, editor.text_value(), EDITOR_FONT_SIZE, text, wrap);
+        assert!(lines.len() >= 3);
+        // End of "a": first line.
+        let (first, _) =
+            editor_caret_pos(&mut fonts, editor.text_value(), 1, EDITOR_FONT_SIZE, text, &lines);
+        assert_eq!(first, 0);
+        // Start of the empty line: the middle line.
+        let (empty, _) =
+            editor_caret_pos(&mut fonts, editor.text_value(), 2, EDITOR_FONT_SIZE, text, &lines);
+        assert_eq!(empty, 1);
+        // Start of "b": last line at x ~ 0, not inside the gap.
+        let (last, x) =
+            editor_caret_pos(&mut fonts, editor.text_value(), 3, EDITOR_FONT_SIZE, text, &lines);
+        assert_eq!(last, lines.len() - 1);
+        assert!(x < 5.0);
+        // Geometry drops one line lower per step.
+        let (_, y1, _) = editor_caret_geometry(
+            &mut fonts,
+            editor.text_value(),
+            1,
+            EDITOR_FONT_SIZE,
+            text,
+            &lines,
+        );
+        let (_, y2, _) = editor_caret_geometry(
+            &mut fonts,
+            editor.text_value(),
+            2,
+            EDITOR_FONT_SIZE,
+            text,
+            &lines,
+        );
+        let (_, y3, _) = editor_caret_geometry(
+            &mut fonts,
+            editor.text_value(),
+            3,
+            EDITOR_FONT_SIZE,
+            text,
+            &lines,
+        );
+        assert!(y2 > y1 && y3 > y2);
+    }
+
+    #[test]
+    fn large_text_caret_ops_stay_correct() {
+        let mut editor = editor();
+        let mut fonts = FontSystem::new();
+        editor.place(&mut fonts, 0.0, 0.0, 400.0, 300.0);
+        editor.mouse_down(10.0, 10.0);
+        let chunk = "lorem ipsum dolor sit amet ".repeat(80);
+        editor.type_text(&format!("{chunk}\n\n{chunk}"));
+        assert!(editor.text_value().len() > 4000);
+        let (_, _, text) = field_colors(&editor.core);
+        let wrap = 300.0;
+        let lines = editor_lines(&mut fonts, editor.text_value(), EDITOR_FONT_SIZE, text, wrap);
+        let len = editor.text_value().len();
+        for caret in [0, 100, 1000, 2160, 2162, 3000, len] {
+            let caret = caret.min(len);
+            let (line, x) = editor_caret_pos(
+                &mut fonts,
+                editor.text_value(),
+                caret,
+                EDITOR_FONT_SIZE,
+                text,
+                &lines,
+            );
+            assert!(line < lines.len());
+            assert!(x >= 0.0);
+            let col = editor_column(
+                &mut fonts,
+                editor.text_value(),
+                line,
+                x + 3.0,
+                EDITOR_FONT_SIZE,
+                text,
+                &lines,
+            );
+            assert!(col <= len);
+        }
+        // Cached lines reuse: same breaks without re-laying-out.
+        let again = editor
+            .core
+            .cached_editor_lines(&mut fonts, EDITOR_FONT_SIZE, text, wrap);
+        assert_eq!(again, lines);
     }
 
     #[test]

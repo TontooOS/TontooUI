@@ -197,7 +197,7 @@ impl LargeTextEditor {
         let before = self.core.caret;
         let was_sel = self.core.sel;
         let (_, _, text) = field_colors(&self.core);
-        let lines = editor_lines(fonts, &self.core.text, LARGE_EDITOR_FONT_SIZE, text, wrap);
+        let lines = self.core.cached_editor_lines(fonts, LARGE_EDITOR_FONT_SIZE, text, wrap);
         let (line, goal_x) = editor_caret_pos(
             fonts,
             &self.core.text,
@@ -241,7 +241,7 @@ impl LargeTextEditor {
     fn caret_at_point(&mut self, fonts: &mut FontSystem, qx: f32, qy: f32) -> usize {
         let (_, _, text) = field_colors(&self.core);
         let iw = self.inner_width().max(0.0);
-        let lines = editor_lines(fonts, &self.core.text, LARGE_EDITOR_FONT_SIZE, text, iw);
+        let lines = self.core.cached_editor_lines(fonts, LARGE_EDITOR_FONT_SIZE, text, iw);
         let rel_y = (qy - self.y - LARGE_EDITOR_PAD + self.scroll_y).max(0.0);
         let mut line = lines.len().saturating_sub(1);
         let mut acc = 0.0;
