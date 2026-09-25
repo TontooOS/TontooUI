@@ -1,5 +1,5 @@
 use tontooui::elements::{
-    BasicList, ListRow, Titlebar, TrafficAction, View, VStack,
+    BasicList, DisclosureGroup, ListRow, Titlebar, TrafficAction, View, VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
@@ -19,10 +19,10 @@ struct ListDemo {
 
 impl ListDemo {
     fn new() -> Self {
-        // Like the reference: plain rows, a grouped section and a
-        // badge list.
+        // Full category showcase: plain rows, sections, badges, row
+        // styles and disclosure groups.
         let stack = VStack::new()
-            .spacing(32.0)
+            .spacing(24.0)
             .child(BasicList::from_slice(&[
                 "Row 1", "Row 2", "Row 3", "Row 4", "Row 5", "Row 6", "Row 7",
                 "Row 8", "Row 9", "Row 10",
@@ -48,7 +48,19 @@ impl ListDemo {
                 ListRow::item("Tinted Item")
                     .text_color(Color::from_rgb8(0x64, 0xd2, 0xff))
                     .no_divider(),
-            ]));
+            ]))
+            .child(
+                DisclosureGroup::from_slice(
+                    "Fruits",
+                    &["Apple", "Banana", "Cherry", "Date"],
+                )
+                .open(true),
+            )
+            .child(DisclosureGroup::from_slice(
+                "Vegetables",
+                &["Carrot", "Lettuce"],
+            ))
+            .child(DisclosureGroup::from_slice("Grains", &["Rice", "Wheat"]));
         Self {
             bar: Titlebar::new("List"),
             stack,
@@ -64,6 +76,17 @@ impl ListDemo {
         loop {
             match self.stack.child_mut::<BasicList>(index) {
                 Some(list) => f(list),
+                None => break,
+            }
+            index += 1;
+        }
+    }
+
+    fn each_group(&mut self, mut f: impl FnMut(&mut DisclosureGroup)) {
+        let mut index = 0;
+        loop {
+            match self.stack.child_mut::<DisclosureGroup>(index) {
+                Some(group) => f(group),
                 None => break,
             }
             index += 1;
@@ -90,6 +113,10 @@ impl App for ListDemo {
         self.each_list(|list| {
             list.set_theme(palette.divider, dark);
             list.set_focused(focused);
+        });
+        self.each_group(|group| {
+            group.set_theme(palette.divider, dark);
+            group.set_focused(focused);
         });
 
         self.bar.set_palette(
@@ -125,12 +152,18 @@ impl App for ListDemo {
             Some(TrafficAction::Maximize) => {
                 self.command = Some(WindowCommand::ToggleMaximize)
             }
-            None => {}
+            None => self.each_group(|group| group.mouse_down(x, y)),
         }
     }
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        if self.bar.press(x as f32, y as f32).is_none() {
+            self.each_group(|group| group.mouse_up(x, y));
+        }
     }
 
     fn set_focused(&mut self, focused: bool) {
@@ -140,7 +173,7 @@ impl App for ListDemo {
 }
 
 fn main() {
-    if let Err(err) = run("List", 900, 480, ListDemo::new()) {
+    if let Err(err) = run("List", 900, 1100, ListDemo::new()) {
         eprintln!("error: {err}");
         std::process::exit(1);
     }

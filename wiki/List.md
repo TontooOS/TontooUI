@@ -220,7 +220,7 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
   sections, row styles) via `list_mut`; `set_theme` and
   `set_focused` forward divider, mode and focus to the children.
 - Apps forward mouse events to the group (see
-  `examples/disclosure.rs`); `View::mouse_up` forwards to the same
+  `examples/list.rs`); `View::mouse_up` forwards to the same
   toggle path. Disabled groups ignore all input.
 
 ## Usage / Example
@@ -236,7 +236,7 @@ let stack = VStack::new().spacing(0.0)
   .child(DisclosureGroup::from_slice("Vegetables", &["Carrot"]));
 ```
 
-Wire theme and input per frame (see `examples/disclosure.rs`):
+Wire theme and input per frame (see `examples/list.rs`):
 
 ```rust
 group.set_theme(palette.divider, dark);
