@@ -4,6 +4,7 @@ pub mod animation;
 pub mod alerts;
 pub mod gestures;
 pub mod groupbox;
+pub mod colors;
 pub mod sheets;
 pub mod unavailable;
 pub mod gauges;
@@ -36,6 +37,7 @@ pub use gestures::{
     GESTURE_MAGNIFY_MAX, GESTURE_MAGNIFY_MIN, GESTURE_MAGNIFY_STEP,
     GESTURE_MOVE_SLOP,
 };
+pub use colors::{GradientPaint, SystemColor, ALL_SYSTEM_COLORS};
 pub use groupbox::{
     BasicGroupBox, StyledGroupBox, GROUP_BG_DARK, GROUP_BG_LIGHT, GROUP_PAD,
     GROUP_RADIUS, GROUP_ROW_GAP, GROUP_ROW_SPACING, GROUP_SYMBOL_SIZE,
