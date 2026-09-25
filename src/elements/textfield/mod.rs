@@ -1,6 +1,8 @@
 pub mod basic;
 pub mod editor;
 pub mod large;
+pub mod large_editor;
+pub mod search;
 pub mod secure;
 
 pub use basic::{
@@ -14,6 +16,14 @@ pub use editor::{
 pub use large::{
     LargeTextField, LARGE_FIELD_FONT_SIZE, LARGE_FIELD_PAD_X, LARGE_FIELD_PAD_Y,
     LARGE_FIELD_RADIUS,
+};
+pub use large_editor::{
+    LargeTextEditor, LARGE_EDITOR_BG_DARK, LARGE_EDITOR_BG_LIGHT,
+    LARGE_EDITOR_FONT_SIZE, LARGE_EDITOR_MIN_H, LARGE_EDITOR_PAD,
+    LARGE_EDITOR_RADIUS, LARGE_EDITOR_WRAP_W,
+};
+pub use search::{
+    SearchField, SEARCH_FONT_SIZE, SEARCH_GAP, SEARCH_ICON_SIZE, SEARCH_PAD_X,
 };
 pub use secure::SecureField;
 
@@ -311,6 +321,259 @@ pub(crate) fn caret_blink() -> bool {
         .map(|d| d.as_millis() % (TEXTFIELD_BLINK_SECONDS * 1000.0) as u128)
         .map(|ms| ms < (TEXTFIELD_BLINK_SECONDS * 500.0) as u128)
         .unwrap_or(true)
+}
+
+/// Line (start, end, height) ranges of `text` wrapped at `wrap`.
+/// Physical heights; empty text yields one empty line.
+pub(crate) fn editor_lines(
+    fonts: &mut FontSystem,
+    text: &str,
+    size: f32,
+    color: Color,
+    wrap: f32,
+) -> Vec<(usize, usize, f32)> {
+    if text.is_empty() {
+        return vec![(0, 0, size * 1.25)];
+    }
+    let probe = fonts.layout_text(text, size, color, Some(wrap.max(0.0)));
+    let mut out = Vec::new();
+    for index in 0..probe.len() {
+        if let Some(line) = probe.get(index) {
+            let range = line.text_range();
+            out.push((range.start, range.end, line.metrics().line_height));
+        }
+    }
+    if out.is_empty() {
+        out.push((0, 0, size * 1.25));
+    }
+    out
+}
+
+/// Advance of `text` in logical px (single line probe).
+fn advance_of(fonts: &mut FontSystem, text: &str, size: f32, color: Color) -> f32 {
+    if text.is_empty() {
+        return 0.0;
+    }
+    let probe = fonts.layout_text(text, size, color, None);
+    FontSystem::layout_size(&probe).0 / fonts.scale
+}
+
+/// Caret line index plus goal x in logical px. The caret belongs to
+/// the first line spanning it; a caret exactly at a line end before
+/// `\n` stays on its line (documented v1 behavior).
+pub(crate) fn editor_caret_pos(
+    fonts: &mut FontSystem,
+    text: &str,
+    caret: usize,
+    size: f32,
+    color: Color,
+    lines: &[(usize, usize, f32)],
+) -> (usize, f32) {
+    let caret = caret.min(text.len());
+    let mut line = lines.len().saturating_sub(1);
+    for (index, (start, end, _)) in lines.iter().enumerate() {
+        if caret >= *start && caret <= *end {
+            line = index;
+            break;
+        }
+    }
+    let (start, end, _) = lines[line];
+    let end = end.min(text.len());
+    let mut x = 0.0;
+    let mut at = start.min(end);
+    while at < caret.min(end) {
+        let next = text[at..]
+            .char_indices()
+            .nth(1)
+            .map(|(i, _)| at + i)
+            .unwrap_or(end);
+        x += advance_of(fonts, &text[at..next.min(end)], size, color);
+        at = next.min(end);
+        if at >= end {
+            break;
+        }
+    }
+    (line, x)
+}
+
+/// Byte index in `line` at column `goal_x` (nearest advance). A
+/// trailing newline belongs to the break, not the walk. Past the
+/// last line end lands at the very end.
+pub(crate) fn editor_column(
+    fonts: &mut FontSystem,
+    text: &str,
+    line: usize,
+    goal_x: f32,
+    size: f32,
+    color: Color,
+    lines: &[(usize, usize, f32)],
+) -> usize {
+    if lines.is_empty() {
+        return text.len();
+    }
+    let line = line.min(lines.len().saturating_sub(1));
+    let (start, end, _) = lines[line];
+    let end = end.min(text.len());
+    let walk_end = if text[start.min(end)..end].ends_with('\n') {
+        end.saturating_sub(1).max(start.min(end))
+    } else {
+        end
+    };
+    let mut x = 0.0;
+    let mut at = start.min(walk_end);
+    while at < walk_end {
+        let next = text[at..]
+            .char_indices()
+            .nth(1)
+            .map(|(i, _)| at + i)
+            .unwrap_or(walk_end);
+        let adv = advance_of(fonts, &text[at..next.min(walk_end)], size, color);
+        if x + adv / 2.0 >= goal_x {
+            break;
+        }
+        x += adv;
+        at = next.min(walk_end);
+    }
+    if line == lines.len().saturating_sub(1) && goal_x >= x {
+        return text.len();
+    }
+    at
+}
+
+/// Caret (x, y, height) in logical px relative to the text origin.
+pub(crate) fn editor_caret_geometry(
+    fonts: &mut FontSystem,
+    text: &str,
+    caret: usize,
+    size: f32,
+    color: Color,
+    lines: &[(usize, usize, f32)],
+) -> (f32, f32, f32) {
+    let (line, x) = editor_caret_pos(fonts, text, caret, size, color, lines);
+    let mut y = 0.0;
+    for (_, _, height) in lines.iter().take(line) {
+        y += *height / fonts.scale;
+    }
+    let line_h = lines
+        .get(line)
+        .map(|(_, _, h)| *h)
+        .unwrap_or(size * 1.25)
+        / fonts.scale;
+    (x, y, line_h)
+}
+
+/// Per-editor metrics for the shared multiline draw.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct EditorMetrics {
+    pub(crate) font_size: f32,
+    pub(crate) pad: f32,
+    pub(crate) radius: f32,
+}
+
+/// Multiline draw shared by both editors: fill, accent ring while
+/// selected (subtle border otherwise), wrapped text clipped to the
+/// padded box with vertical caret tracking and a blinking caret.
+/// Returns the new vertical scroll.
+pub(crate) fn draw_editor_multiline(
+    scene: &mut Scene,
+    fonts: &mut FontSystem,
+    core: &mut FieldCore,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    metrics: &EditorMetrics,
+    bg: Color,
+    border: Color,
+    scroll_y: f32,
+) -> f32 {
+    if w <= 0.0 || h <= 0.0 {
+        return scroll_y;
+    }
+    let scale = fonts.scale as f64;
+    let px = |v: f32| v as f64 * scale;
+    let (fill, border_line, text) = (bg, border, {
+        let (_, _, t) = field_colors(core);
+        t
+    });
+    let body = RoundedRect::new(px(x), px(y), px(x + w), px(y + h), px(metrics.radius));
+    scene.fill(
+        Fill::NonZero,
+        Affine::IDENTITY,
+        &Brush::Solid(fill),
+        None,
+        &body,
+    );
+    if core.selected {
+        scene.stroke(
+            &Stroke::new(px(TEXTFIELD_RING_W)),
+            Affine::IDENTITY,
+            &Brush::Solid(accent_color(core)),
+            None,
+            &body,
+        );
+    } else {
+        scene.stroke(
+            &Stroke::new(1.0 * scale),
+            Affine::IDENTITY,
+            &Brush::Solid(border_line),
+            None,
+            &body,
+        );
+    }
+    let ix = x + metrics.pad;
+    let iy = y + metrics.pad;
+    let iw = (w - metrics.pad * 2.0).max(0.0);
+    let ih = (h - metrics.pad * 2.0).max(0.0);
+    let clip = RoundedRect::new(px(ix), px(iy), px(ix + iw), px(iy + ih), px(4.0));
+    scene.push_clip_layer(Fill::NonZero, Affine::IDENTITY, &clip);
+    let placeholder = placeholder_color(core);
+    // Caret geometry first (needs fonts but not the layout borrow),
+    // then track, then paint text and caret at the new scroll.
+    let content = core.text.clone();
+    let caret = core.caret;
+    let lines = editor_lines(fonts, &content, metrics.font_size, text, iw.max(0.0));
+    let (cx, cy, ch) = editor_caret_geometry(
+        fonts,
+        &content,
+        caret,
+        metrics.font_size,
+        text,
+        &lines,
+    );
+    let mut scroll = scroll_y;
+    if cy - scroll + ch > ih {
+        scroll = (cy + ch - ih).max(0.0);
+    }
+    if cy - scroll < 0.0 {
+        scroll = cy.max(0.0);
+    }
+    {
+        let (layout, _) = core.ensure_layout(
+            fonts,
+            metrics.font_size,
+            text,
+            placeholder,
+            Some(iw.max(0.0)),
+        );
+        draw_layout(scene, layout, ix, iy - scroll, fonts.scale);
+    }
+    if core.selected && caret_blink() {
+        scene.fill(
+            Fill::NonZero,
+            Affine::IDENTITY,
+            &Brush::Solid(accent_color(core)),
+            None,
+            &Rect::new(
+                px(ix + cx),
+                px(iy + cy - scroll),
+                px(ix + cx + TEXTFIELD_CARET_W),
+                px(iy + cy - scroll + ch),
+            ),
+        );
+    }
+    scene.pop_layer();
+    scroll
 }
 
 /// Intrinsic size: text height plus vertical padding.

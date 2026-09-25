@@ -1,6 +1,6 @@
 use tontooui::elements::{
-    BasicText, BasicTextField, LargeTextField, SecureField, TextEditor,
-    Titlebar, TrafficAction, View,
+    BasicText, BasicTextField, LargeTextEditor, LargeTextField, SearchField,
+    SecureField, TextEditor, Titlebar, TrafficAction, View,
 };use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::window::{App, Key, Viewport, WindowCommand, run};
@@ -14,6 +14,8 @@ struct TextFieldDemo {
     large: LargeTextField,
     secure: SecureField,
     editor: TextEditor,
+    search: SearchField,
+    large_editor: LargeTextEditor,
     status: BasicText,
     pending: Vec<Key>,
     watcher: ThemeWatcher,
@@ -30,6 +32,8 @@ impl TextFieldDemo {
             large: LargeTextField::new("Placeholder"),
             secure: SecureField::new("Password"),
             editor: TextEditor::new("Write something…"),
+            search: SearchField::new("Search items…"),
+            large_editor: LargeTextEditor::new("Start typing here…"),
             pending: Vec::new(),
             status: BasicText::new("Click a field, type, ESC or outside click deselects."),
             watcher: ThemeWatcher::new(),
@@ -62,8 +66,13 @@ impl App for TextFieldDemo {
         self.large.set_focused(focused);
         self.secure.set_theme(palette.accent, dark);
         self.secure.set_focused(focused);
+        self.search
+            .set_theme(theme.mode, palette.accent, theme.glass);
+        self.search.set_focused(focused);
         self.editor.set_theme(palette.accent, dark);
         self.editor.set_focused(focused);
+        self.large_editor.set_theme(palette.accent, dark);
+        self.large_editor.set_focused(focused);
         self.status.set_theme(theme.mode);
         self.status.set_focused(focused);
         self.status.set_text(format!(
@@ -72,11 +81,12 @@ impl App for TextFieldDemo {
             self.large.text_value(),
             self.secure.text_value().chars().count()
         ));
-        // Drain buffered keys in order (editor needs fonts).
+        // Drain buffered keys in order (editors need fonts).
         for key in std::mem::take(&mut self.pending) {
             if !self.basic.key(key)
                 && !self.large.key(key)
                 && !self.secure.key(key)
+                && !self.search.key(key)
             {
                 self.editor.key(fonts, key);
             }
@@ -114,10 +124,24 @@ impl App for TextFieldDemo {
         // Editor takes a fixed tall box.
         self.editor.place(fonts, cx, y, content_w, 180.0);
         self.editor.draw(scene, fonts, images);
+        y += 200.0;
+        // Search capsule full-bleed.
+        let (_, sh3) = self.search.measure(fonts);
+        self.search.place(fonts, cx, y, content_w, sh3);
+        self.search.draw(scene, fonts, images);
+        y += sh3 + 20.0;
+        // Large inset editor last.
+        self.large_editor.place(fonts, cx, y, content_w, 220.0);
+        self.large_editor.draw(scene, fonts, images);
     }
 
     fn background(&self) -> Color {
         self.bg
+    }
+
+    fn wants_backdrop(&self) -> bool {
+        // Frosted search capsule needs the blur pass.
+        true
     }
 
     fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
@@ -143,7 +167,9 @@ impl App for TextFieldDemo {
                 self.basic.mouse_down(x, y);
                 self.large.mouse_down(x, y);
                 self.secure.mouse_down(x, y);
+                self.search.mouse_down(x, y);
                 self.editor.mouse_down(x, y);
+                self.large_editor.mouse_down(x, y);
             }
         }
     }
@@ -152,7 +178,9 @@ impl App for TextFieldDemo {
         self.basic.type_text(text);
         self.large.type_text(text);
         self.secure.type_text(text);
+        self.search.type_text(text);
         self.editor.type_text(text);
+        self.large_editor.type_text(text);
     }
 
     fn key(&mut self, key: Key) {

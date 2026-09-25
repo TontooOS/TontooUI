@@ -27,6 +27,10 @@ placeholder, typing, Backspace and caret keys.
 | `LARGE_FIELD_FONT_SIZE` / `LARGE_FIELD_PAD_X` / `LARGE_FIELD_PAD_Y` / `LARGE_FIELD_RADIUS` | 15 px / 12 px / 10 px / 10 px large metrics |
 | `EDITOR_FONT_SIZE` / `EDITOR_PAD` / `EDITOR_RADIUS` | 14 px / 12 px / 10 px editor metrics |
 | `EDITOR_WRAP_W` / `EDITOR_MIN_H` | 240 px intrinsic wrap width / 120 px minimum height |
+| `LARGE_EDITOR_FONT_SIZE` / `LARGE_EDITOR_PAD` / `LARGE_EDITOR_RADIUS` | 15 px / 14 px / 12 px large editor metrics |
+| `LARGE_EDITOR_WRAP_W` / `LARGE_EDITOR_MIN_H` | 320 px intrinsic wrap width / 220 px minimum height |
+| `LARGE_EDITOR_BG_DARK` / `LARGE_EDITOR_BG_LIGHT` | `#141416` / `#F2F2F5` large editor fill |
+| `SEARCH_FONT_SIZE` / `SEARCH_ICON_SIZE` / `SEARCH_PAD_X` / `SEARCH_GAP` | 14 px / 16 px / 14 px / 8 px search metrics |
 
 ## FieldCore
 
@@ -129,8 +133,40 @@ fn key(&mut self, key: Key) {
 }
 ```
 
-See `examples/textfield.rs` for the full demo (all four fields
-with a live value readout and a pending-key queue for the editor).
+See `examples/textfield.rs` for the full demo (all six fields
+with a live value readout and a pending-key queue for the editors).
+
+## SearchField
+
+```rust
+pub fn new(placeholder: impl Into<String>) -> Self
+pub fn set_theme(&mut self, mode: ThemeMode, accent: Color, glass: GlassAmount)
+pub fn set_focused(&mut self, focused: bool)
+pub fn on_change(self, callback: impl FnMut(&str) + 'static) -> Self
+pub fn set_text(&mut self, text: impl Into<String>)
+pub fn set_placeholder(&mut self, placeholder: impl Into<String>)
+pub fn text_value(&self) -> &str
+pub fn is_selected(&self) -> bool
+pub fn type_text(&mut self, content: &str)
+pub fn key(&mut self, key: Key) -> bool
+pub fn mouse_down(&mut self, x: f64, y: f64)
+pub fn rect(&self) -> (f32, f32, f32, f32)
+```
+
+- Toolbar-like frosted glass capsule with a magnifier icon and a
+  single-line input on top. Same editing contract as the basic
+  field, no accent ring (the glass carries the look). The frost
+  needs the shell blur pass: the app opts in with `wants_backdrop`
+  while visible, and the capsule skips the capture pass so the blur
+  stays clean.
+
+## LargeTextEditor
+
+Same API as `TextEditor` (`new`, `set_theme`, `on_change`,
+`set_text`, `type_text`, `key(fonts, key)`, `mouse_down`,
+`is_selected`, `rect`), roomier in every direction with a
+near-black inset fill. Both editors share the multiline caret
+geometry and draw in `mod.rs`.
 
 ## Cross References
 
