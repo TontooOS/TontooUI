@@ -18,6 +18,7 @@ theme, animation and a Vello/WGPU renderer.
 | Gauge | [Gauge.md](Gauge.md) | Basic, linear, circular and capacity gauges |
 | Glass | [Glass.md](Glass.md) | Liquid glass container and backdrop blur |
 | Layout | [Layout.md](Layout.md) | VStack, HStack, ZStack, modifiers, `View` |
+| Menu | [Menu.md](Menu.md) | Simple dropdown with action rows, picker base |
 | Renderer | [Renderer.md](Renderer.md) | Window shell, frame pipeline, backdrop blur |
 | Picker | [Picker.md](Picker.md) | Segmented, inline, menu and date pickers |
 | Progress | [Progress.md](Progress.md) | Linear progress bar with chase buffer |

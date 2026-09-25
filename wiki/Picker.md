@@ -144,6 +144,11 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
 
 ## MenuPicker
 
+Runs on the shared menu base ([Menu.md](Menu.md)): the base owns
+button, frosted panel, rows, hover and viewport clamping, while the
+picker only tracks the selection (button text plus checkmark) and
+fires `on_select` on change. Same function as before.
+
 ```rust
 pub fn new(label: impl Into<String>, options: Vec<String>) -> Self
 pub fn from_slice(label: impl Into<String>, options: &[&str]) -> Self
@@ -300,6 +305,7 @@ click a day to select and close.
 
 ## Cross References
 
+- [Menu.md](Menu.md) – shared dropdown base underneath the picker
 - [Slider.md](Slider.md) – accent fill, manual `accent`, click animation
 - [Toggle.md](Toggle.md) – settings rows, icon badges, `on_toggle` callback
 - [Button.md](Button.md) – control metrics, press overlay

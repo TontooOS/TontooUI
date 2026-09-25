@@ -1,4 +1,4 @@
-use tontooui::elements::{MenuPicker, Titlebar, TrafficAction, View, VStack};
+use tontooui::elements::{Menu, MenuPicker, Titlebar, TrafficAction, View, VStack};
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::text::draw_layout;
@@ -10,11 +10,13 @@ use vello::peniko::Color;
 struct MenuDemo {
     bar: Titlebar,
     stack: VStack,
+    dropdown: Menu,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
     text: Color,
     selected_label: String,
+    last_action: String,
     menu_open: bool,
     command: Option<WindowCommand>,
 }
@@ -28,11 +30,13 @@ impl MenuDemo {
         Self {
             bar: Titlebar::new("Menu"),
             stack,
+            dropdown: Menu::from_slice("Options", &["Option 1", "Option 2", "Option 3"]),
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
             text: Color::WHITE,
             selected_label: "Red".to_string(),
+            last_action: "-".to_string(),
             menu_open: false,
             command: None,
         }
@@ -54,6 +58,13 @@ impl MenuDemo {
             self.selected_label = first.selected_label().unwrap_or("-").to_string();
             self.menu_open = first.is_open();
         }
+        self.last_action = self
+            .dropdown
+            .last_action()
+            .and_then(|i| self.dropdown.option(i))
+            .unwrap_or("-")
+            .to_string();
+        self.menu_open = self.menu_open || self.dropdown.is_open();
     }
 }
 
@@ -82,6 +93,11 @@ impl App for MenuDemo {
             picker.set_glass(theme.mode, theme.glass);
             picker.set_focused(focused);
         });
+        self.dropdown
+            .set_viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+        self.dropdown.set_theme(palette.accent, dark);
+        self.dropdown.set_glass(theme.mode, theme.glass);
+        self.dropdown.set_focused(focused);
         self.refresh_selected_label();
 
         self.bar.set_palette(
@@ -91,8 +107,10 @@ impl App for MenuDemo {
         );
         self.bar.set_rect(viewport.x, viewport.y, viewport.width);
         self.bar.draw(scene, fonts);
-        self.bar
-            .set_title(format!("Menu — {}", self.selected_label));
+        self.bar.set_title(format!(
+            "Menu — {} · {}",
+            self.selected_label, self.last_action
+        ));
 
         // Caption before the stack: the open menu floats above it,
         // like the reference screenshot.
@@ -113,7 +131,7 @@ impl App for MenuDemo {
             "ut labore et dolore magna aliqua.",
             "The quick brown fox jumps over the lazy dog.",
         ];
-        let mut ly = top + 64.0;
+        let mut ly = top + 120.0;
         for line in sample {
             let layout = fonts.layout_text_weighted(line, 13.0, self.text, 400.0, None);
             draw_layout(scene, &layout, viewport.x + 24.0, ly, fonts.scale);
@@ -128,6 +146,16 @@ impl App for MenuDemo {
             (viewport.height - 47.0).max(0.0),
         );
         self.stack.draw(scene, fonts, images);
+        // Simple dropdown below the caption; its open panel floats
+        // above the sample text.
+        self.dropdown.place(
+            fonts,
+            viewport.x + 24.0,
+            top + 72.0,
+            viewport.width - 48.0,
+            24.0,
+        );
+        self.dropdown.draw(scene, fonts, images);
     }
 
     fn background(&self) -> Color {
@@ -156,6 +184,7 @@ impl App for MenuDemo {
             }
             None => {
                 self.each_picker(|picker| picker.mouse_down(x, y));
+                self.dropdown.mouse_down(x, y);
             }
         }
     }
@@ -163,10 +192,12 @@ impl App for MenuDemo {
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
         self.each_picker(|picker| picker.mouse_move(x, y));
+        self.dropdown.mouse_move(x, y);
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {
         self.each_picker(|picker| picker.mouse_up(x, y));
+        self.dropdown.mouse_up(x, y);
         self.refresh_selected_label();
     }
 
@@ -174,6 +205,7 @@ impl App for MenuDemo {
         self.focused = focused;
         self.bar.set_focused(focused);
         self.each_picker(|picker| picker.set_focused(focused));
+        self.dropdown.set_focused(focused);
     }
 }
 
