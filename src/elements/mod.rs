@@ -5,6 +5,7 @@ pub mod alerts;
 pub mod gestures;
 pub mod groupbox;
 pub mod colors;
+pub mod material;
 pub mod sheets;
 pub mod unavailable;
 pub mod gauges;
@@ -44,6 +45,7 @@ pub use colors::{
     PICKER_PILL, PICKER_PILL_W, PICKER_RADIUS, PICKER_ROW_GAP, PICKER_WHEEL,
     color_to_hsva, hsv_to_rgb, hsva_to_color, rgb_to_hsv,
 };
+pub use material::{Material, MaterialKind, ALL_MATERIALS, MATERIAL_RADIUS};
 pub use groupbox::{
     BasicGroupBox, StyledGroupBox, GROUP_BG_DARK, GROUP_BG_LIGHT, GROUP_PAD,
     GROUP_RADIUS, GROUP_ROW_GAP, GROUP_ROW_SPACING, GROUP_SYMBOL_SIZE,

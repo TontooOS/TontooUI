@@ -27,6 +27,7 @@ theme, animation and a Vello/WGPU renderer.
 | Layout | [Layout.md](Layout.md) | VStack, HStack, ZStack, modifiers, `View` |
 | List | [List.md](List.md) | Static text list with row dividers |
 | Menu | [Menu.md](Menu.md) | Simple dropdown with action rows, picker base |
+| Material | [Material.md](Material.md) | Translucent material veils in five thicknesses |
 | Renderer | [Renderer.md](Renderer.md) | Window shell, frame pipeline, backdrop blur |
 | Picker | [Picker.md](Picker.md) | Segmented, inline, menu and date pickers |
 | Progress | [Progress.md](Progress.md) | Linear progress bar with chase buffer |
