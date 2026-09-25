@@ -1,11 +1,14 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use tontooui::elements::{
-    BasicText, ContentUnavailable, SearchEmpty, Titlebar, TrafficAction,
-    View,
+    BasicText, Button, ContentUnavailable, CustomContentUnavailable,
+    SearchEmpty, Titlebar, TrafficAction, View,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
-use tontooui::theme::ThemeWatcher;
+use tontooui::theme::{ThemeMode, ThemeWatcher};
 use vello::Scene;
 use vello::peniko::Color;
 
@@ -15,7 +18,10 @@ struct UnavailableDemo {
     empty: ContentUnavailable,
     plain: ContentUnavailable,
     search: SearchEmpty,
+    custom: CustomContentUnavailable<Button>,
+    notified: Rc<RefCell<bool>>,
     refreshes: u32,
+    notifies: u32,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -24,6 +30,8 @@ struct UnavailableDemo {
 
 impl UnavailableDemo {
     fn new() -> Self {
+        let notified: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
+        let flag = notified.clone();
         Self {
             bar: Titlebar::new("Empty"),
             status: BasicText::new("refreshes: 0"),
@@ -43,7 +51,17 @@ impl UnavailableDemo {
                 "No Results",
                 "Check the spelling or try a new search.",
             ),
+            custom: CustomContentUnavailable::new(
+                "sparkles",
+                "Coming Soon",
+                "This feature is under development. Check back later!",
+                Button::new("Notify Me").on_press(move || {
+                    *flag.borrow_mut() = true;
+                }),
+            ),
+            notified,
             refreshes: 0,
+            notifies: 0,
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -66,11 +84,15 @@ impl App for UnavailableDemo {
         let palette = self.watcher.palette(time_secs);
         self.bg = palette.bg;
         let theme = self.watcher.theme();
+        let dark = theme.mode == ThemeMode::Dark;
         let focused = self.focused;
 
         if self.empty.take_refreshed() {
             self.refreshes += 1;
             self.empty.finish_refresh();
+        }
+        if std::mem::replace(&mut *self.notified.borrow_mut(), false) {
+            self.notifies += 1;
         }
         self.empty.set_theme(theme.mode, palette.accent);
         self.empty.set_focused(focused);
@@ -78,8 +100,16 @@ impl App for UnavailableDemo {
         self.plain.set_focused(focused);
         self.search.set_theme(theme.mode);
         self.search.set_focused(focused);
-        self.status
-            .set_text(format!("refreshes: {}", self.refreshes));
+        self.custom.set_theme(theme.mode);
+        self.custom.set_focused(focused);
+        if let Some(button) = self.custom.child_mut() {
+            button.set_theme(palette.accent, dark);
+            button.set_focused(focused);
+        }
+        self.status.set_text(format!(
+            "refreshes: {}   notifies: {}",
+            self.refreshes, self.notifies
+        ));
         self.status.set_theme(theme.mode);
         self.status.set_focused(focused);
 
@@ -106,10 +136,11 @@ impl App for UnavailableDemo {
         let (ew, eh) = self.empty.measure(fonts);
         let (pw, ph) = self.plain.measure(fonts);
         let (qw, qh) = self.search.measure(fonts);
-        let col_w = ew.max(pw).max(qw);
+        let (cw, ch) = self.custom.measure(fonts);
+        let col_w = ew.max(pw).max(qw).max(cw);
         let cx = viewport.x + ((viewport.width - col_w) / 2.0).max(0.0);
         let mut y = top + 12.0 + sh + 24.0;
-        // Refresh variant, plain variant, search variant below.
+        // Refresh, plain, search and custom variants below.
         self.empty.place(fonts, cx, y, col_w, eh);
         self.empty.draw(scene, fonts, images);
         y += eh + 40.0;
@@ -118,6 +149,9 @@ impl App for UnavailableDemo {
         y += ph + 40.0;
         self.search.place(fonts, cx, y, col_w, qh);
         self.search.draw(scene, fonts, images);
+        y += qh + 40.0;
+        self.custom.place(fonts, cx, y, col_w, ch);
+        self.custom.draw(scene, fonts, images);
     }
 
     fn background(&self) -> Color {
@@ -144,6 +178,8 @@ impl App for UnavailableDemo {
             None => {
                 self.empty.mouse_down(x, y);
                 self.plain.mouse_down(x, y);
+                self.search.mouse_down(x, y);
+                self.custom.mouse_down(x, y);
             }
         }
     }
@@ -151,12 +187,15 @@ impl App for UnavailableDemo {
     fn mouse_up(&mut self, x: f64, y: f64) {
         self.empty.mouse_up(x, y);
         self.plain.mouse_up(x, y);
+        self.search.mouse_up(x, y);
+        self.custom.mouse_up(x, y);
     }
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
         self.empty.set_hover(x as f32, y as f32);
         self.plain.set_hover(x as f32, y as f32);
+        self.custom.set_hover(x as f32, y as f32);
     }
 
     fn set_focused(&mut self, focused: bool) {

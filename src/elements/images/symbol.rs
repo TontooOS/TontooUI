@@ -61,6 +61,16 @@ impl SFSymbolImage {
         self
     }
 
+    /// Swap the glyph name (CoreIcon lookup on next draw).
+    pub fn set_symbol(&mut self, name: impl Into<String>) {
+        self.name = name.into();
+    }
+
+    /// Swap the hand-set glyph color (`None` follows the theme again).
+    pub fn set_color(&mut self, color: Option<Color>) {
+        self.color = color;
+    }
+
     /// Live theme: the glyph follows the theme text color unless the
     /// dev set a manual color.
     pub fn set_theme(&mut self, text: Color, dark: bool) {

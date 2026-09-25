@@ -80,7 +80,37 @@ empty.draw(scene, fonts, images);
 ```
 
 See `examples/unavailable.rs` for the full demo (refresh variant
-with a counter, button-less variant and search variant).
+with a counter, button-less and search variants, custom variant
+with a notify button).
+
+## CustomContentUnavailable
+
+```rust
+pub fn new(icon: impl Into<String>, title: impl Into<String>, message: impl Into<String>, custom: V) -> Self
+pub fn icon(self, name: impl Into<String>) -> Self
+pub fn icon_color(self, color: Color) -> Self
+pub fn title(self, title: impl Into<String>) -> Self
+pub fn message(self, message: impl Into<String>) -> Self
+pub fn set_theme(&mut self, mode: ThemeMode)
+pub fn set_focused(&mut self, focused: bool)
+pub fn set_title(&mut self, title: impl Into<String>)
+pub fn set_message(&mut self, message: impl Into<String>)
+pub fn set_icon(&mut self, name: impl Into<String>)
+pub fn set_icon_color(&mut self, color: Option<Color>)
+pub fn child_mut(&mut self) -> Option<&mut V>
+pub fn icon_value(&self) -> &str
+pub fn rect(&self) -> (f32, f32, f32, f32)
+pub fn set_hover(&mut self, x: f32, y: f32)
+```
+
+- Custom empty state: icon, title and message plus any custom view
+  below (badge, button, progress, like the reference "Coming Soon"
+  rows). Same icon/text styling as the siblings.
+- Setters update parts in place without rebuilding, so a running
+  press on custom content survives live updates. `child_mut`
+  returns the custom view (always the last stack child) for state
+  and theme wiring; presses and hovers reach custom buttons through
+  the `View` protocol.
 
 ## SearchEmpty
 
