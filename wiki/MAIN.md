@@ -14,6 +14,7 @@ theme, animation and a Vello/WGPU renderer.
 | Main index | [MAIN.md](MAIN.md) | This page |
 | Rules | [RULE.md](RULE.md) | Development and usage rules |
 | Animation | [Animation.md](Animation.md) | Frame clock, tweens, springs, decay |
+| Alerts | [Alerts.md](Alerts.md) | Modal frosted alert with OK/Cancel actions |
 | Button | [Button.md](Button.md) | Standard button with CoreIcon SF Symbols |
 | Divider | [Divider.md](Divider.md) | Full-bleed horizontal and vertical dividers |
 | Gauge | [Gauge.md](Gauge.md) | Basic, linear, circular and capacity gauges |

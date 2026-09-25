@@ -1,0 +1,139 @@
+# Alerts
+
+Alerts category in `src/elements/alerts/`: `BasicAlert` in `basic.rs`
+is a modal dialog over the app with a dimmed backdrop, a frosted
+LiquidGlass card, a semibold title, a message and one (OK) or two
+(Cancel + OK) action buttons. It cannot be dismissed by clicking
+outside — only the buttons close it. Entrance and exit fade through
+an engine tween; the app triggers it with `show` (e.g. from its own
+buttons) and reads the result from `mouse_up`. While visible the app
+drives `Titlebar::set_modal_blocked`, which turns the red light gray
+and unclickable. Alert buttons react to clicks only: hover does
+nothing (`Button::hover_effect(false)`).
+
+## Geometry
+
+| Token | Value |
+|---|---|
+| `ALERT_WIDTH` / `ALERT_RADIUS` | 420 px card width / 24 px corner radius |
+| `ALERT_PAD` | 24 px inner padding |
+| `ALERT_TITLE_SIZE` / `ALERT_MESSAGE_SIZE` | 17 px semibold title / 15 px message, both centered and wrapping |
+| `ALERT_TITLE_GAP` / `ALERT_MESSAGE_GAP` | 8 px title gap / 20 px button gap |
+| `ALERT_BUTTON_H` / `ALERT_BUTTON_GAP` | 44 px button height / 12 px two-button gap |
+| `ALERT_FADE_SECONDS` | 0.25 s engine fade in/out |
+| `ALERT_DIM_ALPHA` | 77 alpha black dim over the app behind the card |
+| `ALERT_TITLE_DARK` / `ALERT_TITLE_LIGHT` | White / `#272727` title text |
+| `ALERT_MESSAGE_DARK` / `ALERT_MESSAGE_LIGHT` | White 220 alpha / dark 220 alpha message text |
+| `ALERT_ACCENT` | `#007AFF` OK button fill |
+
+## AlertAction / AlertButton
+
+```rust
+pub enum AlertAction { Ok, Cancel }
+pub struct AlertButton { pub label: String, pub action: AlertAction }
+pub fn ok(label: impl Into<String>) -> Self
+pub fn cancel(label: impl Into<String>) -> Self
+```
+
+- `Ok` renders prominent blue (capsule), `Cancel` renders bordered
+  gray (capsule).
+
+## BasicAlert
+
+```rust
+pub fn ok(title: impl Into<String>, message: impl Into<String>) -> Self
+pub fn buttons(title: impl Into<String>, message: impl Into<String>, buttons: Vec<AlertButton>) -> Self
+pub fn set_theme(&mut self, mode: ThemeMode, accent: Color, glass: GlassAmount)
+pub fn set_focused(&mut self, focused: bool)
+pub fn set_title(&mut self, title: impl Into<String>)
+pub fn set_message(&mut self, message: impl Into<String>)
+pub fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32)
+pub fn viewport(&self) -> (f32, f32, f32, f32)
+pub fn show(&mut self)
+pub fn dismiss(&mut self)
+pub fn is_open(&self) -> bool
+pub fn is_visible(&self) -> bool
+pub fn opacity_at(&self, elapsed: f32) -> f32
+pub fn opacity_value(&self) -> f32
+pub fn mouse_down(&mut self, x: f64, y: f64)
+pub fn mouse_up(&mut self, x: f64, y: f64) -> Option<AlertAction>
+```
+
+- `buttons` with one entry fills the row; two entries share it
+  (Cancel left, OK right, in def order). Empty falls back to a single
+  OK; longer lists clamp to the first two.
+- `show` fades in from transparent (`Tween` 0 to 1, `CubicOut`);
+  `dismiss` fades out from the current opacity and hides itself when
+  done. `is_open` is true only while fully open (accepting clicks);
+  `is_visible` covers fading in, open and fading out — drive
+  `Titlebar::set_modal_blocked` from it.
+- `mouse_down`/`mouse_up` forward to the buttons only while fully
+  open; everything else (outside clicks, mid-fade clicks) is
+  swallowed and returns `None`. Each button fires its action once per
+  click through its press callback.
+- The card measures `ALERT_WIDTH` by content height (wrapping title
+  and message inside the padding) and centers in the viewport set via
+  `set_viewport` (usually the content area below the titlebar). Draw
+  paints the dim, the frosted `GlassContainer` card, the texts and
+  the buttons inside one opacity layer, so the whole overlay fades
+  as one.
+- Missing viewport (zero size) draws nothing; a hidden alert draws
+  nothing.
+
+## Titlebar modal block
+
+```rust
+pub fn set_modal_blocked(&mut self, blocked: bool)
+pub fn modal_blocked(&self) -> bool
+```
+
+- While blocked the red (close) light renders `TRAFFIC_INACTIVE`
+  gray with no hover glyph, and `press` returns `None` for close
+  hits. Minimize and maximize keep working.
+
+## Button hover effect
+
+```rust
+pub fn hover_effect(self, enabled: bool) -> Self
+pub fn set_hover_effect(&mut self, enabled: bool)
+```
+
+- Default on. Off (used by alert buttons) ignores `set_hover` and
+  skips the hover fill: clicks still press, hover shows nothing.
+
+## Usage / Example
+
+```rust
+use tontooui::elements::{AlertAction, BasicAlert, View};
+
+// Triggered from an app button:
+alert.show();
+
+// Per frame:
+bar.set_modal_blocked(alert.is_visible());
+alert.set_viewport(viewport.x, top, viewport.width, content_h);
+alert.draw(scene, fonts, images);
+
+// Input: modal, only the alert hears clicks while visible.
+fn mouse_up(&mut self, x: f64, y: f64) {
+    if alert.is_visible() {
+        match alert.mouse_up(x, y) {
+            Some(AlertAction::Ok) | Some(AlertAction::Cancel) => alert.dismiss(),
+            None => {}
+        }
+        return;
+    }
+    // ...normal app input
+}
+```
+
+See `examples/alert.rs` for the full demo (OK and OK/Cancel alerts
+over buttons plus a toolbar, gray blocked red light).
+
+## Cross References
+
+- [Glass.md](Glass.md) – frosted container used for the card
+- [Button.md](Button.md) – action buttons and the hover effect toggle
+- [Titlebar.md](Titlebar.md) – red light block while modal
+- [Animation.md](Animation.md) – engine tween behind the fade
+- [Layout.md](Layout.md) – `View` measure/place/draw contract

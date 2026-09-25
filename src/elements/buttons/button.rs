@@ -69,6 +69,7 @@ pub struct Button {
     bg: Color,
     text_color: Color,
     hovered: bool,
+    hover_effect: bool,
     pressed: bool,
     disabled: bool,
     focused: bool,
@@ -95,6 +96,7 @@ impl Button {
             bg: BUTTON_BG_DARK,
             text_color: Color::WHITE,
             hovered: false,
+            hover_effect: true,
             pressed: false,
             disabled: false,
             focused: true,
@@ -148,6 +150,23 @@ impl Button {
         self
     }
 
+    /// Hover highlight on/off. Alerts disable it: their buttons react
+    /// to clicks only, hover does nothing.
+    pub fn hover_effect(mut self, enabled: bool) -> Self {
+        self.hover_effect = enabled;
+        if !enabled {
+            self.hovered = false;
+        }
+        self
+    }
+
+    pub fn set_hover_effect(&mut self, enabled: bool) {
+        self.hover_effect = enabled;
+        if !enabled {
+            self.hovered = false;
+        }
+    }
+
     /// Live theme colors (background fill and label/icon color).
     pub fn set_palette(&mut self, bg: Color, text: Color) {
         if text != self.text_color {
@@ -194,7 +213,7 @@ impl Button {
     }
 
     pub fn set_hover(&mut self, x: f32, y: f32) {
-        self.hovered = self.hit(x, y);
+        self.hovered = self.hover_effect && self.hit(x, y);
     }
 
     fn resolved_style(&self) -> ButtonStyle {
@@ -289,7 +308,7 @@ impl Button {
             };
             if self.pressed && !self.disabled {
                 scene.fill(Fill::NonZero, Affine::IDENTITY, &Brush::Solid(press), None, &shape);
-            } else if self.hovered && !self.disabled {
+            } else if self.hovered && self.hover_effect && !self.disabled {
                 scene.fill(Fill::NonZero, Affine::IDENTITY, &Brush::Solid(hover), None, &shape);
             }
         }
@@ -373,5 +392,27 @@ impl View for Button {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hover_effect_off_ignores_hover() {
+        let mut button = Button::new("OK").hover_effect(false);
+        button.place(
+            &mut crate::renderer::text::FontSystem::new(),
+            0.0,
+            0.0,
+            200.0,
+            44.0,
+        );
+        button.set_hover(100.0, 22.0);
+        assert!(!button.hovered);
+        button.set_hover_effect(true);
+        button.set_hover(100.0, 22.0);
+        assert!(button.hovered);
     }
 }

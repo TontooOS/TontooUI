@@ -75,6 +75,7 @@ pub struct Titlebar {
     width: f32,
     hover: bool,
     focused: bool,
+    modal_blocked: bool,
     bg: Color,
     text_color: Color,
     divider_color: Color,
@@ -92,6 +93,7 @@ impl Titlebar {
             width: 0.0,
             hover: false,
             focused: true,
+            modal_blocked: false,
             bg: TITLEBAR_BG_DARK,
             text_color: TITLEBAR_TEXT_DARK,
             divider_color: TITLEBAR_DIVIDER_DARK,
@@ -176,19 +178,39 @@ impl Titlebar {
         None
     }
 
-    /// Update group hover from logical cursor position.
+    /// Update group hover from logical cursor position. While modal
+    /// blocked the close light never highlights.
     pub fn set_hover(&mut self, x: f32, y: f32) {
-        self.hover = self.button_at(x, y).is_some();
+        self.hover = match self.button_at(x, y) {
+            Some(TrafficAction::Close) if self.modal_blocked => false,
+            Some(_) => true,
+            None => false,
+        };
     }
 
     pub fn set_focused(&mut self, focused: bool) {
         self.focused = focused;
     }
 
+    /// Modal block for open alerts: the red (close) light turns gray
+    /// and stops responding, minimize/maximize keep working. Reads
+    /// back via `modal_blocked`.
+    pub fn set_modal_blocked(&mut self, blocked: bool) {
+        self.modal_blocked = blocked;
+    }
+
+    pub fn modal_blocked(&self) -> bool {
+        self.modal_blocked
+    }
+
     /// Click handling. Returns the traffic light action when a button was
-    /// hit, otherwise `None`.
+    /// hit, otherwise `None`. While modal blocked a close hit returns
+    /// `None` (the gray light is not clickable).
     pub fn press(&mut self, x: f32, y: f32) -> Option<TrafficAction> {
-        self.button_at(x, y)
+        match self.button_at(x, y) {
+            Some(TrafficAction::Close) if self.modal_blocked => None,
+            hit => hit,
+        }
     }
 
     fn ensure_layout(&mut self, fonts: &mut FontSystem) {
@@ -251,7 +273,15 @@ impl Titlebar {
         draw_layout(scene, layout, tx, ty, fonts.scale);
 
         let colors = if self.focused {
-            [TRAFFIC_CLOSE, TRAFFIC_MINIMIZE, TRAFFIC_MAXIMIZE]
+            [
+                if self.modal_blocked {
+                    TRAFFIC_INACTIVE
+                } else {
+                    TRAFFIC_CLOSE
+                },
+                TRAFFIC_MINIMIZE,
+                TRAFFIC_MAXIMIZE,
+            ]
         } else {
             [TRAFFIC_INACTIVE; 3]
         };
@@ -268,7 +298,8 @@ impl Titlebar {
                 None,
                 &circle,
             );
-            if self.hover {
+            // No glyph on a blocked close light, even on hover.
+            if self.hover && !(self.modal_blocked && index == 0) {
                 self.draw_glyph(scene, index, px(cx), px(cy), scale);
             }
         }
@@ -384,4 +415,38 @@ fn expand_logo() -> BezPath {
 
     top.extend(bottom);
     top
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn bar() -> Titlebar {
+        let mut bar = Titlebar::new("Alert");
+        bar.set_rect(0.0, 0.0, 900.0);
+        bar
+    }
+
+    #[test]
+    fn close_works_unblocked() {
+        let mut bar = bar();
+        let (cx, cy) = bar.button_center(0);
+        assert_eq!(bar.press(cx, cy), Some(TrafficAction::Close));
+    }
+
+    #[test]
+    fn modal_block_disables_close_only() {
+        let mut bar = bar();
+        bar.set_modal_blocked(true);
+        assert!(bar.modal_blocked());
+        let (cx, cy) = bar.button_center(0);
+        assert_eq!(bar.press(cx, cy), None);
+        // Minimize and maximize keep working.
+        let (mx, my) = bar.button_center(1);
+        assert_eq!(bar.press(mx, my), Some(TrafficAction::Minimize));
+        let (xx, xy) = bar.button_center(2);
+        assert_eq!(bar.press(xx, xy), Some(TrafficAction::Maximize));
+        bar.set_modal_blocked(false);
+        assert_eq!(bar.press(cx, cy), Some(TrafficAction::Close));
+    }
 }
