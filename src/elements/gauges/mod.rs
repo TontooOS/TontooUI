@@ -1,6 +1,12 @@
+pub mod capacity;
 pub mod circular;
 pub mod gauge;
 pub mod linear;
+
+pub use capacity::{
+    CapacityGauge, CAP_FILL, CAP_RING_R, CAP_START, CAP_SWEEP, CAP_TRACK_DARK,
+    CAP_TRACK_LIGHT, CAP_TRACK_W, CAP_VALUE_SIZE,
+};
 
 pub use circular::{
     CircularGauge, CIRC_DOT_R, CIRC_FILL, CIRC_KNOB_R, CIRC_KNOB_RING_R, CIRC_LABEL_SIZE,

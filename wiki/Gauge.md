@@ -119,12 +119,47 @@ pub fn set_focused(&mut self, focused: bool)
 - Unfocused windows desaturate the dial like the rest of the
   palette. No mouse methods: forward nothing.
 
+## CapacityGauge
+
+```rust
+pub fn new(value: f64, min: f64, max: f64) -> Self
+pub fn value_text(self, f: impl Fn(f64) -> String + 'static) -> Self
+pub fn fill(self, color: Color) -> Self
+pub fn track_color(self, color: Color) -> Self
+pub fn value(&self) -> f64
+pub fn fraction(&self) -> f32
+pub fn set_value(&mut self, value: f64)
+pub fn set_theme(&mut self, accent: Color, dark: bool)
+pub fn set_focused(&mut self, focused: bool)
+```
+
+| Token | Value |
+|---|---|
+| `CAP_RING_R` / `CAP_TRACK_W` | 60 px ring radius / 10 px stroke |
+| `CAP_START` / `CAP_SWEEP` | top start / full circle sweep |
+| `CAP_VALUE_SIZE` | 30 px centered value |
+| `CAP_TRACK_DARK` / `CAP_TRACK_LIGHT` | `#3A3A3C` / `#E5E5E5` |
+| `CAP_FILL` | `#007AFF` manual value fill |
+
+- The dial is a fixed 138 px square: gray background track, full
+  circle, with the value arc sweeping clockwise from the top and
+  round caps, plus centered value text. No knob, no caption, like
+  the reference.
+- `set_value` clamps and tweens the arc with a 0.25 s `CubicOut`
+  tween (driven by real frame deltas, so Hz-independent).
+- Arc and track default to label color and mode gray (black on
+  light, like the reference); `fill`/`track_color` win over them.
+  `set_theme` takes the accent for API parity but the dial stays
+  monochrome unless set by hand.
+- Unfocused windows desaturate the dial like the rest of the
+  palette. No mouse methods: forward nothing.
+
 ## Usage / Example
 
 Run `cargo run --example gauge`: green `Progress`, theme-accent,
 red `Storage` and labeled green `Temperature` (`0°`/`100°`,
-`72°`) gauges in a `VStack`, a `60%` linear gauge and a `70%`
-`Battery` dial below.
+`72°`) gauges in a `VStack`, a `60%` linear gauge, a `70%`
+`Battery` dial and a `65%` capacity ring below.
 
 ```rust
 let mut progress = Gauge::new(0.6, 0.0, 1.0)
@@ -147,6 +182,9 @@ let mut battery = CircularGauge::new(70.0, 0.0, 100.0)
     .label("Battery")
     .value_text(|v| format!("{v:.0}%"));
 battery.set_theme(accent, false);
+
+let mut capacity = CapacityGauge::new(65.0, 0.0, 100.0).value_text(|v| format!("{v:.0}%"));
+capacity.set_theme(accent, false);
 ```
 
 ## Cross References
