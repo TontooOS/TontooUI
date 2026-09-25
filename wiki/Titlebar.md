@@ -120,9 +120,11 @@ viewBox), uniformly scaled into the 68% box so it never stretches.
 
 ## Traffic Lights
 
-17 px circles, no border, no shadow. Hovering the group shows glyphs at
-68% size: filled rounded bars for x (dark red) and minus (dark amber), the
-expand logo (near-black) for maximize. An unfocused window shows all gray.
+17 px circles, no border, no shadow. Hovering the group on a focused
+window shows glyphs at 68% size: filled rounded bars for x (dark red)
+and minus (dark amber), the expand logo (near-black) for maximize. An
+unfocused window shows all gray with no glyphs, even on hover. A modal
+blocked close light is gray with no glyph and ignores clicks.
 
 | Token | Value |
 |---|---|

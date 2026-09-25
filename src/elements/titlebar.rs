@@ -194,6 +194,13 @@ impl Titlebar {
         self.focused = focused;
     }
 
+    /// Whether the hover glyph on button `index` is painted: focused
+    /// hover only, so unfocused lights stay plain gray. Never on a
+    /// blocked close light, even on hover.
+    fn glyph_visible(&self, index: usize) -> bool {
+        self.focused && self.hover && !(self.modal_blocked && index == 0)
+    }
+
     /// Modal block for open alerts: the red (close) light turns gray
     /// and stops responding, minimize/maximize keep working. Reads
     /// back via `modal_blocked`.
@@ -301,8 +308,9 @@ impl Titlebar {
                 None,
                 &circle,
             );
-            // No glyph on a blocked close light, even on hover.
-            if self.hover && !(self.modal_blocked && index == 0) {
+            // No glyph on unfocused windows or a blocked close
+            // light, even on hover.
+            if self.glyph_visible(index) {
                 self.draw_glyph(scene, index, px(cx), px(cy), scale);
             }
         }
@@ -451,5 +459,46 @@ mod tests {
         assert_eq!(bar.press(xx, xy), Some(TrafficAction::Maximize));
         bar.set_modal_blocked(false);
         assert_eq!(bar.press(cx, cy), Some(TrafficAction::Close));
+    }
+
+    #[test]
+    fn glyphs_show_on_focused_hover() {
+        let mut bar = bar();
+        let (cx, cy) = bar.button_center(1);
+        bar.set_hover(cx, cy);
+        assert!(bar.glyph_visible(0));
+        assert!(bar.glyph_visible(1));
+        assert!(bar.glyph_visible(2));
+    }
+
+    #[test]
+    fn no_glyphs_without_hover() {
+        let bar = bar();
+        assert!(!bar.glyph_visible(0));
+        assert!(!bar.glyph_visible(1));
+        assert!(!bar.glyph_visible(2));
+    }
+
+    #[test]
+    fn no_glyphs_when_unfocused() {
+        let mut bar = bar();
+        bar.set_focused(false);
+        let (cx, cy) = bar.button_center(1);
+        bar.set_hover(cx, cy);
+        // Unfocused lights stay plain gray, even on hover.
+        assert!(!bar.glyph_visible(0));
+        assert!(!bar.glyph_visible(1));
+        assert!(!bar.glyph_visible(2));
+    }
+
+    #[test]
+    fn blocked_close_hides_glyph_only() {
+        let mut bar = bar();
+        bar.set_modal_blocked(true);
+        let (cx, cy) = bar.button_center(1);
+        bar.set_hover(cx, cy);
+        assert!(!bar.glyph_visible(0));
+        assert!(bar.glyph_visible(1));
+        assert!(bar.glyph_visible(2));
     }
 }
