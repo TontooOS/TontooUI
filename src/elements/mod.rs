@@ -23,6 +23,7 @@ pub mod scrollbar;
 pub mod scrollview;
 pub mod shapes;
 pub mod sliders;
+pub mod steppers;
 pub mod text;
 pub mod titlebar;
 pub mod toggles;
@@ -137,6 +138,11 @@ pub use gauges::{
     LINEAR_RING_R, LINEAR_TRACK_H, LINEAR_VALUE_GAP, LINEAR_VALUE_SIZE,
 };
 pub use sliders::Slider;
+pub use steppers::{
+    Stepper, StepperOrientation, StepperSide, STEPPER_BG_DARK, STEPPER_BG_LIGHT,
+    STEPPER_CHEV_STROKE, STEPPER_DISABLED_ALPHA, STEPPER_DIVIDER_DARK,
+    STEPPER_DIVIDER_LIGHT, STEPPER_DIV_INSET, STEPPER_H, STEPPER_RADIUS, STEPPER_W,
+};
 pub use shapes::{
     Capsule, Circle, CustomShape, Rectangle, RoundedRectangle, ShapeFill,
     SHAPE_CORNER_RADIUS, SHAPE_DEFAULT_FILL, SHAPE_DEFAULT_STROKE,

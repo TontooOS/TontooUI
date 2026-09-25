@@ -38,6 +38,7 @@ theme, animation and a Vello/WGPU renderer.
 | Sheets | [Sheets.md](Sheets.md) | Modal sheet with sizes, custom background, ESC |
 | Shapes | [Shapes.md](Shapes.md) | Rectangle, circle, rounded, capsule and custom shapes |
 | Slider | [Slider.md](Slider.md) | Slider with steps, labels, ticks, glass |
+| Stepper | [Stepper.md](Stepper.md) | Basic stepper with step size, range and limit dimming |
 | Theme | [Theme.md](Theme.md) | Live dark/light, accent, glass stage |
 | Text | [Text.md](Text.md) | Basic text with styles and foregrounds |
 | Textfield | [Textfield.md](Textfield.md) | Slim and large single-line fields |
