@@ -27,6 +27,7 @@ theme, animation and a Vello/WGPU renderer.
 | Layout | [Layout.md](Layout.md) | VStack, HStack, ZStack, modifiers, `View` |
 | List | [List.md](List.md) | Static text list with row dividers |
 | Link | [Link.md](Link.md) | Blue link opening the default browser |
+| Label | [Label.md](Label.md) | Icon, image, styled and icon-only labels |
 | Menu | [Menu.md](Menu.md) | Simple dropdown with action rows, picker base |
 | Material | [Material.md](Material.md) | Translucent material veils in five thicknesses |
 | Renderer | [Renderer.md](Renderer.md) | Window shell, frame pipeline, backdrop blur |

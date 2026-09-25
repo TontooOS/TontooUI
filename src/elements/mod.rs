@@ -7,6 +7,7 @@ pub mod groupbox;
 pub mod colors;
 pub mod material;
 pub mod link;
+pub mod label;
 pub mod sheets;
 pub mod unavailable;
 pub mod gauges;
@@ -49,6 +50,10 @@ pub use colors::{
 };
 pub use material::{Material, MaterialKind, ALL_MATERIALS, MATERIAL_RADIUS};
 pub use link::{BasicLink, LinkStyle, LinkWithImage, StyledLink, LINK_BLUE, LINK_BLUE_PRESSED, LINK_ICON_GAP, LINK_ICON_SIZE, LINK_IMAGE_GAP, LINK_PILL_BG, LINK_PILL_BORDER, LINK_PILL_PAD_X, LINK_PILL_PAD_Y, LINK_PILL_RADIUS, is_openable, open_url};
+pub use label::{
+    BasicLabel, IconLabel, ImageLabel, LabelStyle, StyledLabel, LABEL_DOT,
+    LABEL_GAP, LABEL_ICON_GRAY, LABEL_ICON_SIZE, LABEL_IMAGE_SIZE,
+};
 pub use groupbox::{
     BasicGroupBox, StyledGroupBox, GROUP_BG_DARK, GROUP_BG_LIGHT, GROUP_PAD,
     GROUP_RADIUS, GROUP_ROW_GAP, GROUP_ROW_SPACING, GROUP_SYMBOL_SIZE,
