@@ -1,6 +1,10 @@
+pub mod context;
 pub mod menu;
 pub mod nested;
 
+pub use context::{
+    ContextKind, ContextMenu, CONTEXT_LONG_PRESS_MOVE, CONTEXT_LONG_PRESS_SECONDS,
+};
 pub use nested::{MenuItem, NestedMenu, NESTED_ACCENT, NESTED_CHEV_COL, NESTED_CHEV_GAP, NESTED_DIV_H, NESTED_SUB_GAP};
 pub use menu::{
     Menu, MenuChevron, MENU_ACCENT, MENU_BUTTON_H, MENU_BUTTON_RADIUS, MENU_BTN_PAD_X,

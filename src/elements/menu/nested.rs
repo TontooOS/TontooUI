@@ -95,6 +95,7 @@ impl MenuItem {
 pub struct NestedMenu {
     label: String,
     button: String,
+    anchor: Option<(f32, f32)>,
     items: Vec<MenuItem>,
     open: bool,
     /// Open submenu chain: row index per level.
@@ -137,6 +138,7 @@ impl NestedMenu {
         Self {
             label: String::new(),
             button: button.into(),
+            anchor: None,
             items,
             open: false,
             path: Vec::new(),
@@ -237,6 +239,14 @@ impl NestedMenu {
 
     pub fn button_text(&self) -> &str {
         &self.button
+    }
+
+    /// Float the menu at a point instead of its button (context
+    /// mode): the button hides, takes no layout space and never hits,
+    /// while the root panel anchors at the point. `None` restores the
+    /// button-anchored dropdown.
+    pub fn set_anchor(&mut self, point: Option<(f32, f32)>) {
+        self.anchor = point;
     }
 
     /// Window bounds the panels clamp into. Apps must call this
@@ -508,6 +518,9 @@ impl NestedMenu {
     }
 
     fn button_hit(&self, x: f32, y: f32) -> bool {
+        if self.anchor.is_some() {
+            return false;
+        }
         x >= self.btn_x
             && x <= self.btn_x + self.btn_w
             && y >= self.btn_y
@@ -684,6 +697,11 @@ impl NestedMenu {
 
 impl View for NestedMenu {
     fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
+        // Anchored context menus float above content and take no
+        // layout space.
+        if self.anchor.is_some() {
+            return (0.0, 0.0);
+        }
         let (label_w, label_h) = self.label_size(fonts);
         let label_part = if label_w > 0.0 {
             label_w + MENU_GAP
@@ -701,6 +719,13 @@ impl View for NestedMenu {
         self.y = y;
         self.width = w;
         self.height = h;
+        if let Some((ax, ay)) = self.anchor {
+            self.btn_x = ax;
+            self.btn_y = ay;
+            self.btn_w = self.button_w(fonts);
+            self.layout_panels(fonts);
+            return;
+        }
         let (label_w, label_h) = self.label_size(fonts);
         self.label_x = x;
         self.label_y = y + (h - label_h) / 2.0;
@@ -721,68 +746,71 @@ impl View for NestedMenu {
         }
         self.layout_panels(fonts);
 
-        if !self.label.is_empty() {
+        // Button with fixed text (no hover state). Hidden in anchor
+        // mode, where the panels float at the anchor point.
+        if self.anchor.is_none() {
+            if !self.label.is_empty() {
+                let layout = fonts.layout_text_weighted(
+                    &self.label,
+                    MENU_FONT_SIZE,
+                    self.eff(self.text_color),
+                    400.0,
+                    None,
+                );
+                draw_layout(scene, &layout, self.label_x, self.label_y, fonts.scale);
+            }
+
+            let button = RoundedRect::new(
+                px(self.btn_x),
+                px(self.btn_y),
+                px(self.btn_x + self.btn_w),
+                px(self.btn_y + MENU_BUTTON_H),
+                px(MENU_BUTTON_RADIUS),
+            );
+            scene.fill(
+                Fill::NonZero,
+                Affine::IDENTITY,
+                &Brush::Solid(self.eff(self.button_bg())),
+                None,
+                &button,
+            );
+            if self.armed_button && !self.disabled {
+                let press = if self.dark {
+                    Color::from_rgba8(255, 255, 255, 24)
+                } else {
+                    Color::from_rgba8(0, 0, 0, 24)
+                };
+                scene.fill(
+                    Fill::NonZero,
+                    Affine::IDENTITY,
+                    &Brush::Solid(self.eff(press)),
+                    None,
+                    &button,
+                );
+            }
             let layout = fonts.layout_text_weighted(
-                &self.label,
+                &self.button,
                 MENU_FONT_SIZE,
                 self.eff(self.text_color),
                 400.0,
                 None,
             );
-            draw_layout(scene, &layout, self.label_x, self.label_y, fonts.scale);
-        }
-
-        // Button with fixed text (no hover state).
-        let button = RoundedRect::new(
-            px(self.btn_x),
-            px(self.btn_y),
-            px(self.btn_x + self.btn_w),
-            px(self.btn_y + MENU_BUTTON_H),
-            px(MENU_BUTTON_RADIUS),
-        );
-        scene.fill(
-            Fill::NonZero,
-            Affine::IDENTITY,
-            &Brush::Solid(self.eff(self.button_bg())),
-            None,
-            &button,
-        );
-        if self.armed_button && !self.disabled {
-            let press = if self.dark {
-                Color::from_rgba8(255, 255, 255, 24)
-            } else {
-                Color::from_rgba8(0, 0, 0, 24)
-            };
-            scene.fill(
-                Fill::NonZero,
-                Affine::IDENTITY,
-                &Brush::Solid(self.eff(press)),
-                None,
-                &button,
+            let (_, th) = FontSystem::layout_size(&layout);
+            draw_layout(
+                scene,
+                &layout,
+                self.btn_x + MENU_BTN_PAD_X,
+                self.btn_y + (MENU_BUTTON_H - th / fonts.scale) / 2.0,
+                fonts.scale,
+            );
+            self.draw_down_chevron(
+                scene,
+                self.btn_x + self.btn_w - MENU_BTN_PAD_X - MENU_CHEV_W,
+                self.btn_y + MENU_BUTTON_H / 2.0,
+                fonts.scale,
+                self.eff(self.text_dim),
             );
         }
-        let layout = fonts.layout_text_weighted(
-            &self.button,
-            MENU_FONT_SIZE,
-            self.eff(self.text_color),
-            400.0,
-            None,
-        );
-        let (_, th) = FontSystem::layout_size(&layout);
-        draw_layout(
-            scene,
-            &layout,
-            self.btn_x + MENU_BTN_PAD_X,
-            self.btn_y + (MENU_BUTTON_H - th / fonts.scale) / 2.0,
-            fonts.scale,
-        );
-        self.draw_down_chevron(
-            scene,
-            self.btn_x + self.btn_w - MENU_BTN_PAD_X - MENU_CHEV_W,
-            self.btn_y + MENU_BUTTON_H / 2.0,
-            fonts.scale,
-            self.eff(self.text_dim),
-        );
 
         if !self.open {
             return;

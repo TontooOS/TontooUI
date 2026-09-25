@@ -35,6 +35,15 @@ pub enum Key {
     Escape,
 }
 
+/// Touch contact phases forwarded to the app.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TouchPhase {
+    Started,
+    Moved,
+    Ended,
+    Cancelled,
+}
+
 /// Window operations requested by content (e.g. traffic lights).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WindowCommand {
@@ -69,6 +78,10 @@ pub trait App {
     fn mouse_move(&mut self, _x: f64, _y: f64) {}
     /// Scroll wheel delta in logical px (right/down positive).
     fn mouse_wheel(&mut self, _dx: f64, _dy: f64) {}
+    /// Right-click press in logical px (context menus).
+    fn context_click(&mut self, _x: f64, _y: f64) {}
+    /// Touch contact change in logical px (long-press detection).
+    fn touch(&mut self, _phase: TouchPhase, _x: f64, _y: f64) {}
     fn set_focused(&mut self, _focused: bool) {}
     fn text(&mut self, _text: &str) {}
     fn key(&mut self, _key: Key) {}
@@ -441,26 +454,46 @@ impl<V: App> ApplicationHandler for Shell<V> {
                 active.window.request_redraw();
             }
             WindowEvent::MouseInput { state, button, .. } => {
-                if button != MouseButton::Left {
-                    return;
-                }
                 let scale = active.scale;
                 let x = (active.cursor_pos.0 / scale) as f32;
                 let y = (active.cursor_pos.1 / scale) as f32;
-                if state == ElementState::Pressed {
-                    if let Some((rx, ry, rw, rh)) = self.app.drag_region() {
-                        if x >= rx && x <= rx + rw && y >= ry && y <= ry + rh {
-                            // Titlebar drag: moving keeps focus, no click.
-                            let _ = active.window.drag_window();
-                            return;
+                match (button, state) {
+                    (MouseButton::Left, ElementState::Pressed) => {
+                        if let Some((rx, ry, rw, rh)) = self.app.drag_region() {
+                            if x >= rx && x <= rx + rw && y >= ry && y <= ry + rh {
+                                // Titlebar drag: moving keeps focus, no click.
+                                let _ = active.window.drag_window();
+                                return;
+                            }
                         }
+                        self.app.mouse_down(x as f64, y as f64);
+                        active.window.request_redraw();
                     }
-                    self.app.mouse_down(x as f64, y as f64);
-                    active.window.request_redraw();
-                } else {
-                    self.app.mouse_up(x as f64, y as f64);
-                    active.window.request_redraw();
+                    (MouseButton::Left, ElementState::Released) => {
+                        self.app.mouse_up(x as f64, y as f64);
+                        active.window.request_redraw();
+                    }
+                    (MouseButton::Right, ElementState::Pressed) => {
+                        self.app.context_click(x as f64, y as f64);
+                        active.window.request_redraw();
+                    }
+                    _ => {}
                 }
+            }
+            WindowEvent::Touch(touch) => {
+                let scale = active.scale;
+                let phase = match touch.phase {
+                    winit::event::TouchPhase::Started => TouchPhase::Started,
+                    winit::event::TouchPhase::Moved => TouchPhase::Moved,
+                    winit::event::TouchPhase::Ended => TouchPhase::Ended,
+                    winit::event::TouchPhase::Cancelled => TouchPhase::Cancelled,
+                };
+                self.app.touch(
+                    phase,
+                    touch.location.x / scale,
+                    touch.location.y / scale,
+                );
+                active.window.request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } => {
                 if event.state != ElementState::Pressed {

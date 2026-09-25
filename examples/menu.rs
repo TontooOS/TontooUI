@@ -1,8 +1,8 @@
-use tontooui::elements::{Menu, MenuPicker, Titlebar, TrafficAction, View, VStack};
+use tontooui::elements::{ContextMenu, Menu, MenuPicker, Titlebar, TrafficAction, View, VStack};
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::text::draw_layout;
-use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
+use tontooui::renderer::window::{App, TouchPhase, Viewport, WindowCommand, run};
 use tontooui::theme::{ThemeMode, ThemeWatcher};
 use vello::Scene;
 use vello::peniko::Color;
@@ -11,6 +11,7 @@ struct MenuDemo {
     bar: Titlebar,
     stack: VStack,
     dropdown: Menu,
+    context: ContextMenu,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -31,6 +32,10 @@ impl MenuDemo {
             bar: Titlebar::new("Menu"),
             stack,
             dropdown: Menu::from_slice("Options", &["Option 1", "Option 2", "Option 3"]),
+            context: ContextMenu::basic(
+                (0.0, 0.0, 0.0, 0.0),
+                Menu::from_slice("Edit", &["Cut", "Copy", "Paste"]),
+            ),
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -98,6 +103,16 @@ impl App for MenuDemo {
         self.dropdown.set_theme(palette.accent, dark);
         self.dropdown.set_glass(theme.mode, theme.glass);
         self.dropdown.set_focused(focused);
+        // Context area over the sample text: right-click or
+        // long-press opens the anchored menu there.
+        let top = viewport.y + 31.0;
+        self.context
+            .set_area((viewport.x + 24.0, top + 120.0, 260.0, 110.0));
+        self.context
+            .set_viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+        self.context.set_theme(palette.accent, dark);
+        self.context.set_glass(theme.mode, theme.glass);
+        self.context.set_focused(focused);
         self.refresh_selected_label();
 
         self.bar.set_palette(
@@ -123,7 +138,8 @@ impl App for MenuDemo {
         draw_layout(scene, &layout, cx, cy, fonts.scale);
 
         // Sample text under the picker: opening the menu blurs these
-        // lines through the frosted glass (glass test).
+        // lines through the frosted glass (glass test). Right-click
+        // or long-press them for the context menu.
         let sample = [
             "Lorem ipsum dolor sit amet,",
             "consectetur adipiscing elit,",
@@ -156,6 +172,9 @@ impl App for MenuDemo {
             24.0,
         );
         self.dropdown.draw(scene, fonts, images);
+        // Context overlay last so its panel floats above everything.
+        self.context.place(fonts, viewport.x, viewport.y, viewport.width, viewport.height);
+        self.context.draw(scene, fonts, images);
     }
 
     fn background(&self) -> Color {
@@ -172,7 +191,7 @@ impl App for MenuDemo {
 
     fn wants_backdrop(&self) -> bool {
         // Glass menu needs the blur pass while open.
-        self.menu_open
+        self.menu_open || self.context.is_open()
     }
 
     fn mouse_down(&mut self, x: f64, y: f64) {
@@ -185,6 +204,7 @@ impl App for MenuDemo {
             None => {
                 self.each_picker(|picker| picker.mouse_down(x, y));
                 self.dropdown.mouse_down(x, y);
+                self.context.mouse_down(x, y);
             }
         }
     }
@@ -193,12 +213,22 @@ impl App for MenuDemo {
         self.bar.set_hover(x as f32, y as f32);
         self.each_picker(|picker| picker.mouse_move(x, y));
         self.dropdown.mouse_move(x, y);
+        self.context.mouse_move(x, y);
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {
         self.each_picker(|picker| picker.mouse_up(x, y));
         self.dropdown.mouse_up(x, y);
+        self.context.mouse_up(x, y);
         self.refresh_selected_label();
+    }
+
+    fn context_click(&mut self, x: f64, y: f64) {
+        self.context.context_click(x, y);
+    }
+
+    fn touch(&mut self, phase: TouchPhase, x: f64, y: f64) {
+        self.context.touch(phase, x, y);
     }
 
     fn set_focused(&mut self, focused: bool) {
@@ -206,6 +236,7 @@ impl App for MenuDemo {
         self.bar.set_focused(focused);
         self.each_picker(|picker| picker.set_focused(focused));
         self.dropdown.set_focused(focused);
+        self.context.set_focused(focused);
     }
 }
 

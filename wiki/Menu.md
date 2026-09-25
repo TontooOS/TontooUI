@@ -154,11 +154,70 @@ pub fn mouse_wheel(&mut self, dx: f64, dy: f64)
   size; scrolling is unnecessary. Apps must call `set_viewport`
   every frame and return `is_open()` from `App::wants_backdrop`.
 
+## ContextMenu
+
+```rust
+pub enum ContextKind {
+    Basic(Menu),
+    Nested(NestedMenu),
+}
+pub fn new(area: (f32, f32, f32, f32), kind: ContextKind) -> Self
+pub fn basic(area: (f32, f32, f32, f32), menu: Menu) -> Self
+pub fn nested(area: (f32, f32, f32, f32), menu: NestedMenu) -> Self
+pub fn set_area(&mut self, area: (f32, f32, f32, f32))
+pub fn area(&self) -> (f32, f32, f32, f32)
+pub fn is_open(&self) -> bool
+pub fn close(&mut self)
+pub fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32)
+pub fn set_theme(&mut self, accent: Color, dark: bool)
+pub fn set_glass(&mut self, mode: ThemeMode, glass: GlassAmount)
+pub fn set_focused(&mut self, focused: bool)
+pub fn context_click(&mut self, x: f64, y: f64)
+pub fn touch(&mut self, phase: TouchPhase, x: f64, y: f64)
+pub fn mouse_down(&mut self, x: f64, y: f64)
+pub fn mouse_move(&mut self, x: f64, y: f64)
+pub fn mouse_up(&mut self, x: f64, y: f64)
+pub fn mouse_wheel(&mut self, dx: f64, dy: f64)
+```
+
+| Token | Value |
+|---|---|
+| `CONTEXT_LONG_PRESS_SECONDS` | 0.6 s hold to open |
+| `CONTEXT_LONG_PRESS_MOVE` | 10 px travel cancelling the hold |
+
+- Opens any menu (basic or nested) anchored at the pointer on
+  right-click press or touch long-press inside the area. The menu
+  hides its button, takes no layout space and clamps into the
+  viewport like every glass panel.
+- Touch long-press opens on release after holding still; quick taps
+  and moving away cancel it.
+- Overlay element: draw it after everything else so its panel
+  floats on top. Apps forward `context_click`/`touch` plus the
+  usual mouse methods and return `is_open()` from
+  `App::wants_backdrop`.
+
+```rust
+let mut edit = ContextMenu::basic(
+    (24.0, 120.0, 260.0, 110.0),
+    Menu::from_slice("Edit", &["Cut", "Copy", "Paste"]),
+);
+```
+
+## Anchor mode
+
+`Menu::set_anchor` and `NestedMenu::set_anchor` float the menu at
+a point instead of its button (context mode): the button hides,
+takes no layout space and never hits, while the panel anchors at
+the point with the usual viewport clamp. `None` restores the
+button-anchored dropdown.
+
 ## Usage / Example
 
 Run `cargo run --example menu`: `Color` picker plus an `Options`
 simple dropdown (`Option 1/2/3`, last action in the titlebar) over
 sample text lines that show the frost blur behind the open panels.
+Right-click or long-press the sample text for an `Edit`
+context menu (`Cut`/`Copy`/`Paste`).
 
 ```rust
 let mut options = Menu::from_slice("Options", &["Option 1", "Option 2", "Option 3"])

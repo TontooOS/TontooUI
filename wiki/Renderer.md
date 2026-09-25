@@ -138,7 +138,18 @@ pub fn wants_backdrop(&self) -> bool
 Non-printable keys forwarded to the view. Printable input arrives via
 `text()` as already-decoded strings (including key repeat). Wheel
 scrolling arrives via `mouse_wheel` in logical px (right/down
-positive, line steps normalized to 20 px).
+positive, line steps normalized to 20 px). Right-button presses
+arrive via `context_click` (context menus); touch contacts arrive
+via `touch` with a `TouchPhase`:
+
+```rust
+pub enum TouchPhase {
+    Started,
+    Moved,
+    Ended,
+    Cancelled,
+}
+```
 
 ## Frame Pipeline
 

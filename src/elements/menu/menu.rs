@@ -74,6 +74,7 @@ pub enum MenuChevron {
 pub struct Menu {
     label: String,
     button: String,
+    anchor: Option<(f32, f32)>,
     chevron: MenuChevron,
     options: Vec<String>,
     open: bool,
@@ -117,6 +118,7 @@ impl Menu {
         Self {
             label: String::new(),
             button: button.into(),
+            anchor: None,
             chevron: MenuChevron::Down,
             options,
             open: false,
@@ -244,6 +246,14 @@ impl Menu {
 
     pub fn set_checked(&mut self, row: Option<usize>) {
         self.checked = row;
+    }
+
+    /// Float the menu at a point instead of its button (context
+    /// mode): the button hides, takes no layout space and never hits,
+    /// while the panel anchors at the point. `None` restores the
+    /// button-anchored dropdown.
+    pub fn set_anchor(&mut self, point: Option<(f32, f32)>) {
+        self.anchor = point;
     }
 
     /// Window bounds the menu is clamped into. Apps must call this
@@ -422,6 +432,9 @@ impl Menu {
     }
 
     fn button_hit(&self, x: f32, y: f32) -> bool {
+        if self.anchor.is_some() {
+            return false;
+        }
         x >= self.btn_x
             && x <= self.btn_x + self.btn_w
             && y >= self.btn_y
@@ -492,6 +505,9 @@ impl Menu {
     pub fn mouse_up(&mut self, x: f64, y: f64) {
         self.finish_up(x, y);
     }
+
+    /// Scrolling is not needed: panels cap at the window size.
+    pub fn mouse_wheel(&mut self, _dx: f64, _dy: f64) {}
 
     fn finish_up(&mut self, x: f64, y: f64) {
         if self.disabled {
@@ -596,6 +612,11 @@ impl Menu {
 
 impl View for Menu {
     fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
+        // Anchored context menus float above content and take no
+        // layout space.
+        if self.anchor.is_some() {
+            return (0.0, 0.0);
+        }
         let (label_w, label_h) = self.label_size(fonts);
         let label_part = if label_w > 0.0 {
             label_w + MENU_GAP
@@ -613,6 +634,13 @@ impl View for Menu {
         self.y = y;
         self.width = w;
         self.height = h;
+        if let Some((ax, ay)) = self.anchor {
+            self.btn_x = ax;
+            self.btn_y = ay;
+            self.btn_w = self.button_w(fonts);
+            self.layout_menu(fonts);
+            return;
+        }
         let (label_w, label_h) = self.label_size(fonts);
         self.label_x = x;
         self.label_y = y + (h - label_h) / 2.0;
@@ -636,69 +664,82 @@ impl View for Menu {
         // Viewport may change between frames: re-clamp every draw.
         self.layout_menu(fonts);
 
-        if !self.label.is_empty() {
+        if self.anchor.is_none() {
+            if !self.label.is_empty() {
+                let layout = fonts.layout_text_weighted(
+                    &self.label,
+                    MENU_FONT_SIZE,
+                    self.eff(self.text_color),
+                    400.0,
+                    None,
+                );
+                draw_layout(scene, &layout, self.label_x, self.label_y, fonts.scale);
+            }
+        }
+
+        // Button with fixed text (no hover state). Hidden in anchor
+        // mode, where the panel floats at the anchor point.
+        if self.anchor.is_none() {
+            let button = RoundedRect::new(
+                px(self.btn_x),
+                px(self.btn_y),
+                px(self.btn_x + self.btn_w),
+                px(self.btn_y + MENU_BUTTON_H),
+                px(MENU_BUTTON_RADIUS),
+            );
+            scene.fill(
+                Fill::NonZero,
+                Affine::IDENTITY,
+                &Brush::Solid(self.eff(self.button_bg())),
+                None,
+                &button,
+            );
+            if self.armed_button && !self.disabled {
+                let press = if self.dark {
+                    Color::from_rgba8(255, 255, 255, 24)
+                } else {
+                    Color::from_rgba8(0, 0, 0, 24)
+                };
+                scene.fill(
+                    Fill::NonZero,
+                    Affine::IDENTITY,
+                    &Brush::Solid(self.eff(press)),
+                    None,
+                    &button,
+                );
+            }
             let layout = fonts.layout_text_weighted(
-                &self.label,
+                &self.button,
                 MENU_FONT_SIZE,
                 self.eff(self.text_color),
                 400.0,
                 None,
             );
-            draw_layout(scene, &layout, self.label_x, self.label_y, fonts.scale);
-        }
-
-        // Button with fixed text (no hover state).
-        let button = RoundedRect::new(
-            px(self.btn_x),
-            px(self.btn_y),
-            px(self.btn_x + self.btn_w),
-            px(self.btn_y + MENU_BUTTON_H),
-            px(MENU_BUTTON_RADIUS),
-        );
-        scene.fill(
-            Fill::NonZero,
-            Affine::IDENTITY,
-            &Brush::Solid(self.eff(self.button_bg())),
-            None,
-            &button,
-        );
-        if self.armed_button && !self.disabled {
-            let press = if self.dark {
-                Color::from_rgba8(255, 255, 255, 24)
-            } else {
-                Color::from_rgba8(0, 0, 0, 24)
-            };
-            scene.fill(
-                Fill::NonZero,
-                Affine::IDENTITY,
-                &Brush::Solid(self.eff(press)),
-                None,
-                &button,
+            let (_, th) = FontSystem::layout_size(&layout);
+            draw_layout(
+                scene,
+                &layout,
+                self.btn_x + MENU_BTN_PAD_X,
+                self.btn_y + (MENU_BUTTON_H - th / fonts.scale) / 2.0,
+                fonts.scale,
             );
-        }
-        let layout = fonts.layout_text_weighted(
-            &self.button,
-            MENU_FONT_SIZE,
-            self.eff(self.text_color),
-            400.0,
-            None,
-        );
-        let (_, th) = FontSystem::layout_size(&layout);
-        draw_layout(
-            scene,
-            &layout,
-            self.btn_x + MENU_BTN_PAD_X,
-            self.btn_y + (MENU_BUTTON_H - th / fonts.scale) / 2.0,
-            fonts.scale,
-        );
-        let chev_x = self.btn_x + self.btn_w - MENU_BTN_PAD_X - MENU_CHEV_W;
-        let chev_y = self.btn_y + MENU_BUTTON_H / 2.0;
-        match self.chevron {
-            MenuChevron::Down => {
-                self.draw_chevron_down(scene, chev_x, chev_y, fonts.scale, self.eff(self.text_dim))
-            }
-            MenuChevron::Both => {
-                self.draw_chevron_both(scene, chev_x, chev_y, fonts.scale, self.eff(self.text_dim))
+            let chev_x = self.btn_x + self.btn_w - MENU_BTN_PAD_X - MENU_CHEV_W;
+            let chev_y = self.btn_y + MENU_BUTTON_H / 2.0;
+            match self.chevron {
+                MenuChevron::Down => self.draw_chevron_down(
+                    scene,
+                    chev_x,
+                    chev_y,
+                    fonts.scale,
+                    self.eff(self.text_dim),
+                ),
+                MenuChevron::Both => self.draw_chevron_both(
+                    scene,
+                    chev_x,
+                    chev_y,
+                    fonts.scale,
+                    self.eff(self.text_dim),
+                ),
             }
         }
 
@@ -938,6 +979,31 @@ mod tests {
         m.mouse_down(2.0, 2.0);
         m.mouse_up(2.0, 2.0);
         assert!(!m.is_open());
+    }
+
+    #[test]
+    fn anchor_floats_without_button() {
+        let mut m = menu();
+        let mut fonts = FontSystem::new();
+        m.set_viewport(0.0, 0.0, 800.0, 600.0);
+        m.set_anchor(Some((400.0, 300.0)));
+        // Anchored menus take no layout space.
+        assert_eq!(m.measure(&mut fonts), (0.0, 0.0));
+        m.place(&mut fonts, 0.0, 0.0, 0.0, 0.0);
+        // Button never hits in anchor mode.
+        m.mouse_down(400.0, 300.0);
+        m.mouse_up(400.0, 300.0);
+        assert!(!m.is_open());
+        // Programmatic open anchors the panel at the point (below
+        // it, like under a button) and inside the viewport.
+        m.open();
+        m.place(&mut fonts, 0.0, 0.0, 0.0, 0.0);
+        let (x, y, w, h) = m.menu_rect();
+        assert!(x <= 400.0 && 400.0 <= x + w);
+        assert!(y >= 300.0 || y + h <= 300.0);
+        assert!(x >= 0.0 && y >= 0.0 && x + w <= 800.0 && y + h <= 600.0);
+        m.set_anchor(None);
+        assert_ne!(m.measure(&mut fonts), (0.0, 0.0));
     }
 
     #[test]
