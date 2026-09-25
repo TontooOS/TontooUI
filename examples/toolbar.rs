@@ -4,9 +4,10 @@ use tontooui::elements::{
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
-use tontooui::theme::ThemeWatcher;
+use tontooui::theme::{ThemeMode, ThemeWatcher};
 use vello::Scene;
-use vello::peniko::Color;
+use vello::kurbo::{Affine, Point, Rect};
+use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
 struct ToolbarDemo {
     bar: Titlebar,
@@ -74,8 +75,11 @@ impl App for ToolbarDemo {
         self.watcher.poll(time_secs);
         self.watcher.set_focused(self.focused, time_secs);
         let palette = self.watcher.palette(time_secs);
-        self.bg = palette.bg;
         let theme = self.watcher.theme();
+        let dark = theme.mode == ThemeMode::Dark;
+        // Wallpaper gradient behind everything (also feeds the glass
+        // backdrop pass so the Lens toolbars refract it).
+        self.bg = draw_wallpaper(scene, fonts, viewport, dark);
         let focused = self.focused;
         self.each_toolbar(|bar| {
             bar.set_theme(theme.mode, theme.glass);
@@ -147,4 +151,67 @@ fn main() {
         eprintln!("error: {err}");
         std::process::exit(1);
     }
+}
+
+/// Wallpaper gradient covering the viewport, theme-aware: saturated
+/// indigo/violet/teal in dark mode, pastel in light mode. Returns the
+/// top stop so `background()` matches the window edges.
+fn draw_wallpaper(
+    scene: &mut Scene,
+    fonts: &FontSystem,
+    viewport: Viewport,
+    dark: bool,
+) -> Color {
+    let stops = if dark {
+        [
+            Color::from_rgb8(0x43, 0x34, 0x9e),
+            Color::from_rgb8(0x7c, 0x3a, 0xed),
+            Color::from_rgb8(0x0e, 0x74, 0x90),
+        ]
+    } else {
+        [
+            Color::from_rgb8(0xc7, 0xd2, 0xfe),
+            Color::from_rgb8(0xf0, 0xab, 0xfc),
+            Color::from_rgb8(0x99, 0xf6, 0xe4),
+        ]
+    };
+    let scale = fonts.scale as f64;
+    let gradient = Gradient::new_linear(
+        Point::new(
+            viewport.x as f64 * scale,
+            viewport.y as f64 * scale,
+        ),
+        Point::new(
+            (viewport.x + viewport.width) as f64 * scale,
+            (viewport.y + viewport.height) as f64 * scale,
+        ),
+    )
+    .with_stops([
+        ColorStop {
+            offset: 0.0,
+            color: stops[0].into(),
+        },
+        ColorStop {
+            offset: 0.55,
+            color: stops[1].into(),
+        },
+        ColorStop {
+            offset: 1.0,
+            color: stops[2].into(),
+        },
+    ]);
+    let rect = Rect::new(
+        viewport.x as f64 * scale,
+        viewport.y as f64 * scale,
+        (viewport.x + viewport.width) as f64 * scale,
+        (viewport.y + viewport.height) as f64 * scale,
+    );
+    scene.fill(
+        Fill::NonZero,
+        Affine::IDENTITY,
+        &Brush::Gradient(gradient),
+        None,
+        &rect,
+    );
+    stops[0]
 }
