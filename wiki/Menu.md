@@ -203,6 +203,51 @@ let mut edit = ContextMenu::basic(
 );
 ```
 
+## MenuButton
+
+```rust
+pub fn new(label: impl Into<String>, options: Vec<String>) -> Self
+pub fn from_slice(label: impl Into<String>, options: &[&str]) -> Self
+pub fn on_press(self, callback: impl FnMut() + 'static) -> Self
+pub fn on_action(self, callback: impl FnMut(usize) + 'static) -> Self
+pub fn hover_fill(self, color: Color) -> Self
+pub fn disabled(self, disabled: bool) -> Self
+pub fn is_open(&self) -> bool
+pub fn close(&mut self)
+pub fn len(&self) -> usize
+pub fn is_empty(&self) -> bool
+pub fn last_action(&self) -> Option<usize>
+pub fn set_label(&mut self, label: impl Into<String>)
+pub fn set_theme(&mut self, accent: Color, dark: bool)
+pub fn set_glass(&mut self, mode: ThemeMode, glass: GlassAmount)
+pub fn set_focused(&mut self, focused: bool)
+pub fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32)
+pub fn mouse_down(&mut self, x: f64, y: f64)
+pub fn mouse_move(&mut self, x: f64, y: f64)
+pub fn mouse_up(&mut self, x: f64, y: f64)
+pub fn mouse_wheel(&mut self, dx: f64, dy: f64)
+```
+
+| Token | Value |
+|---|---|
+| `MENUBTN_CHEV_ZONE` | 32 px chevron zone |
+| `MENUBTN_DIV_INSET` | 6 px divider inset |
+
+- Split button: the main zone (label left) acts as a plain button
+  with hover and press states and fires `on_press`; the chevron
+  zone (divider plus down chevron) opens the anchored dropdown
+  whose rows fire `on_action`. Same menu base underneath: frosted
+  panel, accent hover, heavy shadow, viewport clamp.
+- While the menu is open, clicks only select or dismiss (no
+  press). Apps must call `set_viewport` every frame and return
+  `is_open()` from `App::wants_backdrop`.
+
+```rust
+let mut save = MenuButton::from_slice("Menu Label", &["Edit", "Delete"])
+    .on_press(|| println!("pressed"))
+    .on_action(|i| println!("row: {i}"));
+```
+
 ## Anchor mode
 
 `Menu::set_anchor` and `NestedMenu::set_anchor` float the menu at
@@ -217,7 +262,8 @@ Run `cargo run --example menu`: `Color` picker plus an `Options`
 simple dropdown (`Option 1/2/3`, last action in the titlebar) over
 sample text lines that show the frost blur behind the open panels.
 Right-click or long-press the sample text for an `Edit`
-context menu (`Cut`/`Copy`/`Paste`).
+context menu (`Cut`/`Copy`/`Paste`), plus a `Menu Label` split
+button (`Edit`/`Delete` rows) below the dropdown.
 
 ```rust
 let mut options = Menu::from_slice("Options", &["Option 1", "Option 2", "Option 3"])

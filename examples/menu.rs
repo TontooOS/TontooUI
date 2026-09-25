@@ -1,4 +1,6 @@
-use tontooui::elements::{ContextMenu, Menu, MenuPicker, Titlebar, TrafficAction, View, VStack};
+use tontooui::elements::{
+    ContextMenu, Menu, MenuButton, MenuPicker, Titlebar, TrafficAction, View, VStack,
+};
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::text::draw_layout;
@@ -11,6 +13,7 @@ struct MenuDemo {
     bar: Titlebar,
     stack: VStack,
     dropdown: Menu,
+    action: MenuButton,
     context: ContextMenu,
     watcher: ThemeWatcher,
     focused: bool,
@@ -32,6 +35,7 @@ impl MenuDemo {
             bar: Titlebar::new("Menu"),
             stack,
             dropdown: Menu::from_slice("Options", &["Option 1", "Option 2", "Option 3"]),
+            action: MenuButton::from_slice("Menu Label", &["Edit", "Delete"]),
             context: ContextMenu::basic(
                 (0.0, 0.0, 0.0, 0.0),
                 Menu::from_slice("Edit", &["Cut", "Copy", "Paste"]),
@@ -103,6 +107,11 @@ impl App for MenuDemo {
         self.dropdown.set_theme(palette.accent, dark);
         self.dropdown.set_glass(theme.mode, theme.glass);
         self.dropdown.set_focused(focused);
+        self.action
+            .set_viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+        self.action.set_theme(palette.accent, dark);
+        self.action.set_glass(theme.mode, theme.glass);
+        self.action.set_focused(focused);
         // Context area over the sample text: right-click or
         // long-press opens the anchored menu there.
         let top = viewport.y + 31.0;
@@ -147,7 +156,7 @@ impl App for MenuDemo {
             "ut labore et dolore magna aliqua.",
             "The quick brown fox jumps over the lazy dog.",
         ];
-        let mut ly = top + 120.0;
+        let mut ly = top + 140.0;
         for line in sample {
             let layout = fonts.layout_text_weighted(line, 13.0, self.text, 400.0, None);
             draw_layout(scene, &layout, viewport.x + 24.0, ly, fonts.scale);
@@ -172,6 +181,15 @@ impl App for MenuDemo {
             24.0,
         );
         self.dropdown.draw(scene, fonts, images);
+        // Split action/menu button below the dropdown.
+        self.action.place(
+            fonts,
+            viewport.x + 24.0,
+            top + 104.0,
+            viewport.width - 48.0,
+            24.0,
+        );
+        self.action.draw(scene, fonts, images);
         // Context overlay last so its panel floats above everything.
         self.context.place(fonts, viewport.x, viewport.y, viewport.width, viewport.height);
         self.context.draw(scene, fonts, images);
@@ -191,7 +209,7 @@ impl App for MenuDemo {
 
     fn wants_backdrop(&self) -> bool {
         // Glass menu needs the blur pass while open.
-        self.menu_open || self.context.is_open()
+        self.menu_open || self.dropdown.is_open() || self.action.is_open() || self.context.is_open()
     }
 
     fn mouse_down(&mut self, x: f64, y: f64) {
@@ -204,6 +222,7 @@ impl App for MenuDemo {
             None => {
                 self.each_picker(|picker| picker.mouse_down(x, y));
                 self.dropdown.mouse_down(x, y);
+                self.action.mouse_down(x, y);
                 self.context.mouse_down(x, y);
             }
         }
@@ -213,12 +232,14 @@ impl App for MenuDemo {
         self.bar.set_hover(x as f32, y as f32);
         self.each_picker(|picker| picker.mouse_move(x, y));
         self.dropdown.mouse_move(x, y);
+        self.action.mouse_move(x, y);
         self.context.mouse_move(x, y);
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {
         self.each_picker(|picker| picker.mouse_up(x, y));
         self.dropdown.mouse_up(x, y);
+        self.action.mouse_up(x, y);
         self.context.mouse_up(x, y);
         self.refresh_selected_label();
     }
@@ -236,6 +257,7 @@ impl App for MenuDemo {
         self.bar.set_focused(focused);
         self.each_picker(|picker| picker.set_focused(focused));
         self.dropdown.set_focused(focused);
+        self.action.set_focused(focused);
         self.context.set_focused(focused);
     }
 }
