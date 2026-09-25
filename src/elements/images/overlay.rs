@@ -5,10 +5,11 @@ use vello::Scene;
 use vello::kurbo::{Affine, Point, RoundedRect};
 use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
+use super::super::animation::Spin;
 use super::super::layout::View;
 use super::{
     IMAGE_BADGE_SIZE, IMAGE_PLACEHOLDER_DARK, IMAGE_PLACEHOLDER_LIGHT, IMAGE_RADIUS,
-    IMAGE_TEXT_SIZE, ImageFit, fit_rect, resolve_resource_path,
+    IMAGE_TEXT_SIZE, ImageFit, fit_rect, resolve_resource_path, spin_transform,
 };
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, draw_layout};
@@ -35,6 +36,7 @@ pub struct ImageOverlay {
     badge_color: Color,
     dark: bool,
     focused: bool,
+    spin_deg: f32,
     x: f32,
     y: f32,
     placed_w: f32,
@@ -53,6 +55,7 @@ impl ImageOverlay {
             badge_color: Color::WHITE,
             dark: true,
             focused: true,
+            spin_deg: 0.0,
             x: 0.0,
             y: 0.0,
             placed_w: 0.0,
@@ -192,10 +195,18 @@ impl View for ImageOverlay {
                     fit_rect(iw, ih, self.placed_w, self.placed_h, ImageFit::Cover);
                 scene.push_clip_layer(Fill::NonZero, Affine::IDENTITY, &frame);
                 let s = (dw / iw) as f64 * scale;
-                let transform = Affine::translate((
+                let base = Affine::translate((
                     (self.x + dx) as f64 * scale,
                     (self.y + dy) as f64 * scale,
                 )) * Affine::scale(s);
+                // Only the photo spins; gradient, caption and badge
+                // stay put.
+                let transform = spin_transform(
+                    base,
+                    (self.x + self.placed_w / 2.0) as f64 * scale,
+                    (self.y + self.placed_h / 2.0) as f64 * scale,
+                    self.spin_deg,
+                );
                 scene.draw_image(&image, transform);
                 // Bottom gradient so the caption stays readable.
                 let gradient = Gradient::new_linear(
@@ -277,6 +288,12 @@ impl View for ImageOverlay {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+impl Spin for ImageOverlay {
+    fn set_spin(&mut self, degrees: f32) {
+        self.spin_deg = degrees;
     }
 }
 

@@ -4,8 +4,9 @@ use vello::Scene;
 use vello::kurbo::Affine;
 use vello::peniko::Color;
 
+use super::super::animation::Spin;
 use super::super::layout::View;
-use super::IMAGE_SYMBOL_SIZE;
+use super::{IMAGE_SYMBOL_SIZE, spin_transform};
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
 use crate::theme::desaturate;
@@ -22,6 +23,7 @@ pub struct SFSymbolImage {
     theme_text: Color,
     dark: bool,
     focused: bool,
+    spin_deg: f32,
     x: f32,
     y: f32,
     placed_w: f32,
@@ -37,6 +39,7 @@ impl SFSymbolImage {
             theme_text: Color::from_rgb8(0xd8, 0xd9, 0xd9),
             dark: true,
             focused: true,
+            spin_deg: 0.0,
             x: 0.0,
             y: 0.0,
             placed_w: 0.0,
@@ -123,14 +126,27 @@ impl View for SFSymbolImage {
             let s = (self.placed_w / iw as f32).min(self.placed_h / ih as f32);
             let ix = self.x + (self.placed_w - iw as f32 * s) / 2.0;
             let iy = self.y + (self.placed_h - ih as f32 * s) / 2.0;
-            let transform = Affine::translate((ix as f64 * scale, iy as f64 * scale))
+            let base = Affine::translate((ix as f64 * scale, iy as f64 * scale))
                 * Affine::scale(s as f64 * scale);
+            let (bw, bh) = (iw as f64 * s as f64 * scale, ih as f64 * s as f64 * scale);
+            let transform = spin_transform(
+                base,
+                ix as f64 * scale + bw / 2.0,
+                iy as f64 * scale + bh / 2.0,
+                self.spin_deg,
+            );
             scene.draw_image(&image, transform);
         }
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+impl Spin for SFSymbolImage {
+    fn set_spin(&mut self, degrees: f32) {
+        self.spin_deg = degrees;
     }
 }
 

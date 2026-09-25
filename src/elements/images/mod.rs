@@ -10,6 +10,7 @@ pub use url::UrlImage;
 
 use std::path::PathBuf;
 
+use vello::kurbo::Affine;
 use vello::peniko::Color;
 
 /// Box size for `SFSymbolImage` in logical px.
@@ -65,6 +66,20 @@ pub(crate) fn resolve_resource_path(name: &str) -> PathBuf {
         }
     }
     PathBuf::from("assets").join(name)
+}
+
+/// Wrap a `draw_image` transform with a rotation around the physical
+/// (`cx`, `cy`) center. Zero degrees return the base untouched, so
+/// idle elements pay nothing.
+pub(crate) fn spin_transform(base: Affine, cx: f64, cy: f64, degrees: f32) -> Affine {
+    if degrees == 0.0 {
+        base
+    } else {
+        Affine::translate((cx, cy))
+            * Affine::rotate(degrees.to_radians() as f64)
+            * Affine::translate((-cx, -cy))
+            * base
+    }
 }
 
 /// Candidate paths for an app resource `name`, in priority order.

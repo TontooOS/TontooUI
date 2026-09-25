@@ -1,5 +1,6 @@
 pub mod buttons;
 pub mod dividers;
+pub mod animation;
 pub mod gauges;
 pub mod glass;
 pub mod images;
@@ -20,6 +21,10 @@ pub use buttons::{
     Button, ButtonShape, ButtonStyle, BUTTON_ACCENT, BUTTON_BG_DARK, BUTTON_BG_LIGHT,
     BUTTON_FONT_SIZE, BUTTON_GAP, BUTTON_ICON_SIZE, BUTTON_PAD_X, BUTTON_PAD_Y,
     BUTTON_RADIUS,
+};
+pub use animation::{
+    Animated, Anchor, AnimSpec, Keyframe, Phase, Spin, Timeline, Transform,
+    ANIM_CLIP_MARGIN, ANIM_DEFAULT_SECONDS,
 };
 pub use pickers::{
     DatePicker, InlinePicker, MenuPicker, SegmentedPicker, DATE_ACCENT, DATE_CELL_H,

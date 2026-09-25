@@ -5,10 +5,11 @@ use vello::Scene;
 use vello::kurbo::{Affine, RoundedRect};
 use vello::peniko::{Brush, Fill};
 
+use super::super::animation::Spin;
 use super::super::layout::View;
 use super::{
     IMAGE_PLACEHOLDER_DARK, IMAGE_PLACEHOLDER_LIGHT, IMAGE_RADIUS, ImageFit,
-    fit_rect, resolve_resource_path,
+    fit_rect, resolve_resource_path, spin_transform,
 };
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
@@ -26,6 +27,7 @@ pub struct AppImage {
     radius: f32,
     dark: bool,
     focused: bool,
+    spin_deg: f32,
     x: f32,
     y: f32,
     placed_w: f32,
@@ -42,6 +44,7 @@ impl AppImage {
             radius: IMAGE_RADIUS,
             dark: true,
             focused: true,
+            spin_deg: 0.0,
             x: 0.0,
             y: 0.0,
             placed_w: 0.0,
@@ -141,10 +144,16 @@ impl View for AppImage {
                 );
                 scene.push_clip_layer(Fill::NonZero, Affine::IDENTITY, &frame);
                 let s = (dw / iw as f32) as f64 * scale;
-                let transform = Affine::translate((
+                let base = Affine::translate((
                     (self.x + dx) as f64 * scale,
                     (self.y + dy) as f64 * scale,
                 )) * Affine::scale(s);
+                let transform = spin_transform(
+                    base,
+                    (self.x + self.placed_w / 2.0) as f64 * scale,
+                    (self.y + self.placed_h / 2.0) as f64 * scale,
+                    self.spin_deg,
+                );
                 scene.draw_image(&image, transform);
                 scene.pop_layer();
             }
@@ -162,6 +171,12 @@ impl View for AppImage {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+impl Spin for AppImage {
+    fn set_spin(&mut self, degrees: f32) {
+        self.spin_deg = degrees;
     }
 }
 
