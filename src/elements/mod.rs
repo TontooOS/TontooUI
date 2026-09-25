@@ -8,6 +8,7 @@ pub mod menu;
 pub mod pickers;
 pub mod progress;
 pub mod scrollbar;
+pub mod shapes;
 pub mod sliders;
 pub mod text;
 pub mod titlebar;
@@ -63,6 +64,11 @@ pub use gauges::{
     LINEAR_RING_R, LINEAR_TRACK_H, LINEAR_VALUE_GAP, LINEAR_VALUE_SIZE,
 };
 pub use sliders::Slider;
+pub use shapes::{
+    Capsule, Circle, CustomShape, Rectangle, RoundedRectangle, ShapeFill,
+    SHAPE_CORNER_RADIUS, SHAPE_DEFAULT_FILL, SHAPE_DEFAULT_STROKE,
+    SHAPE_SHADOW, SHAPE_SHADOW_DY, SHAPE_STROKE_W,
+};
 pub use list::{
     BasicList, DisclosureGroup, ListRow, ListRowStyle, DISCLOSURE_ANIM_SECONDS,
     DISCLOSURE_CHEV_GAP, DISCLOSURE_CHEV_H, DISCLOSURE_CHEV_PAD,
