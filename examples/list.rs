@@ -39,6 +39,15 @@ impl ListDemo {
                 ListRow::item("Drafts").badge("12"),
                 ListRow::item("Sent"),
                 ListRow::item("Trash").badge("100"),
+            ]))
+            .child(BasicList::from_rows(vec![
+                ListRow::item("Default Row"),
+                ListRow::item("Custom Background").background(Color::from_rgba8(
+                    0x00, 0x7a, 0xff, 38,
+                )),
+                ListRow::item("Tinted Item")
+                    .text_color(Color::from_rgb8(0x64, 0xd2, 0xff))
+                    .no_divider(),
             ]));
         Self {
             bar: Titlebar::new("List"),

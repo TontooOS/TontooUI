@@ -24,10 +24,17 @@ follow the theme divider color unless the dev sets manual colors.
 ## ListRow
 
 ```rust
-pub enum ListRow { Item { text: String, badge: Option<String> }, Section(String) }
+pub enum ListRow { Item { text: String, badge: Option<String>, style: ListRowStyle }, Section { title: String, style: ListRowStyle } }
 pub fn item(text: impl Into<String>) -> Self
 pub fn section(title: impl Into<String>) -> Self
 pub fn badge(self, badge: impl Into<String>) -> Self
+pub fn style(self, style: ListRowStyle) -> Self
+pub fn text_color(self, color: Color) -> Self
+pub fn background(self, color: Color) -> Self
+pub fn divider(self, show: bool) -> Self
+pub fn no_divider(self) -> Self
+pub fn set_style(&mut self, style: ListRowStyle)
+pub fn row_style(&self) -> ListRowStyle
 pub fn text(&self) -> &str
 pub fn badge_text(&self) -> Option<&str>
 pub fn is_section(&self) -> bool
@@ -39,6 +46,28 @@ pub fn is_section(&self) -> bool
 - `section` is a dim title row that groups the items below it
   (`Grouped`). `badge` on a section is a no-op and `badge_text`
   returns `None` there.
+- `text_color`, `background` and `divider`/`no_divider` are
+  shortcuts for `style` with a single field set; `set_style`
+  replaces the whole style in place.
+
+## ListRowStyle
+
+```rust
+pub struct ListRowStyle { pub text: Option<Color>, pub background: Option<Color>, pub divider: Option<bool> }
+pub fn new() -> Self
+pub fn text_color(self, color: Color) -> Self
+pub fn background(self, color: Color) -> Self
+pub fn divider(self, show: bool) -> Self
+```
+
+- Every field is opt-in: a default style renders exactly like an
+  unstyled row. `text` wins over the list text/dim colors (item
+  text, section title and badge alike).
+- `background` is a full-bleed fill behind the row text (`Custom
+  Background`); `None` is transparent.
+- `divider` overrides the list `show_dividers` for this row only
+  (`Some(false)` hides its hairline, `Some(true)` forces one);
+  never draws after the last row.
 
 ## BasicList
 
@@ -66,14 +95,19 @@ pub fn clear(&mut self)
 pub fn rows(&self) -> &[ListRow]
 pub fn row_count(&self) -> usize
 pub fn set_row_height(&mut self, px: f32)
+pub fn set_row_style(&mut self, index: usize, style: ListRowStyle) -> bool
+pub fn row_divider(&self, index: usize) -> bool
 pub fn rect(&self) -> (f32, f32, f32, f32)
 pub fn content_height(&self) -> f32
 ```
 
 - `measure` returns the fill width and `content_height`: rows times
-  row height, one hairline per inner gap, plus `LIST_SECTION_GAP`
-  above every section title except a leading one. An empty list is
-  0 px tall; hidden dividers take no space.
+  row height, one hairline per shown divider, plus
+  `LIST_SECTION_GAP` above every section title except a leading
+  one. An empty list is 0 px tall; hidden dividers take no space.
+  `row_divider` reports whether row `index` draws its hairline
+  (false past the last row); `set_row_style` restyles one row by
+  index and returns false when out of bounds.
 - `row_height` clamps to >= 0 (zero-height rows draw nothing),
   `font_size` to >= 1 and `padding` to >= 0.
 - `text_color`, `dim_color` (badges, section titles) and
@@ -109,6 +143,16 @@ let mailbox = BasicList::from_rows(vec![
   ListRow::item("Drafts").badge("12"),
   ListRow::item("Sent"),
   ListRow::item("Trash").badge("100"),
+]);
+
+let styled = BasicList::from_rows(vec![
+  ListRow::item("Default Row"),
+  ListRow::item("Custom Background").background(Color::from_rgba8(
+    0x00, 0x7a, 0xff, 38,
+  )),
+  ListRow::item("Tinted Item")
+    .text_color(Color::from_rgb8(0x64, 0xd2, 0xff))
+    .no_divider(),
 ]);
 ```
 
