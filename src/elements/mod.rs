@@ -24,6 +24,7 @@ pub mod scrollview;
 pub mod shapes;
 pub mod sliders;
 pub mod steppers;
+pub mod tables;
 pub mod text;
 pub mod titlebar;
 pub mod toggles;
@@ -142,6 +143,12 @@ pub use steppers::{
     Stepper, StepperOrientation, StepperSide, STEPPER_BG_DARK, STEPPER_BG_LIGHT,
     STEPPER_CHEV_STROKE, STEPPER_DISABLED_ALPHA, STEPPER_DIVIDER_DARK,
     STEPPER_DIVIDER_LIGHT, STEPPER_DIV_INSET, STEPPER_H, STEPPER_RADIUS, STEPPER_W,
+};
+pub use tables::{
+    BasicTable, TableColumn, TableHit, TableSortCmp, TABLE_BAR_W, TABLE_COL_GAP,
+    TABLE_DIVIDER_DARK, TABLE_DIVIDER_LIGHT, TABLE_FONT_SIZE, TABLE_HBAR_H, TABLE_HEADER_H,
+    TABLE_HEADER_SIZE, TABLE_PAD_X, TABLE_RADIUS, TABLE_ROW_FILL_DARK, TABLE_ROW_FILL_LIGHT,
+    TABLE_ROW_GAP, TABLE_ROW_H, TABLE_SELECTED_ALPHA,
 };
 pub use shapes::{
     Capsule, Circle, CustomShape, Rectangle, RoundedRectangle, ShapeFill,

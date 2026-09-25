@@ -86,6 +86,10 @@ pub trait App {
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_up(&mut self, _x: f64, _y: f64) {}
     fn mouse_move(&mut self, _x: f64, _y: f64) {}
+    /// Modifier keys currently held (Ctrl for multi-select, Shift for
+    /// range select). The shell calls this on modifier changes;
+    /// default ignores. Tables read it through `set_modifiers`.
+    fn set_modifiers(&mut self, _ctrl: bool, _shift: bool) {}
     /// Scroll wheel delta in logical px (right/down positive).
     fn mouse_wheel(&mut self, _dx: f64, _dy: f64) {}
     /// Right-click press in logical px (context menus).
@@ -553,6 +557,11 @@ impl<V: App> ApplicationHandler for Shell<V> {
                 if redraw {
                     active.window.request_redraw();
                 }
+            }
+            WindowEvent::ModifiersChanged(modifiers) => {
+                let state = modifiers.state();
+                self.app.set_modifiers(state.control_key(), state.shift_key());
+                active.window.request_redraw();
             }
             WindowEvent::MouseWheel { delta, .. } => {
                 let scale = active.scale;

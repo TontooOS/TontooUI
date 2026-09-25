@@ -77,6 +77,7 @@ pub trait App {
     );
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_move(&mut self, _x: f64, _y: f64) {}
+    fn set_modifiers(&mut self, _ctrl: bool, _shift: bool) {}
     fn mouse_wheel(&mut self, _dx: f64, _dy: f64) {}
     fn set_focused(&mut self, _focused: bool) {}
     fn text(&mut self, _text: &str) {}
@@ -155,7 +156,9 @@ Non-printable keys forwarded to the view. Printable input arrives via
 scrolling arrives via `mouse_wheel` in logical px (right/down
 positive, line steps normalized to 20 px). Right-button presses
 arrive via `context_click` (context menus); touch contacts arrive
-via `touch` with a `TouchPhase`:
+via `touch` with a `TouchPhase`. Modifier changes arrive via
+`set_modifiers` (Ctrl for multi-select, Shift for range select); the
+default ignores them so existing apps keep working:
 
 ```rust
 pub enum TouchPhase {
