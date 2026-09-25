@@ -1,4 +1,5 @@
 pub mod buttons;
+pub mod gauges;
 pub mod glass;
 pub mod layout;
 pub mod pickers;
@@ -29,6 +30,10 @@ pub use pickers::{
     SEGMENTED_LABEL_SIZE, SEGMENTED_MIN_SEG_W, SEGMENTED_PAD, SEGMENTED_PAD_X,
     SEGMENTED_PILL_RADIUS, SEGMENTED_PRESSED_DARK, SEGMENTED_PRESSED_LIGHT,
     SEGMENTED_RADIUS, SEGMENTED_TRACK_DARK, SEGMENTED_TRACK_LIGHT,
+};
+pub use gauges::{
+    Gauge, GAUGE_ANIM_SECONDS, GAUGE_FILL, GAUGE_RADIUS, GAUGE_TITLE_GAP,
+    GAUGE_TITLE_SIZE, GAUGE_TRACK_DARK, GAUGE_TRACK_H, GAUGE_TRACK_LIGHT,
 };
 pub use sliders::Slider;
 pub use toggles::{

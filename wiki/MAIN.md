@@ -15,10 +15,11 @@ theme, animation and a Vello/WGPU renderer.
 | Rules | [RULE.md](RULE.md) | Development and usage rules |
 | Animation | [Animation.md](Animation.md) | Frame clock, tweens, springs, decay |
 | Button | [Button.md](Button.md) | Standard button with CoreIcon SF Symbols |
+| Gauge | [Gauge.md](Gauge.md) | Basic gauge bar with title and accent fill |
 | Glass | [Glass.md](Glass.md) | Liquid glass container and backdrop blur |
 | Layout | [Layout.md](Layout.md) | VStack, HStack, ZStack, modifiers, `View` |
 | Renderer | [Renderer.md](Renderer.md) | Window shell, frame pipeline, backdrop blur |
-| Picker | [Picker.md](Picker.md) | Segmented and inline pickers with labels |
+| Picker | [Picker.md](Picker.md) | Segmented, inline, menu and date pickers |
 | Slider | [Slider.md](Slider.md) | Slider with steps, labels, ticks, glass |
 | Theme | [Theme.md](Theme.md) | Live dark/light, accent, glass stage |
 | Titlebar | [Titlebar.md](Titlebar.md) | Custom decoration bar with drag region |
