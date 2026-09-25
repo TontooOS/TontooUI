@@ -18,7 +18,7 @@ change).
 | `MENU_CHEV_W` / `MENU_CHEV_GAP` | 12 px chevron box / 8 px text-to-chevron gap |
 | `MENU_PAD` / `MENU_RADIUS` | 6 px panel padding / 9 px panel radius |
 | `MENU_ROW_H` / `MENU_ROW_SPACING` | 26 px rows, 2 px row gap |
-| `MENU_CHECK_COL` / `MENU_TEXT_GAP` | 20 px check column / 6 px check-to-text gap |
+| `MENU_CHECK_COL` / `MENU_TEXT_GAP` | 20 px check column / 6 px check-to-text gap, only when `checked` is set |
 | `MENU_CHECK_W` / `MENU_CHECK_H` | 10 px by 7.5 px fixed checkmark glyph |
 | `MENU_PANEL_GAP` | 4 px button-to-panel gap |
 | `MENU_SHADOW_BLUR` | 24 px heavy edge shadow |
@@ -79,8 +79,9 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
   row index and closes; any other release closes. `last_action`
   records the row without needing a callback. Empty option lists
   never open.
-- `checked` draws the fixed checkmark on that row (picker use);
-  `None` is plain action rows.
+- `checked` draws the fixed checkmark on that row (picker use)
+  and reserves the check column; `None` is plain action rows with
+  text starting at the panel padding (no wasted left space).
 - Hovering a row tints it with the hover fill (system accent unless
   set manually with `hover_fill`) and turns row text and checkmark
   white.

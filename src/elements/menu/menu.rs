@@ -363,6 +363,17 @@ impl Menu {
         MENU_ROW_H + MENU_ROW_SPACING
     }
 
+    /// Left indent for the check column: only reserved when a
+    /// checkmark exists, otherwise row text starts at the panel
+    /// padding.
+    fn check_indent(&self) -> f32 {
+        if self.checked.is_some() {
+            MENU_CHECK_COL + MENU_TEXT_GAP
+        } else {
+            0.0
+        }
+    }
+
     fn row_y(&self, row: usize) -> f32 {
         self.menu_y + MENU_PAD + row as f32 * self.row_stride()
     }
@@ -378,7 +389,7 @@ impl Menu {
         }
         let mut content_w: f32 = 0.0;
         for option in &self.options {
-            content_w = content_w.max(MENU_CHECK_COL + MENU_TEXT_GAP + self.text_w(fonts, option));
+            content_w = content_w.max(self.check_indent() + self.text_w(fonts, option));
         }
         let mut w = (content_w + MENU_PAD * 2.0).max(self.btn_w);
         let mut h = MENU_PAD * 2.0
@@ -746,6 +757,7 @@ impl View for Menu {
             } else {
                 self.text_color
             };
+            let text_x = self.menu_x + MENU_PAD + self.check_indent();
             if self.checked == Some(i) {
                 self.draw_check(
                     scene,
@@ -766,7 +778,7 @@ impl View for Menu {
             draw_layout(
                 scene,
                 &layout,
-                self.menu_x + MENU_PAD + MENU_CHECK_COL + MENU_TEXT_GAP,
+                text_x,
                 ry + (MENU_ROW_H - th / fonts.scale) / 2.0,
                 fonts.scale,
             );
@@ -886,6 +898,16 @@ mod tests {
         m.place(&mut fonts, 150.0, 90.0, w, h);
         let (x, y, mw, mh) = (m.menu_x, m.menu_y, m.menu_w, m.menu_h);
         assert!(x >= 0.0 && y >= 0.0 && x + mw <= 200.0 && y + mh <= 120.0);
+    }
+
+    #[test]
+    fn check_column_only_when_checked() {
+        // No icons, no indent: plain rows start at the panel padding.
+        assert_eq!(menu().check_indent(), 0.0);
+        assert_eq!(
+            menu().checked(Some(0)).check_indent(),
+            MENU_CHECK_COL + MENU_TEXT_GAP
+        );
     }
 
     #[test]
