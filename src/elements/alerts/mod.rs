@@ -1,10 +1,12 @@
 pub mod action;
 pub mod basic;
 pub mod confirm;
+pub mod icon;
 
 pub use action::{ActionAlert, AlertEvent};
 pub use basic::{AlertAction, AlertButton, BasicAlert};
 pub use confirm::ConfirmationDialog;
+pub use icon::IconAlert;
 
 use vello::peniko::Color;
 
@@ -28,6 +30,10 @@ pub const ALERT_MESSAGE_GAP: f32 = 15.0;
 pub const ALERT_BUTTON_H: f32 = 33.0;
 /// Gap between two action buttons in logical px.
 pub const ALERT_BUTTON_GAP: f32 = 9.0;
+/// SF icon box in logical px (icon alerts).
+pub const ALERT_ICON_SIZE: f32 = 44.0;
+/// Gap between the icon and the text in logical px (icon alerts).
+pub const ALERT_ICON_GAP: f32 = 12.0;
 /// Fade in/out time in seconds (engine tween).
 pub const ALERT_FADE_SECONDS: f32 = 0.25;
 /// Dim alpha over the app behind the alert (0..255).

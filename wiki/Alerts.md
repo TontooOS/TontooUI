@@ -8,7 +8,10 @@ action variant with a leading-aligned title and message plus exactly
 two side-by-side buttons with custom tints (e.g. gray Cancel plus
 red Delete), and `ConfirmationDialog` in `confirm.rs` is the choice
 variant with only a centered title and a vertical stack of
-full-width option buttons plus a trailing cancel. None can be
+full-width option buttons plus a trailing cancel, and `IconAlert` in
+`icon.rs` is the icon variant with an SF Symbol on the left, a
+leading-aligned title plus message on its right, and any number of
+full-width action buttons stacked below. None can be
 dismissed by clicking outside — only the buttons close them.
 Entrance and exit fade through an engine tween; the app triggers
 them with `show` (e.g. from its own buttons). The action variants
@@ -27,6 +30,7 @@ unclickable. Alert buttons react to clicks only: hover does nothing
 | `ALERT_TITLE_SIZE` / `ALERT_MESSAGE_SIZE` | 12.75 px semibold title / 11.25 px message, wrapping |
 | `ALERT_TITLE_GAP` / `ALERT_MESSAGE_GAP` | 6 px title gap / 15 px button gap |
 | `ALERT_BUTTON_H` / `ALERT_BUTTON_GAP` | 33 px button height / 9 px button gap |
+| `ALERT_ICON_SIZE` / `ALERT_ICON_GAP` | 44 px SF icon box / 12 px icon-text gap |
 | `ALERT_FADE_SECONDS` | 0.25 s engine fade in/out (shared by all variants) |
 | `ALERT_DIM_ALPHA` | 77 alpha black dim over the app behind the card |
 | `ALERT_TITLE_DARK` / `ALERT_TITLE_LIGHT` | White / `#272727` title text |
@@ -151,6 +155,46 @@ pub fn mouse_up(&mut self, x: f64, y: f64) -> Option<AlertEvent>
   button as an `AlertEvent` (stack index, action, label) once per
   click; clicks outside or mid-fade are swallowed.
 
+## IconAlert
+
+```rust
+pub fn new(icon: impl Into<String>, title: impl Into<String>, message: impl Into<String>, actions: Vec<AlertButton>) -> Self
+pub fn icon_color(self, color: Color) -> Self
+pub fn set_icon_color(&mut self, color: Option<Color>)
+pub fn icon_value(&self) -> &str
+pub fn icon_color_value(&self) -> Option<Color>
+pub fn cancel(self, label: impl Into<String>) -> Self
+pub fn no_cancel(self) -> Self
+pub fn set_theme(&mut self, mode: ThemeMode, text: Color, glass: GlassAmount)
+pub fn set_focused(&mut self, focused: bool)
+pub fn set_title(&mut self, title: impl Into<String>)
+pub fn set_message(&mut self, message: impl Into<String>)
+pub fn defs_value(&self) -> &[AlertButton]
+pub fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32)
+pub fn show(&mut self)
+pub fn dismiss(&mut self)
+pub fn is_open(&self) -> bool
+pub fn is_visible(&self) -> bool
+pub fn opacity_value(&self) -> f32
+pub fn mouse_down(&mut self, x: f64, y: f64)
+pub fn mouse_up(&mut self, x: f64, y: f64) -> Option<AlertEvent>
+```
+
+- Same modal core as the other variants (frosted card, dim, engine
+  fade, `show`/`dismiss`, viewport centering), but with an SF Symbol
+  (`ALERT_ICON_SIZE` box, top-aligned) on the left, a
+  leading-aligned title plus message on its right, and any number of
+  full-width action buttons stacked below.
+- Without `.icon_color()` the glyph follows the theme text color via
+  `set_theme` (which takes the text color, not the accent); a custom
+  tint wins. Empty actions fall back to a single OK; a trailing
+  Cancel is added by default (`cancel` renames it, `no_cancel` drops
+  it).
+- Every button renders tinted gray (or its custom tint), like the
+  system prompt. A press returns the button as an `AlertEvent`
+  (stack index, action, label) once per click; clicks outside or
+  mid-fade are swallowed.
+
 ## Titlebar modal block
 
 ```rust
@@ -219,9 +263,9 @@ if let Some(event) = alert.mouse_up(x, y) {
 }
 ```
 
-See `examples/alert.rs` for the full demo (OK, OK/Cancel, action and
-confirmation dialogs over buttons plus a toolbar, gray blocked red
-light).
+See `examples/alert.rs` for the full demo (OK, OK/Cancel, action,
+confirmation and icon alerts over buttons plus a toolbar, gray
+blocked red light).
 
 ## Cross References
 
