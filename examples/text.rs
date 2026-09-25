@@ -1,6 +1,6 @@
 use tontooui::elements::{
-    Align, BasicText, TextAlignment, TextForeground, TextStyle, Titlebar, TrafficAction, View,
-    VStack,
+    Align, BasicText, FormattedText, Span, TextAlignment, TextForeground, TextStyle, Titlebar,
+    TrafficAction, View, VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
@@ -68,7 +68,29 @@ impl TextDemo {
             ]))
             .child(BasicText::new("Primary").foreground(TextForeground::Primary))
             .child(BasicText::new("Secondary").foreground(TextForeground::Secondary))
-            .child(BasicText::new("Tertiary").foreground(TextForeground::Tertiary));
+            .child(BasicText::new("Tertiary").foreground(TextForeground::Tertiary))
+            .child(FormattedText::markdown("**Bold Text**"))
+            .child(FormattedText::markdown("*Italic Text*"))
+            .child(FormattedText::markdown("***Bold & Italic***"))
+            .child(FormattedText::spans(vec![Span::new("Underlined Text").underline()]))
+            .child(FormattedText::spans(vec![Span::new("Underlined Red")
+                .underline_color(Color::from_rgb8(0xff, 0x3b, 0x30))]))
+            .child(FormattedText::markdown("~~Strikethrough Text~~"))
+            .child(FormattedText::spans(vec![Span::new("Strikethrough Green")
+                .strikethrough_color(Color::from_rgb8(0x34, 0xc7, 0x59))]))
+            .child(FormattedText::markdown("`Monospaced`"))
+            .child(
+                FormattedText::markdown("[Link](https://example.com)")
+                    .on_link(|url| println!("link pressed: {url}")),
+            )
+            .child(FormattedText::markdown("**Bold** and *italic* together"))
+            .child(
+                FormattedText::markdown(
+                    "Truncated Text that keeps going past the box edge again and again",
+                )
+                .width(300.0)
+                .line_limit(1),
+            );
         Self {
             bar: Titlebar::new("Text"),
             stack,
@@ -85,6 +107,18 @@ impl TextDemo {
             match self.stack.child_mut::<BasicText>(index) {
                 Some(text) => f(text),
                 None => break,
+            }
+            index += 1;
+        }
+    }
+
+    fn each_formatted(&mut self, mut f: impl FnMut(&mut FormattedText)) {
+        let mut index = 0;
+        loop {
+            if let Some(text) = self.stack.child_mut::<FormattedText>(index) {
+                f(text);
+            } else if self.stack.child_mut::<BasicText>(index).is_none() {
+                break;
             }
             index += 1;
         }
@@ -107,6 +141,14 @@ impl App for TextDemo {
         let dark = self.watcher.theme().mode == ThemeMode::Dark;
         let focused = self.focused;
         self.each_text(|text| {
+            if dark {
+                text.set_theme(ThemeMode::Dark);
+            } else {
+                text.set_theme(ThemeMode::Light);
+            }
+            text.set_focused(focused);
+        });
+        self.each_formatted(|text| {
             if dark {
                 text.set_theme(ThemeMode::Dark);
             } else {
@@ -152,12 +194,18 @@ impl App for TextDemo {
             Some(TrafficAction::Maximize) => {
                 self.command = Some(WindowCommand::ToggleMaximize)
             }
-            None => {}
+            None => {
+                self.each_formatted(|text| text.mouse_down(x, y));
+            }
         }
     }
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
+    }
+
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        self.each_formatted(|text| text.mouse_up(x, y));
     }
 
     fn set_focused(&mut self, focused: bool) {
@@ -167,7 +215,7 @@ impl App for TextDemo {
 }
 
 fn main() {
-    if let Err(err) = run("Text", 800, 900, TextDemo::new()) {
+    if let Err(err) = run("Text", 800, 1150, TextDemo::new()) {
         eprintln!("error: {err}");
         std::process::exit(1);
     }

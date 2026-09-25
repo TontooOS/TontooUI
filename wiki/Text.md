@@ -125,6 +125,87 @@ let rainbow = BasicText::new("Gradient Text").foreground_gradient(vec![
 
 See `examples/text.rs` for the full style and foreground catalog.
 
+## Formatting
+
+`FormattedText` in `formatted.rs` renders inline spans (bold, italic,
+code, underline, strikethrough, colors, links) from markdown
+(`FormattedText::markdown`) or explicit spans
+(`FormattedText::spans`). `line_limit` truncates with an ellipsis,
+links fire `on_link` on click.
+
+```rust
+pub fn markdown(source: impl Into<String>) -> Self
+pub fn spans(spans: Vec<Span>) -> Self
+pub fn line_limit(self, lines: usize) -> Self
+pub fn accent(self, accent: Color) -> Self
+pub fn on_link(self, callback: impl FnMut(&str) + 'static) -> Self
+pub fn link_at(&self, x: f32, y: f32) -> Option<String>
+```
+
+Markdown subset, single paragraph: `**bold**`, `*italic*`,
+`_italic_`, `***bold italic***`, `~~strikethrough~~`, `` `code` ``
+(monospace), `[label](url)`, `\` escapes the next character.
+Unmatched markers stay literal; `_` needs word flanking so
+`foo_bar` keeps its underscores.
+
+Explicit spans cover what markdown cannot (colored decorations):
+
+```rust
+pub struct Span {
+    pub text: String,
+    pub bold: bool,
+    pub italic: bool,
+    pub code: bool,
+    pub color: Option<Color>,
+    pub underline: bool,
+    pub underline_color: Option<Color>,
+    pub strikethrough: bool,
+    pub strikethrough_color: Option<Color>,
+    pub link: Option<String>,
+}
+```
+
+```rust
+pub fn new(text: impl Into<String>) -> Self
+pub fn bold(self) -> Self
+pub fn italic(self) -> Self
+pub fn code(self) -> Self
+pub fn color(self, color: Color) -> Self
+pub fn underline(self) -> Self
+pub fn underline_color(self, color: Color) -> Self
+pub fn strikethrough(self) -> Self
+pub fn strikethrough_color(self, color: Color) -> Self
+pub fn link(self, url: impl Into<String>) -> Self
+pub fn parse_markdown(source: &str) -> Vec<Span>
+```
+
+- Links render in the accent color (default theme blue, `accent()`
+  overrides), underlined, and hit-test exactly on their glyphs
+  (`Cluster::from_point_exact`): padding never counts as a link.
+- `line_limit(n)` keeps the longest char-prefix plus "…" fitting `n`
+  lines (binary search over one re-layout per probe, on dirty only).
+- Decorations paint from Parley run metrics
+  (`underline_offset`/`underline_size`, `strikethrough_offset`/
+  `strikethrough_size`); decoration colors fall back to the span
+  color, then the base foreground.
+- Base `foreground`/`style`/`alignment`/`width` builders mirror
+  `BasicText`. Gradient foregrounds paint default runs; explicit
+  colors keep theirs.
+
+```rust
+use tontooui::elements::{FormattedText, Span, View};
+
+let md = FormattedText::markdown("**Bold** and *italic* together");
+let colored = FormattedText::spans(vec![
+    Span::new("Underlined Red").underline_color(Color::from_rgb8(0xff, 0x3b, 0x30)),
+    Span::new(" and "),
+    Span::new("Green Strike").strikethrough_color(Color::from_rgb8(0x34, 0xc7, 0x59)),
+]);
+let link = FormattedText::markdown("[Link](https://example.com)")
+    .on_link(|url| println!("open {url}"));
+let short = FormattedText::markdown("Long text…").width(300.0).line_limit(1);
+```
+
 ## Cross References
 
 - [Renderer.md](Renderer.md) – `FontSystem` layout and backdrop

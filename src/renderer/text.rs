@@ -1,5 +1,7 @@
+use std::ops::Range;
+
 use parley::{
-    Alignment, AlignmentOptions, FontContext, FontWeight, GenericFamily, Layout,
+    Alignment, AlignmentOptions, FontContext, FontStyle, FontWeight, GenericFamily, Layout,
     LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
 };
 use vello::Scene;
@@ -80,6 +82,95 @@ impl FontSystem {
     pub fn layout_size(layout: &Layout<SolidBrush>) -> (f32, f32) {
         (layout.width(), layout.height())
     }
+
+    /// Lay out `content` with inline `spans` (byte ranges into `content`)
+    /// at `size` logical px. Additive companion to `layout_text_weighted`
+    /// (which stays unchanged): bold pins weight 700, `monospace` switches
+    /// the run to the monospace generic family, decorations take the
+    /// span color or fall back to the base `color`. Out-of-bounds ranges
+    /// are clamped, empty ranges skipped.
+    pub fn layout_rich_text(
+        &mut self,
+        content: &str,
+        size: f32,
+        color: Color,
+        max_width: Option<f32>,
+        spans: &[RichSpan],
+    ) -> Layout<SolidBrush> {
+        let px = size * self.scale;
+        let mut builder =
+            self.layout_cx
+                .ranged_builder(&mut self.font_cx, content, 1.0, true);
+        builder.push_default(StyleProperty::Brush(SolidBrush { color }));
+        builder.push_default(GenericFamily::SystemUi);
+        builder.push_default(LineHeight::FontSizeRelative(1.25));
+        builder.push_default(StyleProperty::FontSize(px));
+        builder.push_default(StyleProperty::FontWeight(FontWeight::new(400.0)));
+        for span in spans {
+            let start = span.range.start.min(content.len());
+            let end = span.range.end.min(content.len());
+            if start >= end {
+                continue;
+            }
+            let range = start..end;
+            if span.bold {
+                builder.push(
+                    StyleProperty::FontWeight(FontWeight::new(700.0)),
+                    range.clone(),
+                );
+            }
+            if span.italic {
+                builder.push(StyleProperty::FontStyle(FontStyle::Italic), range.clone());
+            }
+            if span.monospace {
+                builder.push(GenericFamily::Monospace, range.clone());
+            }
+            if let Some(span_color) = span.color {
+                builder.push(
+                    StyleProperty::Brush(SolidBrush { color: span_color }),
+                    range.clone(),
+                );
+            }
+            if span.underline {
+                builder.push(StyleProperty::Underline(true), range.clone());
+                builder.push(
+                    StyleProperty::UnderlineBrush(Some(SolidBrush {
+                        color: span.underline_color.or(span.color).unwrap_or(color),
+                    })),
+                    range.clone(),
+                );
+            }
+            if span.strikethrough {
+                builder.push(StyleProperty::Strikethrough(true), range.clone());
+                builder.push(
+                    StyleProperty::StrikethroughBrush(Some(SolidBrush {
+                        color: span.strikethrough_color.or(span.color).unwrap_or(color),
+                    })),
+                    range.clone(),
+                );
+            }
+        }
+        let mut layout = builder.build(content);
+        layout.break_all_lines(max_width.map(|w| w * self.scale));
+        layout.align(Alignment::Start, AlignmentOptions::default());
+        layout
+    }
+}
+
+/// Inline span style for `layout_rich_text`: a byte `range` into the
+/// content plus style flags. `underline_color`/`strikethrough_color`
+/// fall back to `color`, then to the layout base color.
+#[derive(Clone, Debug, Default)]
+pub struct RichSpan {
+    pub range: Range<usize>,
+    pub bold: bool,
+    pub italic: bool,
+    pub monospace: bool,
+    pub color: Option<Color>,
+    pub underline: bool,
+    pub underline_color: Option<Color>,
+    pub strikethrough: bool,
+    pub strikethrough_color: Option<Color>,
 }
 
 impl Default for FontSystem {

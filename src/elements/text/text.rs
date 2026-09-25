@@ -261,7 +261,7 @@ fn linear_stops(colors: &[Color]) -> Vec<ColorStop> {
 }
 
 /// Horizontal gradient brush spanning the logical text block.
-fn gradient_brush(
+pub(crate) fn gradient_brush(
     colors: &[Color],
     x: f32,
     y: f32,
@@ -282,7 +282,7 @@ fn gradient_brush(
 
 /// Same glyph loop as `draw_layout`, but every run paints `brush`
 /// instead of its baked solid color.
-fn draw_with_brush(
+pub(crate) fn draw_with_brush(
     scene: &mut Scene,
     layout: &Layout<SolidBrush>,
     x: f32,
