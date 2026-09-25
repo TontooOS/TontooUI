@@ -168,6 +168,15 @@ impl BasicText {
         }
     }
 
+    /// Resolved base foreground (shared with `LabeledText` icon tint).
+    pub(crate) fn resolve_foreground(
+        &self,
+        mode: ThemeMode,
+        focused: bool,
+    ) -> ResolvedForeground {
+        self.foreground.resolve(mode, focused)
+    }
+
     fn ensure_layout(&mut self, fonts: &mut FontSystem) {
         if !self.dirty && self.layout.is_some() {
             return;

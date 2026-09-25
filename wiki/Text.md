@@ -206,6 +206,45 @@ let link = FormattedText::markdown("[Link](https://example.com)")
 let short = FormattedText::markdown("Long text…").width(300.0).line_limit(1);
 ```
 
+## Labeled Text
+
+`LabeledText` in `labeled.rs` is text with an SF Symbol (SwiftUI
+`Label`): an icon from CoreIcon beside a real `BasicText`, so style,
+foreground (including gradients), alignment and wrapping behave
+identically. A missing icon draws the text alone.
+
+```rust
+pub fn new(text: impl Into<String>, icon: impl Into<String>) -> Self
+pub fn style(self, style: TextStyle) -> Self
+pub fn foreground(self, foreground: TextForeground) -> Self
+pub fn foreground_color(self, color: Color) -> Self
+pub fn alignment(self, alignment: TextAlignment) -> Self
+pub fn width(self, px: f32) -> Self
+pub fn icon_size(self, px: f32) -> Self
+pub fn gap(self, px: f32) -> Self
+pub fn icon_color(self, color: Color) -> Self
+```
+
+| Token | Value |
+|---|---|
+| `LABELED_GAP` | `6.0` icon-to-text gap |
+
+- The icon box defaults to the text size (`icon_size()` overrides,
+  aspect kept) and centers on the first line.
+- The icon inherits the resolved text color unless `icon_color`
+  overrides it: leave it off for tinted text (blue handset row), set
+  it for a contrasting icon (red heart row).
+
+```rust
+use tontooui::elements::{LabeledText, TextStyle, View};
+
+let starred = LabeledText::new("Starred", "star").style(TextStyle::Title2);
+let custom = LabeledText::new("Custom Label", "heart")
+    .icon_color(Color::from_rgb8(0xff, 0x3b, 0x30));
+let handset = LabeledText::new("Handset", "phone")
+    .foreground_color(Color::from_rgb8(0x00, 0x7a, 0xff));
+```
+
 ## Cross References
 
 - [Renderer.md](Renderer.md) – `FontSystem` layout and backdrop

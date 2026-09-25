@@ -1,6 +1,6 @@
 use tontooui::elements::{
-    Align, BasicText, FormattedText, Span, TextAlignment, TextForeground, TextStyle, Titlebar,
-    TrafficAction, View, VStack,
+    Align, BasicText, FormattedText, LabeledText, Span, TextAlignment, TextForeground, TextStyle,
+    Titlebar, TrafficAction, View, VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
@@ -90,6 +90,18 @@ impl TextDemo {
                 )
                 .width(300.0)
                 .line_limit(1),
+            )
+            .child(
+                LabeledText::new("Starred", "star")
+                    .style(TextStyle::Title2),
+            )
+            .child(
+                LabeledText::new("Custom Label", "heart")
+                    .icon_color(Color::from_rgb8(0xff, 0x3b, 0x30)),
+            )
+            .child(
+                LabeledText::new("Handset", "phone")
+                    .foreground_color(Color::from_rgb8(0x00, 0x7a, 0xff)),
             );
         Self {
             bar: Titlebar::new("Text"),
@@ -117,7 +129,23 @@ impl TextDemo {
         loop {
             if let Some(text) = self.stack.child_mut::<FormattedText>(index) {
                 f(text);
-            } else if self.stack.child_mut::<BasicText>(index).is_none() {
+            } else if self.stack.child_mut::<BasicText>(index).is_none()
+                && self.stack.child_mut::<LabeledText>(index).is_none()
+            {
+                break;
+            }
+            index += 1;
+        }
+    }
+
+    fn each_labeled(&mut self, mut f: impl FnMut(&mut LabeledText)) {
+        let mut index = 0;
+        loop {
+            if let Some(text) = self.stack.child_mut::<LabeledText>(index) {
+                f(text);
+            } else if self.stack.child_mut::<BasicText>(index).is_none()
+                && self.stack.child_mut::<FormattedText>(index).is_none()
+            {
                 break;
             }
             index += 1;
@@ -149,6 +177,14 @@ impl App for TextDemo {
             text.set_focused(focused);
         });
         self.each_formatted(|text| {
+            if dark {
+                text.set_theme(ThemeMode::Dark);
+            } else {
+                text.set_theme(ThemeMode::Light);
+            }
+            text.set_focused(focused);
+        });
+        self.each_labeled(|text| {
             if dark {
                 text.set_theme(ThemeMode::Dark);
             } else {
@@ -215,7 +251,7 @@ impl App for TextDemo {
 }
 
 fn main() {
-    if let Err(err) = run("Text", 800, 1150, TextDemo::new()) {
+    if let Err(err) = run("Text", 800, 1250, TextDemo::new()) {
         eprintln!("error: {err}");
         std::process::exit(1);
     }
