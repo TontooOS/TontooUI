@@ -1,14 +1,21 @@
 pub mod basic;
+pub mod editor;
 pub mod large;
+pub mod secure;
 
 pub use basic::{
     BasicTextField, TEXTFIELD_FONT_SIZE, TEXTFIELD_PAD_X, TEXTFIELD_PAD_Y,
     TEXTFIELD_RADIUS,
 };
+pub use editor::{
+    TextEditor, EDITOR_FONT_SIZE, EDITOR_MIN_H, EDITOR_PAD, EDITOR_RADIUS,
+    EDITOR_WRAP_W,
+};
 pub use large::{
     LargeTextField, LARGE_FIELD_FONT_SIZE, LARGE_FIELD_PAD_X, LARGE_FIELD_PAD_Y,
     LARGE_FIELD_RADIUS,
 };
+pub use secure::SecureField;
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -41,14 +48,18 @@ pub const TEXTFIELD_CARET_W: f32 = 2.0;
 /// Caret blink period in seconds (macOS-like).
 pub const TEXTFIELD_BLINK_SECONDS: f64 = 1.06;
 
-/// Shared single-line editing core behind both field variants:
+/// Shared single-line editing core behind the field variants:
 /// text plus caret (always a char boundary), placeholder, selection
-/// and accent. Layouts cache per scale per the crisp text rules.
+/// and accent. `masked` echoes bullets (secure fields), `multiline`
+/// keeps newlines (editor). Layouts cache per content, color, size,
+/// wrap and scale per the crisp text rules.
 pub(crate) struct FieldCore {
     text: String,
     caret: usize,
     placeholder: String,
     selected: bool,
+    masked: bool,
+    multiline: bool,
     accent: Color,
     dark: bool,
     focused: bool,
@@ -58,6 +69,7 @@ pub(crate) struct FieldCore {
     layout_text: String,
     layout_color: Color,
     layout_size: f32,
+    layout_wrap: Option<f32>,
     layout_scale: f32,
     dirty: bool,
 }
@@ -69,6 +81,8 @@ impl FieldCore {
             caret: 0,
             placeholder,
             selected: false,
+            masked: false,
+            multiline: false,
             accent: TEXTFIELD_ACCENT,
             dark: true,
             focused: true,
@@ -78,15 +92,19 @@ impl FieldCore {
             layout_text: String::new(),
             layout_color: Color::WHITE,
             layout_size: 0.0,
+            layout_wrap: None,
             layout_scale: 0.0,
             dirty: true,
         }
     }
 
-    /// Insert printable text at the caret (single line: control
-    /// chars and newlines are skipped). Fires `on_change`.
+    /// Insert text at the caret. Single line skips control chars and
+    /// newlines; multiline keeps `\n`. Fires `on_change`.
     pub(crate) fn insert(&mut self, content: &str) {
-        let clean: String = content.chars().filter(|c| !c.is_control()).collect();
+        let clean: String = content
+            .chars()
+            .filter(|c| !c.is_control() || (self.multiline && *c == '\n'))
+            .collect();
         if clean.is_empty() {
             return;
         }
@@ -159,7 +177,17 @@ impl FieldCore {
         }
     }
 
-    /// Laid-out content: the text, or the placeholder when empty.
+    /// Displayed content: bullets per char when masked, the raw
+    /// text otherwise.
+    pub(crate) fn echo(&self) -> String {
+        if self.masked {
+            "•".repeat(self.text.chars().count())
+        } else {
+            self.text.clone()
+        }
+    }
+
+    /// Laid-out content: the echo, or the placeholder when empty.
     /// Returns the layout plus whether it shows the placeholder.
     pub(crate) fn ensure_layout(
         &mut self,
@@ -167,12 +195,13 @@ impl FieldCore {
         size: f32,
         text_color: Color,
         placeholder_color: Color,
+        wrap: Option<f32>,
     ) -> (&Layout<SolidBrush>, bool) {
         let empty = self.text.is_empty();
         let content = if empty {
             self.placeholder.clone()
         } else {
-            self.text.clone()
+            self.echo()
         };
         let color = if empty { placeholder_color } else { text_color };
         if !self.dirty
@@ -180,23 +209,31 @@ impl FieldCore {
             && self.layout_text == content
             && self.layout_color == color
             && self.layout_size == size
+            && self.layout_wrap == wrap
             && self.layout_scale == fonts.scale
         {
             return (self.layout.as_ref().expect("layout built"), empty);
         }
-        self.layout = Some(fonts.layout_text(&content, size, color, None));
+        let layout = fonts.layout_text(&content, size, color, wrap);
+        self.layout = Some(layout);
         self.layout_text = content;
         self.layout_color = color;
         self.layout_size = size;
+        self.layout_wrap = wrap;
         self.layout_scale = fonts.scale;
         self.dirty = false;
         (self.layout.as_ref().expect("layout built"), empty)
     }
 
-    /// Caret x in logical px (advance of the text before the caret).
+    /// Caret x in logical px (advance of the echo before the caret).
     pub(crate) fn caret_x(&self, fonts: &mut FontSystem, size: f32, color: Color) -> f32 {
-        let prefix = &self.text[..self.caret.min(self.text.len())];
-        let layout = fonts.layout_text(prefix, size, color, None);
+        let prefix_chars = self.text[..self.caret.min(self.text.len())].chars().count();
+        let prefix = if self.masked {
+            "•".repeat(prefix_chars)
+        } else {
+            self.text[..self.caret.min(self.text.len())].to_string()
+        };
+        let layout = fonts.layout_text(&prefix, size, color, None);
         FontSystem::layout_size(&layout).0 / fonts.scale
     }
 
@@ -284,7 +321,7 @@ pub(crate) fn measure_field(
 ) -> (f32, f32) {
     let (_, _, text) = field_colors(core);
     let (layout, _) =
-        core.ensure_layout(fonts, metrics.font_size, text, text);
+        core.ensure_layout(fonts, metrics.font_size, text, text, None);
     let (_, th) = FontSystem::layout_size(layout);
     (
         metrics.min_width + metrics.pad_x * 2.0,
@@ -348,7 +385,7 @@ pub(crate) fn draw_field(
     let placeholder = placeholder_color(core);
     let th = {
         let (layout, _) =
-            core.ensure_layout(fonts, metrics.font_size, text, placeholder);
+            core.ensure_layout(fonts, metrics.font_size, text, placeholder, None);
         FontSystem::layout_size(layout).1
     };
     let ty = iy + (ih - th / fonts.scale) / 2.0;
@@ -357,7 +394,7 @@ pub(crate) fn draw_field(
     let scroll = core.scroll;
     {
         let (layout, _) =
-            core.ensure_layout(fonts, metrics.font_size, text, placeholder);
+            core.ensure_layout(fonts, metrics.font_size, text, placeholder, None);
         draw_layout(scene, layout, ix - scroll, ty, fonts.scale);
     }
     // Blinking caret while selected.

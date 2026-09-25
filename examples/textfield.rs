@@ -1,8 +1,7 @@
 use tontooui::elements::{
-    BasicText, BasicTextField, LargeTextField, Titlebar, TrafficAction,
-    View,
-};
-use tontooui::renderer::FontSystem;
+    BasicText, BasicTextField, LargeTextField, SecureField, TextEditor,
+    Titlebar, TrafficAction, View,
+};use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::window::{App, Key, Viewport, WindowCommand, run};
 use tontooui::theme::{ThemeMode, ThemeWatcher};
@@ -13,7 +12,10 @@ struct TextFieldDemo {
     bar: Titlebar,
     basic: BasicTextField,
     large: LargeTextField,
+    secure: SecureField,
+    editor: TextEditor,
     status: BasicText,
+    pending: Vec<Key>,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -26,6 +28,9 @@ impl TextFieldDemo {
             bar: Titlebar::new("TextField"),
             basic: BasicTextField::new("Enter text here"),
             large: LargeTextField::new("Placeholder"),
+            secure: SecureField::new("Password"),
+            editor: TextEditor::new("Write something…"),
+            pending: Vec::new(),
             status: BasicText::new("Click a field, type, ESC or outside click deselects."),
             watcher: ThemeWatcher::new(),
             focused: true,
@@ -55,13 +60,27 @@ impl App for TextFieldDemo {
         self.basic.set_focused(focused);
         self.large.set_theme(palette.accent, dark);
         self.large.set_focused(focused);
+        self.secure.set_theme(palette.accent, dark);
+        self.secure.set_focused(focused);
+        self.editor.set_theme(palette.accent, dark);
+        self.editor.set_focused(focused);
         self.status.set_theme(theme.mode);
         self.status.set_focused(focused);
         self.status.set_text(format!(
-            "basic: \"{}\"   large: \"{}\"",
+            "basic: \"{}\"   large: \"{}\"   secure: {} chars",
             self.basic.text_value(),
-            self.large.text_value()
+            self.large.text_value(),
+            self.secure.text_value().chars().count()
         ));
+        // Drain buffered keys in order (editor needs fonts).
+        for key in std::mem::take(&mut self.pending) {
+            if !self.basic.key(key)
+                && !self.large.key(key)
+                && !self.secure.key(key)
+            {
+                self.editor.key(fonts, key);
+            }
+        }
 
         self.bar.set_palette(
             palette.titlebar_bg,
@@ -87,6 +106,14 @@ impl App for TextFieldDemo {
         let (_, lh) = self.large.measure(fonts);
         self.large.place(fonts, cx, y, content_w, lh);
         self.large.draw(scene, fonts, images);
+        y += lh + 20.0;
+        let (_, sh2) = self.secure.measure(fonts);
+        self.secure.place(fonts, cx, y, content_w, sh2);
+        self.secure.draw(scene, fonts, images);
+        y += sh2 + 20.0;
+        // Editor takes a fixed tall box.
+        self.editor.place(fonts, cx, y, content_w, 180.0);
+        self.editor.draw(scene, fonts, images);
     }
 
     fn background(&self) -> Color {
@@ -110,11 +137,13 @@ impl App for TextFieldDemo {
             Some(TrafficAction::Maximize) => {
                 self.command = Some(WindowCommand::ToggleMaximize)
             }
-            // Every press reaches both fields: inside selects,
+            // Every press reaches all fields: inside selects,
             // anywhere else deselects.
             None => {
                 self.basic.mouse_down(x, y);
                 self.large.mouse_down(x, y);
+                self.secure.mouse_down(x, y);
+                self.editor.mouse_down(x, y);
             }
         }
     }
@@ -122,13 +151,14 @@ impl App for TextFieldDemo {
     fn text(&mut self, text: &str) {
         self.basic.type_text(text);
         self.large.type_text(text);
+        self.secure.type_text(text);
+        self.editor.type_text(text);
     }
 
     fn key(&mut self, key: Key) {
-        // ESC, Backspace and caret keys go to the selected field.
-        if !self.basic.key(key) {
-            self.large.key(key);
-        }
+        // Buffered: the editor needs fonts for vertical caret
+        // motion, which only `draw` has. Drained below in order.
+        self.pending.push(key);
     }
 
     fn mouse_move(&mut self, x: f64, y: f64) {

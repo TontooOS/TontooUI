@@ -39,6 +39,8 @@ pub enum Key {
     Backspace,
     Left,
     Right,
+    Up,
+    Down,
     Enter,
     Escape,
 }
@@ -534,6 +536,8 @@ impl<V: App> ApplicationHandler for Shell<V> {
                     PhysicalKey::Code(KeyCode::Backspace) => self.app.key(Key::Backspace),
                     PhysicalKey::Code(KeyCode::ArrowLeft) => self.app.key(Key::Left),
                     PhysicalKey::Code(KeyCode::ArrowRight) => self.app.key(Key::Right),
+                    PhysicalKey::Code(KeyCode::ArrowUp) => self.app.key(Key::Up),
+                    PhysicalKey::Code(KeyCode::ArrowDown) => self.app.key(Key::Down),
                     PhysicalKey::Code(KeyCode::Enter) | PhysicalKey::Code(KeyCode::NumpadEnter) => {
                         self.app.key(Key::Enter)
                     }
