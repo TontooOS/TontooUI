@@ -3,6 +3,7 @@ pub mod gauges;
 pub mod glass;
 pub mod layout;
 pub mod pickers;
+pub mod progress;
 pub mod sliders;
 pub mod titlebar;
 pub mod toggles;
@@ -32,6 +33,10 @@ pub use pickers::{
     SEGMENTED_LABEL_SIZE, SEGMENTED_MIN_SEG_W, SEGMENTED_PAD, SEGMENTED_PAD_X,
     SEGMENTED_PILL_RADIUS, SEGMENTED_PRESSED_DARK, SEGMENTED_PRESSED_LIGHT,
     SEGMENTED_RADIUS, SEGMENTED_TRACK_DARK, SEGMENTED_TRACK_LIGHT,
+};
+pub use progress::{
+    LinearProgress, PROGRESS_FILL, PROGRESS_RADIUS, PROGRESS_SPEED, PROGRESS_TITLE_GAP,
+    PROGRESS_TITLE_SIZE, PROGRESS_TRACK_DARK, PROGRESS_TRACK_H, PROGRESS_TRACK_LIGHT,
 };
 pub use gauges::{
     CapacityGauge, CircularGauge, Gauge, LinearGauge, CAP_FILL, CAP_RING_R, CAP_START,

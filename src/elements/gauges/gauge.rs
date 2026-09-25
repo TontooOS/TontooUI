@@ -436,6 +436,7 @@ mod tests {
         let (plain_w, plain_h) = plain.measure(&mut fonts);
         let (labeled_w, labeled_h) = labeled.measure(&mut fonts);
         assert_eq!(plain_w, 160.0);
+        assert_eq!(plain_h, GAUGE_TRACK_H);
         assert!(labeled_w > plain_w);
         assert_eq!(
             labeled_h,
