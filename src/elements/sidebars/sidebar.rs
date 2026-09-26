@@ -1079,7 +1079,9 @@ impl Sidebar {
         // Refilter on typed text (fires `on_search` on change).
         self.poll_search();
         let p = self.anim_p;
-        let cross = p > 0.001 && p < 0.999;
+        // Exact endpoints: any in-between value crossfades inside the
+        // live clip, so nothing ever spills past the divider.
+        let cross = p > 0.0 && p < 1.0;
         let bar_w = self.bar_w();
         // Sidebar body (full height, square: the shell rounds the window).
         if bar_w > 0.0 {
@@ -1311,16 +1313,18 @@ impl Sidebar {
         }
     }
 
-    /// Search row placement (skipped while hidden or collapsed).
+    /// Search row placement from the live column width (same edge
+    /// as the divider, so the field never crosses it mid-flight).
+    /// Skipped while hidden; zeroed while collapsed.
     fn layout_search(&mut self, fonts: &mut FontSystem) {
-        if !self.show_search || self.collapsed {
+        if !self.show_search {
             return;
         }
         self.search.place(
             fonts,
             self.x + SIDEBAR_PAD,
             self.y + SIDEBAR_SEARCH_TOP,
-            (self.eff_setting() - SIDEBAR_PAD * 2.0).max(0.0),
+            (self.bar_w() - SIDEBAR_PAD * 2.0).max(0.0),
             SIDEBAR_SEARCH_H,
         );
     }
@@ -1550,6 +1554,31 @@ mod tests {
         let (sx, sy, sw, sh) = bar.search.rect();
         assert_eq!((sx, sy), (SIDEBAR_PAD, SIDEBAR_SEARCH_TOP));
         assert_eq!((sw, sh), (SIDEBAR_W - SIDEBAR_PAD * 2.0, SIDEBAR_SEARCH_H));
+    }
+
+    #[test]
+    fn search_row_never_crosses_divider() {
+        let mut bar = bar();
+        for width in [240.0, 233.0, 300.0, 480.0] {
+            bar.set_width(width);
+            bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
+            let (sx, _, sw, _) = bar.search.rect();
+            assert!(
+                sx + sw <= bar.bar_w() - SIDEBAR_PAD + 1e-4,
+                "search crosses divider at width {width}"
+            );
+        }
+        // Collapsed: zeroed, nothing to draw.
+        bar.set_collapsed(true);
+        bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
+        assert_eq!(bar.search.rect().2, 0.0);
+        // Mid-collapse the live edge still bounds the field.
+        bar.set_collapsed(false);
+        bar.toggle_sidebar();
+        bar.update_progress(SIDEBAR_COLLAPSE_SECONDS / 2.0);
+        bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
+        let (sx, _, sw, _) = bar.search.rect();
+        assert!(sx + sw <= bar.bar_w() - SIDEBAR_PAD + 1e-4);
     }
 
     #[test]
