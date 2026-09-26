@@ -37,6 +37,9 @@ pub trait View {
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_up(&mut self, _x: f64, _y: f64) {}
     fn set_hover(&mut self, _x: f32, _y: f32) {}
+    /// Window focus for dimming (containers forward to every child;
+    /// defaults ignore).
+    fn set_focused(&mut self, _focused: bool) {}
     /// Printable text for focused inputs (containers forward to the
     /// active child; defaults ignore).
     fn text(&mut self, _text: &str) {}
@@ -325,6 +328,12 @@ impl View for VStack {
         }
     }
 
+    fn set_focused(&mut self, focused: bool) {
+        for child in self.children.iter_mut() {
+            child.set_focused(focused);
+        }
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -406,6 +415,12 @@ impl View for HStack {
     fn set_hover(&mut self, x: f32, y: f32) {
         for child in self.children.iter_mut() {
             child.set_hover(x, y);
+        }
+    }
+
+    fn set_focused(&mut self, focused: bool) {
+        for child in self.children.iter_mut() {
+            child.set_focused(focused);
         }
     }
 
@@ -519,6 +534,10 @@ impl View for Padding {
         self.child.set_hover(x, y);
     }
 
+    fn set_focused(&mut self, focused: bool) {
+        self.child.set_focused(focused);
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -571,6 +590,10 @@ impl View for Background {
         self.child.set_hover(x, y);
     }
 
+    fn set_focused(&mut self, focused: bool) {
+        self.child.set_focused(focused);
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
@@ -605,6 +628,10 @@ impl View for Frame {
 
     fn set_hover(&mut self, x: f32, y: f32) {
         self.child.set_hover(x, y);
+    }
+
+    fn set_focused(&mut self, focused: bool) {
+        self.child.set_focused(focused);
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -669,6 +696,12 @@ impl View for ZStack {
     fn set_hover(&mut self, x: f32, y: f32) {
         for child in self.children.iter_mut() {
             child.set_hover(x, y);
+        }
+    }
+
+    fn set_focused(&mut self, focused: bool) {
+        for child in self.children.iter_mut() {
+            child.set_focused(focused);
         }
     }
 
@@ -738,5 +771,20 @@ mod tests {
         stack.mouse_down(cx as f64, cy as f64);
         stack.mouse_up(cx as f64, cy as f64);
         assert!(*fired.borrow());
+    }
+
+    #[test]
+    fn stacks_forward_focus_to_nested_children() {
+        use super::super::sliders::Slider;
+
+        let mut stack = VStack::new()
+            .spacing(0.0)
+            .child(Slider::new(1.0, 0.0, 2.0));
+        stack.set_focused(false);
+        let back = stack.child_mut::<Slider>(0).expect("slider");
+        assert!(!back.is_focused());
+        stack.set_focused(true);
+        let back = stack.child_mut::<Slider>(0).expect("slider");
+        assert!(back.is_focused());
     }
 }

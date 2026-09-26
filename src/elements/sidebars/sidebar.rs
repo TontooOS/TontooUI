@@ -656,6 +656,9 @@ impl Sidebar {
         self.left_bar.set_focused(focused);
         self.right_bar.set_focused(focused);
         self.search.set_focused(focused);
+        for page in &mut self.pages {
+            page.set_focused(focused);
+        }
     }
 
     /// True while the Lens toolbar pills are on screen: return it
@@ -1599,6 +1602,36 @@ mod tests {
         bar.page_text("x");
         assert_eq!(bar.search_text(), "");
         assert!(!bar.search_text_cursor());
+    }
+
+    #[test]
+    fn window_focus_reaches_page_content() {
+        use crate::elements::{Slider, VStack};
+
+        fn first_slider_focused(bar: &mut Sidebar) -> bool {
+            let page = bar.page_mut(0).expect("general page");
+            let stack = page
+                .as_any_mut()
+                .downcast_mut::<VStack>()
+                .expect("vstack");
+            stack
+                .child_mut::<Slider>(1)
+                .expect("slider")
+                .is_focused()
+        }
+
+        // General demo page: two texts, then sliders.
+        let page = VStack::new()
+            .spacing(8.0)
+            .child(crate::elements::BasicText::new("t"))
+            .child(Slider::new(1.0, 0.0, 2.0));
+        let mut bar = Sidebar::new(vec![SidebarItem::new("G", "gear")]).page(page);
+        bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
+        assert!(first_slider_focused(&mut bar));
+        bar.set_focused(false);
+        assert!(!first_slider_focused(&mut bar));
+        bar.set_focused(true);
+        assert!(first_slider_focused(&mut bar));
     }
 
     #[test]

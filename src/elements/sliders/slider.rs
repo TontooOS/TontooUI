@@ -211,6 +211,10 @@ impl Slider {
         self.focused = focused;
     }
 
+    pub fn is_focused(&self) -> bool {
+        self.focused
+    }
+
     pub fn value(&self) -> f64 {
         self.value
     }
@@ -699,6 +703,11 @@ impl View for Slider {
     /// View event path: release the knob, like `mouse_up`.
     fn mouse_up(&mut self, x: f64, y: f64) {
         self.mouse_up(x, y);
+    }
+
+    /// View focus path: dim the slider with the window.
+    fn set_focused(&mut self, focused: bool) {
+        self.set_focused(focused);
     }
 
     /// View event path: held knob follows hover moves (apps forward

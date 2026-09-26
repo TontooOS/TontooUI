@@ -15,6 +15,7 @@ pub trait View {
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_up(&mut self, _x: f64, _y: f64) {}
     fn set_hover(&mut self, _x: f32, _y: f32) {}
+    fn set_focused(&mut self, _focused: bool) {}
     fn text(&mut self, _text: &str) {}
     fn key(&mut self, _key: Key) -> bool { false }
     fn mouse_wheel(&mut self, _dx: f64, _dy: f64) {}
@@ -25,7 +26,10 @@ pub trait View {
 
 Everything visible is a `View`. Intrinsic size, rect assignment and drawing
 in logical px. `flex` is the share of remaining stack space (zero means
-fixed). `as_any_mut` powers typed child access for state updates. All
+fixed). `as_any_mut` powers typed child access for state updates. Stacks
+and wrappers (`VStack`, `HStack`, `ZStack`, `Padding`, `Background`,
+`Frame`) forward mouse, hover and `set_focused` to every child, so
+window dimming reaches nested content. All
 built-in views (`Titlebar`, stacks, `Spacer`, modifiers, and the rebuilt
 elements landing next) implement it. An `App` (see
 [Renderer.md](Renderer.md)) owns the root view tree and forwards events

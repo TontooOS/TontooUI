@@ -168,6 +168,8 @@ pub fn page_key(&mut self, key: Key) -> bool
   popup per color button (see [Colors.md](Colors.md)).
 - `wants_backdrop` stays true while the Lens pills are on screen;
   return it from `App::wants_backdrop` like the toolbar demo.
+  `set_focused` dims pills, search and every page for unfocused
+  windows.
 - `press` reports traffic hits for the shell `WindowCommand`
   mapping (never forward those presses to `mouse_down`).
   `drag_rect` cuts out the traffic cluster and the pill group:
