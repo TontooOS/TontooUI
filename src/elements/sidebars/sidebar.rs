@@ -49,18 +49,18 @@ pub const SIDEBAR_REOPEN_HIT: f32 = 8.0;
 /// Dragging further than this below the minimum snaps shut.
 pub const SIDEBAR_CLOSE_SLOP: f32 = 48.0;
 /// Item row height in logical px.
-pub const SIDEBAR_ROW_H: f32 = 48.0;
+pub const SIDEBAR_ROW_H: f32 = 24.0;
 /// Sidebar inset in logical px.
 pub const SIDEBAR_PAD: f32 = 16.0;
 /// Gap between the traffic cluster and the left pill in logical
 /// px (clears the light glow plus glass reflection).
 pub const SIDEBAR_PILL_GAP: f32 = 12.0;
 /// Row icon box in logical px.
-pub const SIDEBAR_ICON_SIZE: f32 = 28.0;
+pub const SIDEBAR_ICON_SIZE: f32 = 14.0;
 /// Gap between icon and label in logical px.
-pub const SIDEBAR_ICON_GAP: f32 = 12.0;
+pub const SIDEBAR_ICON_GAP: f32 = 6.0;
 /// Item label size in logical px.
-pub const SIDEBAR_LABEL_SIZE: f32 = 19.0;
+pub const SIDEBAR_LABEL_SIZE: f32 = 9.5;
 /// Content toolbar title size in logical px.
 pub const SIDEBAR_TITLE_SIZE: f32 = 19.0;
 /// Traffic lights top edge in logical px.
@@ -1125,7 +1125,7 @@ impl Sidebar {
                     ry as f64 * scale,
                     (self.x + self.bar_w() - 8.0) as f64 * scale,
                     (ry + SIDEBAR_ROW_H) as f64 * scale,
-                    12.0 * scale,
+                    6.0 * scale,
                 );
                 scene.fill(
                     Fill::NonZero,
