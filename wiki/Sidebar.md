@@ -12,7 +12,7 @@ column and lets the content fill the width.
 
 | Token | Value |
 |---|---|
-| `SIDEBAR_W` / `SIDEBAR_MIN_W` | 300 px default width / 220 px minimum |
+| `SIDEBAR_W` / `SIDEBAR_MIN_W` | 240 px default width / 220 px minimum |
 | `SIDEBAR_ROW_H` | 46 px item rows |
 | `SIDEBAR_PAD` | 16 px sidebar inset |
 | `SIDEBAR_ICON_SIZE` / `SIDEBAR_ICON_GAP` | 22 px icon box / 12 px gap |
@@ -42,8 +42,9 @@ pub fn new(items: Vec<SidebarItem>) -> Self
 pub fn page(self, page: impl View + 'static) -> Self
 pub fn width(self, px: f32) -> Self
 pub fn back_button(self, show: bool) -> Self
-pub fn toolbar_button(self, button: Button) -> Self
-pub fn add_toolbar_button(&mut self, button: Button)
+pub fn set_back_button(&mut self, show: bool)
+pub fn toolbar_button(self, icon: impl Into<String>, on_press: impl FnMut() + 'static) -> Self
+pub fn add_toolbar_button(&mut self, icon: impl Into<String>, on_press: impl FnMut() + 'static)
 pub fn on_select(self, callback: impl FnMut(usize) + 'static) -> Self
 pub fn on_back(self, callback: impl FnMut() + 'static) -> Self
 pub fn on_collapse(self, callback: impl FnMut(bool) + 'static) -> Self
@@ -57,7 +58,9 @@ pub fn toggle_sidebar(&mut self)
 pub fn page_mut(&mut self, index: usize) -> Option<&mut dyn View>
 pub fn active_page_mut(&mut self) -> Option<&mut dyn View>
 pub fn set_theme(&mut self, accent: Color, dark: bool)
+pub fn set_glass(&mut self, mode: ThemeMode, amount: GlassAmount)
 pub fn set_focused(&mut self, focused: bool)
+pub fn wants_backdrop(&self) -> bool
 pub fn press(&mut self, x: f64, y: f64) -> Option<TrafficAction>
 pub fn drag_rect(&self) -> (f32, f32, f32, f32)
 pub fn set_hover(&mut self, x: f32, y: f32)
@@ -71,15 +74,21 @@ pub fn page_key(&mut self, key: Key) -> bool
 - Pages match items by order; missing pages stay empty. The
   toolbar title follows the selected label until `set_title`
   overrides it (`clear_title` restores the follow mode).
+- The content toolbar holds two real `BasicToolbar` pills (see
+  [Toolbar.md](Toolbar.md)): toggle plus back on the left, dev
+  icons plus the always-visible collapse on the right. Pill clicks
+  land in shared pending state and apply on the next mouse-up or
+  draw, so unit tests never need a draw in between.
 - Item clicks select (firing `on_select` on change); programmatic
   `select` returns false out of range. The back button only fires
   `on_back` (history stays the app's job, see the demo).
 - Toggle and collapse both flip the column and fire `on_collapse`;
   `set_collapsed` stays silent.
-- Dev buttons are app-built circle icon buttons (press callbacks
-  included) placed right, before the always-visible collapse
-  button. The example adds one after construction so its callback
-  can hold a shared sidebar handle.
+- Dev icons carry their own press callbacks, placed right before
+  collapse. The example adds one after construction so its
+  callback can hold a shared sidebar handle.
+- `wants_backdrop` stays true while the Lens pills are on screen;
+  return it from `App::wants_backdrop` like the toolbar demo.
 - `press` reports traffic hits for the shell `WindowCommand`
   mapping (never forward those presses to `mouse_down`);
   `drag_rect` is the sidebar top strip minus the traffic cluster

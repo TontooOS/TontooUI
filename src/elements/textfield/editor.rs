@@ -459,6 +459,7 @@ mod tests {
 
     #[test]
     fn select_all_and_cut_paste_multiline() {
+        let _guard = crate::elements::textfield::clipboard::test_lock();
         let mut editor = editor();
         let mut fonts = FontSystem::new();
         editor.place(&mut fonts, 0.0, 0.0, 400.0, 200.0);

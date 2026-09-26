@@ -397,6 +397,7 @@ mod tests {
 
     #[test]
     fn cut_copy_paste_roundtrip() {
+        let _guard = crate::elements::textfield::clipboard::test_lock();
         let (mut field, _) = typed("hello world");
         for _ in 0..5 {
             field.key(Key::SelectLeft);

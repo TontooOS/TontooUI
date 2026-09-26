@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use tontooui::elements::{
-    BasicText, Button, ButtonShape, Sidebar, SidebarItem, TrafficAction, View, VStack,
+    BasicText, Sidebar, SidebarItem, TrafficAction, View, VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
@@ -56,19 +56,13 @@ impl SidebarDemo {
                 move || go_back.set(true)
             }),
         ));
-        // Dev toolbar button: jumps to Notifications. Added after
+        // Dev toolbar icon: jumps to Notifications. Added after
         // construction; the callback only sets a flag (selecting
         // here would re-enter the borrowed sidebar, draw applies it).
-        sidebar.borrow_mut().add_toolbar_button(
-            Button::new("")
-                .shape(ButtonShape::Circle)
-                .icon("magnifyingglass")
-                .icon_size(20.0)
-                .on_press({
-                    let jump_to = jump_to.clone();
-                    move || jump_to.set(Some(3))
-                }),
-        );
+        sidebar.borrow_mut().add_toolbar_button("magnifyingglass", {
+            let jump_to = jump_to.clone();
+            move || jump_to.set(Some(3))
+        });
         Self {
             sidebar,
             history,
@@ -108,6 +102,7 @@ impl App for SidebarDemo {
         {
             let mut sidebar = self.sidebar.borrow_mut();
             sidebar.set_theme(palette.accent, dark);
+            sidebar.set_glass(theme.mode, theme.glass);
             sidebar.set_focused(focused);
         }
         // Back navigation: pop the trail and select the previous
@@ -139,6 +134,11 @@ impl App for SidebarDemo {
 
     fn background(&self) -> Color {
         self.bg
+    }
+
+    fn wants_backdrop(&self) -> bool {
+        // Lens toolbar pills need the blur pass while visible.
+        self.sidebar.borrow().wants_backdrop()
     }
 
     fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {

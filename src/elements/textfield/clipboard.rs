@@ -35,6 +35,16 @@ pub(crate) fn get() -> Option<String> {
     })
 }
 
+/// Test serialization: clipboard tests share the global buffers,
+/// so each holds this lock for its duration (poison-tolerant).
+#[cfg(test)]
+pub(crate) fn test_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// Write text: always mirrors into the fallback buffer so pastes
 /// work even where the system clipboard is unreachable. Returns
 /// true when the system clipboard accepted the text.
@@ -56,6 +66,7 @@ mod tests {
 
     #[test]
     fn fallback_roundtrip_without_display_server() {
+        let _guard = super::test_lock();
         // Headless CI has no clipboard: the fallback keeps the API
         // total (set always stores, get returns what was set).
         set("hello clipboard");
