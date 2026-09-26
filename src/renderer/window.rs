@@ -284,6 +284,7 @@ impl<V: App> Shell<V> {
                     &mut active.images,
                 );
                 loader.set_capture_pass(true);
+                loader.set_busy(active.backdrop.busy_handle());
                 self.app.draw(&mut active.scene, &mut active.fonts, &mut loader, viewport, elapsed);
             }
             if let Err(err) = active.renderer.render_to_texture(
@@ -321,6 +322,7 @@ impl<V: App> Shell<V> {
                 loader.set_capture_pass(false);
                 loader.set_backdrop(backdrop_image);
                 loader.set_backdrop_sharp(backdrop_sharp);
+                loader.set_busy(active.backdrop.busy_handle());
                 self.app.draw(&mut active.scene, &mut active.fonts, &mut loader, viewport, elapsed);
             }
             super::frame::draw_frame(&mut active.scene, size.width, size.height, scale);

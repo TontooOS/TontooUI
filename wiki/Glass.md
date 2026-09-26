@@ -22,6 +22,8 @@ pub fn set_bounds(&mut self, x: f32, y: f32, width: f32, height: f32)
 pub fn set_radius(&mut self, px: f32)
 pub fn set_tint(&mut self, tint: Color)
 pub fn set_glass_type(&mut self, glass_type: GlassType)
+pub fn set_auto_frost(&mut self, auto_frost: bool)
+pub fn frost_value(&self) -> f32
 pub fn set_theme(&mut self, mode: ThemeMode, amount: GlassAmount)
 pub fn set_focused(&mut self, focused: bool)
 pub fn child_mut<T: View + 'static>(&mut self) -> Option<&mut T>
@@ -39,6 +41,16 @@ pub enum GlassType {
 - `Frosted`: same lens plus a heavy blur veil (`GLASS_FROST_VEIL`, 0.95)
   over the whole body, so behind shows through but stays unrecognizable,
   with the strongest frost at the edge.
+- `set_auto_frost` (default on): the clear center gains a blur veil
+  with the local backdrop busyness (capped at `AUTO_FROST_VEIL`,
+  0.65), so text and icons stay readable over video and photos
+  while plain backgrounds stay perfectly clear. The shell samples
+  luma variance per 16 px tile (`BUSY_TILE`) about twice per second
+  (`BUSY_EVERY_N_FRAMES`, 30) into a shared grid
+  (`BusyGrid::amount_at`); `frost_for_busy` maps variance to frost
+  (plain below `BUSY_LO`, full at `BUSY_HI`, smooth between) and
+  the container eases toward it (`frost_value` reads the live
+  value). No sample yet (or no backdrop) means clear.
 
 Defaults: 320 x 180, 24 px radius, dark frost tint. `set_tint` overrides
 manually; `set_theme` follows the system glass stage.

@@ -14,6 +14,17 @@ use wgpu::{
 /// Default gaussian sigma in physical px for the in-app backdrop blur.
 pub const BACKDROP_SIGMA: f32 = 8.0;
 
+/// Busyness tile size in physical px for the variance map.
+pub const BUSY_TILE: u32 = 16;
+/// Variance sampling cadence: every Nth blur run (~2 Hz at 60 fps).
+pub const BUSY_EVERY_N_FRAMES: u64 = 30;
+/// Busyness below this variance reads as plain background.
+pub const BUSY_LO: f32 = 0.004;
+/// Busyness at/above this variance reads as fully busy media.
+pub const BUSY_HI: f32 = 0.03;
+/// Veil ceiling for automatic frost (stays below full frost).
+pub const AUTO_FROST_VEIL: f32 = 0.65;
+
 const WORKGROUP: u32 = 8;
 
 /// Separable gaussian blur over the captured in-app backdrop.
@@ -73,6 +84,67 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 "#;
 
+/// Low-res luma variance of the sharp capture, one float per
+/// `BUSY_TILE` square. Glass samples it to frost busy backdrops
+/// (video, photos) while staying clear over plain content.
+/// Row-major, `tiles_x` per row.
+#[derive(Clone, Default)]
+pub struct BusyGrid {
+    /// Capture size in physical px (for scale sanity checks).
+    pub width: u32,
+    pub height: u32,
+    pub tiles_x: u32,
+    pub tiles_y: u32,
+    pub tiles: Vec<f32>,
+}
+
+impl BusyGrid {
+    /// Average variance over the physical-px rect. Returns `None`
+    /// while no sample arrived yet.
+    pub fn amount_at(&self, x0: f32, y0: f32, x1: f32, y1: f32) -> Option<f32> {
+        if self.tiles.is_empty() || self.tiles_x == 0 || self.tiles_y == 0 {
+            return None;
+        }
+        let tile = BUSY_TILE as f32;
+        let tx0 = (x0.div_euclid(tile) as u32).min(self.tiles_x.saturating_sub(1));
+        let tx1 = ((x1 - 1.0).div_euclid(tile) as u32).min(self.tiles_x.saturating_sub(1));
+        let ty0 = (y0.div_euclid(tile) as f32).max(0.0) as u32;
+        let ty0 = ty0.min(self.tiles_y.saturating_sub(1));
+        let ty1 = ((y1 - 1.0).div_euclid(tile) as f32).max(0.0) as u32;
+        let ty1 = ty1.min(self.tiles_y.saturating_sub(1));
+        if tx1 < tx0 || ty1 < ty0 {
+            return None;
+        }
+        let mut sum = 0.0f32;
+        let mut n = 0u32;
+        for ty in ty0..=ty1 {
+            for tx in tx0..=tx1 {
+                if let Some(v) = self
+                    .tiles
+                    .get(ty as usize * self.tiles_x as usize + tx as usize)
+                {
+                    sum += *v;
+                    n += 1;
+                }
+            }
+        }
+        if n == 0 { None } else { Some(sum / n as f32) }
+    }
+}
+
+/// Busyness 0..1 from a mean tile variance: plain below `BUSY_LO`,
+/// fully busy at `BUSY_HI`, smooth between.
+pub fn frost_for_busy(busy: f32) -> f32 {
+    if busy <= BUSY_LO {
+        0.0
+    } else if busy >= BUSY_HI {
+        1.0
+    } else {
+        let t = (busy - BUSY_LO) / (BUSY_HI - BUSY_LO);
+        t * t * (3.0 - 2.0 * t)
+    }
+}
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 struct Params {
@@ -106,6 +178,81 @@ struct PassTargets {
     output_view: TextureView,
 }
 
+/// Luma variance of the sharp capture, one float per `BUSY_TILE`
+/// square: feeds the `BusyGrid` glass reads for automatic frost.
+const VARIANCE_SHADER: &str = r#"
+struct VParams {
+  width: u32,
+  height: u32,
+  tiles_x: u32,
+  tiles_y: u32,
+};
+
+@group(0) @binding(0) var src: texture_2d<f32>;
+@group(0) @binding(1) var dst: texture_storage_2d<r32float, write>;
+@group(0) @binding(2) var<uniform> params: VParams;
+
+@compute @workgroup_size(1, 1, 1)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  if gid.x >= params.tiles_x || gid.y >= params.tiles_y {
+    return;
+  }
+  let tile = 16u;
+  var sum = 0.0;
+  var sum2 = 0.0;
+  var n = 0u;
+  for (var ty = 0u; ty < tile; ty = ty + 1u) {
+    for (var tx = 0u; tx < tile; tx = tx + 1u) {
+      let px = vec2<i32>(vec2<u32>(gid.x * tile + tx, gid.y * tile + ty));
+      if px.x >= i32(params.width) || px.y >= i32(params.height) {
+        continue;
+      }
+      let c = textureLoad(src, px, 0);
+      let luma = dot(c.rgb, vec3<f32>(0.299, 0.587, 0.114));
+      sum = sum + luma;
+      sum2 = sum2 + luma * luma;
+      n = n + 1u;
+    }
+  }
+  var v = 0.0;
+  if n > 0u {
+    let m = sum / f32(n);
+    v = max(sum2 / f32(n) - m * m, 0.0);
+  }
+  textureStore(dst, vec2<i32>(gid.xy), vec4<f32>(v, 0.0, 0.0, 0.0));
+}
+"#;
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct VParams {
+    width: u32,
+    height: u32,
+    tiles_x: u32,
+    tiles_y: u32,
+}
+
+impl VParams {
+    fn to_bytes(self) -> [u8; 16] {
+        let mut out = [0u8; 16];
+        out[0..4].copy_from_slice(&self.width.to_le_bytes());
+        out[4..8].copy_from_slice(&self.height.to_le_bytes());
+        out[8..12].copy_from_slice(&self.tiles_x.to_le_bytes());
+        out[12..16].copy_from_slice(&self.tiles_y.to_le_bytes());
+        out
+    }
+}
+
+struct VarTargets {
+    tex: Texture,
+    view: TextureView,
+    tiles_x: u32,
+    tiles_y: u32,
+    staging: Buffer,
+    /// Floats per staging row (256-byte aligned).
+    row_stride: usize,
+}
+
 /// Owns the offscreen targets and the compute pipeline for one window.
 pub struct BackdropBlur {
     pipeline: ComputePipeline,
@@ -114,6 +261,11 @@ pub struct BackdropBlur {
     image: Option<ImageData>,
     sharp: Option<ImageData>,
     sigma: f32,
+    var_pipeline: ComputePipeline,
+    var_layout: BindGroupLayout,
+    var_targets: Option<VarTargets>,
+    busy: std::sync::Arc<std::sync::Mutex<BusyGrid>>,
+    frames: u64,
 }
 
 impl BackdropBlur {
@@ -170,6 +322,58 @@ impl BackdropBlur {
             compilation_options: PipelineCompilationOptions::default(),
             cache: None,
         });
+        let var_shader = device.create_shader_module(ShaderModuleDescriptor {
+            label: Some("tontooui backdrop variance"),
+            source: ShaderSource::Wgsl(VARIANCE_SHADER.into()),
+        });
+        let var_layout = device.create_bind_group_layout(&BindGroupLayoutDescriptor {
+            label: Some("tontooui backdrop variance"),
+            entries: &[
+                BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Texture {
+                        sample_type: TextureSampleType::Float { filterable: false },
+                        view_dimension: TextureViewDimension::D2,
+                        multisampled: false,
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 1,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::StorageTexture {
+                        access: StorageTextureAccess::WriteOnly,
+                        format: TextureFormat::R32Float,
+                        view_dimension: TextureViewDimension::D2,
+                    },
+                    count: None,
+                },
+                BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: ShaderStages::COMPUTE,
+                    ty: BindingType::Buffer {
+                        ty: BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
+            ],
+        });
+        let var_pipeline_layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
+            label: Some("tontooui backdrop variance"),
+            bind_group_layouts: &[Some(&var_layout)],
+            immediate_size: 0,
+        });
+        let var_pipeline = device.create_compute_pipeline(&ComputePipelineDescriptor {
+            label: Some("tontooui backdrop variance"),
+            layout: Some(&var_pipeline_layout),
+            module: &var_shader,
+            entry_point: Some("main"),
+            compilation_options: PipelineCompilationOptions::default(),
+            cache: None,
+        });
         Self {
             pipeline,
             layout,
@@ -177,6 +381,11 @@ impl BackdropBlur {
             image: None,
             sharp: None,
             sigma: BACKDROP_SIGMA,
+            var_pipeline,
+            var_layout,
+            var_targets: None,
+            busy: std::sync::Arc::new(std::sync::Mutex::new(BusyGrid::default())),
+            frames: 0,
         }
     }
 
@@ -252,6 +461,54 @@ impl BackdropBlur {
         });
         self.image = None;
         self.sharp = None;
+        // Variance map plus readback staging for automatic frost.
+        let tiles_x = width.div_ceil(BUSY_TILE);
+        let tiles_y = height.div_ceil(BUSY_TILE);
+        let var_tex = device.create_texture(&TextureDescriptor {
+            label: Some("tontooui backdrop variance"),
+            size: wgpu::Extent3d {
+                width: tiles_x,
+                height: tiles_y,
+                depth_or_array_layers: 1,
+            },
+            mip_level_count: 1,
+            sample_count: 1,
+            dimension: TextureDimension::D2,
+            format: TextureFormat::R32Float,
+            usage: TextureUsages::STORAGE_BINDING | TextureUsages::COPY_SRC,
+            view_formats: &[],
+        });
+        // Rows pad to 256 bytes for texture-to-buffer copies.
+        let row_stride = (tiles_x as usize).div_ceil(64) * 64;
+        let staging = device.create_buffer(&BufferDescriptor {
+            label: Some("tontooui backdrop variance staging"),
+            size: (row_stride * tiles_y as usize * 4) as u64,
+            usage: BufferUsages::MAP_READ | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        self.var_targets = Some(VarTargets {
+            view: var_tex.create_view(&Default::default()),
+            tex: var_tex,
+            tiles_x,
+            tiles_y,
+            staging,
+            row_stride,
+        });
+        if let Ok(mut busy) = self.busy.lock() {
+            *busy = BusyGrid {
+                width,
+                height,
+                tiles_x,
+                tiles_y,
+                tiles: vec![0.0; tiles_x as usize * tiles_y as usize],
+            };
+        }
+    }
+
+    /// Shared busyness grid handle for `ImageLoader` (glass queries
+    /// it per rect; refreshed about twice per second).
+    pub fn busy_handle(&self) -> std::sync::Arc<std::sync::Mutex<BusyGrid>> {
+        self.busy.clone()
     }
 
     /// View Vello renders the backdrop capture into.
@@ -264,7 +521,9 @@ impl BackdropBlur {
     }
 
     /// Horizontal then vertical gaussian over `content` into `output`.
-    pub fn run(&self, device: &Device, queue: &Queue) {
+    /// Every `BUSY_EVERY_N_FRAMES`-th run also refreshes the variance
+    /// map (blocking briefly on a tiny readback, about twice a second).
+    pub fn run(&mut self, device: &Device, queue: &Queue) {
         let Some(t) = self.targets.as_ref() else {
             return;
         };
@@ -312,7 +571,137 @@ impl BackdropBlur {
             pass.set_bind_group(0, &v.0, &[]);
             pass.dispatch_workgroups(width.div_ceil(WORKGROUP), height.div_ceil(WORKGROUP), 1);
         }
+        self.frames = self.frames.wrapping_add(1);
+        let sample = self.frames % BUSY_EVERY_N_FRAMES == 0;
+        if sample {
+            self.dispatch_variance(device, &mut encoder, width, height);
+        }
         queue.submit(Some(encoder.finish()));
+        if sample {
+            self.readback_variance(device);
+        }
+    }
+
+    /// Queue one variance dispatch plus the staging copy.
+    fn dispatch_variance(
+        &self,
+        device: &Device,
+        encoder: &mut wgpu::CommandEncoder,
+        width: u32,
+        height: u32,
+    ) {
+        let (Some(t), Some(vt)) = (self.targets.as_ref(), self.var_targets.as_ref()) else {
+            return;
+        };
+        let params = VParams {
+            width,
+            height,
+            tiles_x: vt.tiles_x,
+            tiles_y: vt.tiles_y,
+        };
+        let buffer = device.create_buffer(&BufferDescriptor {
+            label: Some("tontooui backdrop variance params"),
+            size: std::mem::size_of::<VParams>() as u64,
+            usage: BufferUsages::UNIFORM,
+            mapped_at_creation: true,
+        });
+        buffer
+            .slice(..)
+            .get_mapped_range_mut()
+            .copy_from_slice(&params.to_bytes());
+        buffer.unmap();
+        let bind = device.create_bind_group(&BindGroupDescriptor {
+            label: Some("tontooui backdrop variance"),
+            layout: &self.var_layout,
+            entries: &[
+                BindGroupEntry {
+                    binding: 0,
+                    resource: BindingResource::TextureView(&t.content_view),
+                },
+                BindGroupEntry {
+                    binding: 1,
+                    resource: BindingResource::TextureView(&vt.view),
+                },
+                BindGroupEntry {
+                    binding: 2,
+                    resource: buffer.as_entire_binding(),
+                },
+            ],
+        });
+        {
+            let mut pass = encoder.begin_compute_pass(&ComputePassDescriptor {
+                label: Some("tontooui backdrop variance"),
+                timestamp_writes: None,
+            });
+            pass.set_pipeline(&self.var_pipeline);
+            pass.set_bind_group(0, &bind, &[]);
+            pass.dispatch_workgroups(vt.tiles_x, vt.tiles_y, 1);
+        }
+        encoder.copy_texture_to_buffer(
+            wgpu::TexelCopyTextureInfo {
+                texture: &vt.tex,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            wgpu::TexelCopyBufferInfo {
+                buffer: &vt.staging,
+                layout: wgpu::TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(vt.row_stride as u32 * 4),
+                    rows_per_image: Some(vt.tiles_y),
+                },
+            },
+            wgpu::Extent3d {
+                width: vt.tiles_x,
+                height: vt.tiles_y,
+                depth_or_array_layers: 1,
+            },
+        );
+    }
+
+    /// Block briefly on the tiny staging readback and publish the
+    /// grid. Skips silently when mapping fails so a frame never dies
+    /// on measurement.
+    fn readback_variance(&mut self, device: &Device) {
+        let Some(vt) = self.var_targets.as_ref() else {
+            return;
+        };
+        let (tiles_x, tiles_y, row_stride) = (vt.tiles_x, vt.tiles_y, vt.row_stride);
+        let (width, height) = (tiles_x, tiles_y);
+        let slice = vt.staging.slice(..);
+        let (tx, rx) = std::sync::mpsc::channel();
+        slice.map_async(wgpu::MapMode::Read, move |result| {
+            let _ = tx.send(result.is_ok());
+        });
+        // Bounded wait: a late map just skips this sample.
+        let wait = wgpu::PollType::Wait {
+            submission_index: None,
+            timeout: Some(std::time::Duration::from_millis(100)),
+        };
+        if device.poll(wait).is_err() {
+            return;
+        }
+        if rx.recv().unwrap_or(false) {
+            let data = slice.get_mapped_range();
+            let mut tiles = vec![0.0f32; tiles_x as usize * tiles_y as usize];
+            for ty in 0..tiles_y as usize {
+                for tx in 0..tiles_x as usize {
+                    let off = (ty * row_stride + tx) * 4;
+                    let bytes: [u8; 4] = data[off..off + 4].try_into().unwrap_or([0; 4]);
+                    tiles[ty * tiles_x as usize + tx] = f32::from_le_bytes(bytes).max(0.0);
+                }
+            }
+            drop(data);
+            vt.staging.unmap();
+            if let Ok(mut busy) = self.busy.lock() {
+                busy.width = width;
+                busy.height = height;
+                busy.tiles_x = tiles_x;
+                busy.tiles_y = tiles_y;
+                busy.tiles = tiles;
+            }
+        }
     }
 
     /// Register (or refresh) the blurred output so views can sample it.
@@ -602,4 +991,49 @@ fn bind_pass(
         ],
     });
     (bind, buffer)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frost_curve_plain_busy_smooth() {
+        assert_eq!(frost_for_busy(0.0), 0.0);
+        assert_eq!(frost_for_busy(BUSY_LO), 0.0);
+        assert_eq!(frost_for_busy(BUSY_HI), 1.0);
+        assert_eq!(frost_for_busy(BUSY_HI * 10.0), 1.0);
+        let mid = frost_for_busy((BUSY_LO + BUSY_HI) / 2.0);
+        assert!((mid - 0.5).abs() < 1e-6, "mid was {mid}");
+        // Smoothstep rushes the middle, eases the ends.
+        let q = frost_for_busy(BUSY_LO + (BUSY_HI - BUSY_LO) * 0.25);
+        assert!(q > 0.1 && q < 0.25, "q was {q}");
+    }
+
+    #[test]
+    fn grid_averages_overlapped_tiles() {
+        let grid = BusyGrid {
+            width: 64,
+            height: 64,
+            tiles_x: 4,
+            tiles_y: 4,
+            tiles: (0..16).map(|i| i as f32 / 100.0).collect(),
+        };
+        // Empty grid reports nothing (glass stays clear).
+        assert_eq!(BusyGrid::default().amount_at(0.0, 0.0, 64.0, 64.0), None);
+        // Single tile (tile (1,1) holds 0.05).
+        assert_eq!(grid.amount_at(16.0, 16.0, 32.0, 32.0), Some(0.05));
+        // Whole grid: mean of 0.00..0.15.
+        let all = grid.amount_at(0.0, 0.0, 64.0, 64.0).expect("mean");
+        assert!((all - 0.075).abs() < 1e-6, "mean was {all}");
+        // Out-of-range clamps instead of failing.
+        assert!(grid.amount_at(-100.0, -100.0, 1000.0, 1000.0).is_some());
+    }
+
+    #[test]
+    fn variance_tiles_cover_content() {
+        // 900x620 at tile 16: ceil math for partial edge tiles.
+        assert_eq!(900u32.div_ceil(BUSY_TILE), 57);
+        assert_eq!(620u32.div_ceil(BUSY_TILE), 39);
+    }
 }

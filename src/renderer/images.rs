@@ -47,6 +47,7 @@ pub struct ImageLoader<'a> {
     backdrop: Option<ImageData>,
     backdrop_sharp: Option<ImageData>,
     capture_pass: bool,
+    busy: Option<std::sync::Arc<std::sync::Mutex<super::backdrop::BusyGrid>>>,
 }
 
 impl<'a> ImageLoader<'a> {
@@ -64,6 +65,7 @@ impl<'a> ImageLoader<'a> {
             backdrop: None,
             backdrop_sharp: None,
             capture_pass: false,
+            busy: None,
         }
     }
 
@@ -95,6 +97,23 @@ impl<'a> ImageLoader<'a> {
 
     pub fn set_capture_pass(&mut self, capture_pass: bool) {
         self.capture_pass = capture_pass;
+    }
+
+    /// Busyness grid for automatic glass frost (shared with the
+    /// backdrop blur, refreshed about twice per second).
+    pub fn set_busy(
+        &mut self,
+        busy: std::sync::Arc<std::sync::Mutex<super::backdrop::BusyGrid>>,
+    ) {
+        self.busy = Some(busy);
+    }
+
+    /// Mean backdrop variance over the physical-px rect, or `None`
+    /// while no sample arrived yet (glass stays clear then).
+    pub fn busy_amount(&self, x0: f32, y0: f32, x1: f32, y1: f32) -> Option<f32> {
+        let busy = self.busy.as_ref()?;
+        let grid = busy.lock().ok()?;
+        grid.amount_at(x0, y0, x1, y1)
     }
 
     /// Get `(image, width, height)` for an SF Symbol name, downscaled with

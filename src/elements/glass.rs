@@ -5,7 +5,9 @@ use super::layout::View;
 use vello::kurbo::{Affine, BezPath, Point, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
-use crate::renderer::backdrop::{fill_frosted_glass, fill_lens_glass};
+use crate::renderer::backdrop::{
+    AUTO_FROST_VEIL, fill_backdrop_veil, fill_frosted_glass, fill_lens_glass, frost_for_busy,
+};
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
 use crate::theme::{GlassAmount, ThemeMode, desaturate};
@@ -89,6 +91,12 @@ pub struct GlassContainer {
     grain: bool,
     focused: bool,
     glass_type: GlassType,
+    /// Frost busy backdrops (video, photos) automatically: the clear
+    /// center gains a blur veil with the local variance. Off while
+    /// no backdrop sample arrived yet.
+    auto_frost: bool,
+    frost: f32,
+    frost_last: Option<std::time::Instant>,
     child: Option<Box<dyn View>>,
 }
 
@@ -105,6 +113,9 @@ impl GlassContainer {
             grain: false,
             focused: true,
             glass_type: GlassType::Lens,
+            auto_frost: true,
+            frost: 0.0,
+            frost_last: None,
             child: None,
         }
     }
@@ -156,6 +167,22 @@ impl GlassContainer {
 
     pub fn set_glass_type(&mut self, glass_type: GlassType) {
         self.glass_type = glass_type;
+    }
+
+    /// Automatic frost for busy backdrops (default on): the clear
+    /// center gains a blur veil with the local pixel variance, so
+    /// text and icons stay readable over video and photos while
+    /// plain backgrounds stay perfectly clear.
+    pub fn set_auto_frost(&mut self, auto_frost: bool) {
+        self.auto_frost = auto_frost;
+        if !auto_frost {
+            self.frost = 0.0;
+        }
+    }
+
+    /// Current smoothed frost 0..1 (drives the veil; tests read it).
+    pub fn frost_value(&self) -> f32 {
+        self.frost
     }
 
     /// Inactive windows desaturate the frost like the rest of the palette.
@@ -320,6 +347,36 @@ impl GlassContainer {
             }
             GlassType::Frosted => {
                 fill_frosted_glass(scene, images, &rect, radius, GLASS_ZOOM, band);
+            }
+        }
+        // Automatic frost: busy pixels behind a clear center gain a
+        // blur veil (smoothed, so the twice-per-second samples never
+        // pop). Plain backgrounds keep frost at zero.
+        if self.glass_type == GlassType::Lens {
+            let now = std::time::Instant::now();
+            let dt = self
+                .frost_last
+                .map(|last| now.saturating_duration_since(last).as_secs_f32())
+                .unwrap_or(0.0)
+                .min(0.25);
+            self.frost_last = Some(now);
+            let target = if self.auto_frost {
+                images
+                    .busy_amount(
+                        self.x * fonts.scale,
+                        self.y * fonts.scale,
+                        (self.x + self.width) * fonts.scale,
+                        (self.y + self.height) * fonts.scale,
+                    )
+                    .map(frost_for_busy)
+                    .unwrap_or(0.0)
+            } else {
+                0.0
+            };
+            let k = (dt * 5.0).min(1.0);
+            self.frost += (target - self.frost) * k;
+            if self.frost > 0.003 {
+                fill_backdrop_veil(scene, images, &body, self.frost * AUTO_FROST_VEIL);
             }
         }
 
