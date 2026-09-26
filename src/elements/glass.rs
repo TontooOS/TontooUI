@@ -456,36 +456,6 @@ impl GlassContainer {
             None,
             &bevel,
         );
-
-        // Chromatic rim split: red outside, cyan inside the crisp edge.
-        let red = RoundedRect::new(
-            rect.x0 - 0.75 * scale,
-            rect.y0 - 0.75 * scale,
-            rect.x1 + 0.75 * scale,
-            rect.y1 + 0.75 * scale,
-            radius + 0.75 * scale,
-        );
-        scene.stroke(
-            &Stroke::new(1.0 * scale),
-            Affine::IDENTITY,
-            &Brush::Solid(GLASS_CHROMA_RED),
-            None,
-            &red,
-        );
-        let cyan = RoundedRect::new(
-            rect.x0 + 0.75 * scale,
-            rect.y0 + 0.75 * scale,
-            rect.x1 - 0.75 * scale,
-            rect.y1 - 0.75 * scale,
-            (radius - 0.75 * scale).max(0.0),
-        );
-        scene.stroke(
-            &Stroke::new(1.0 * scale),
-            Affine::IDENTITY,
-            &Brush::Solid(GLASS_CHROMA_CYAN),
-            None,
-            &cyan,
-        );
         }
 
         // Edge sheen for both finishes: subtle top light, brightest in
