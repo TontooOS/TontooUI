@@ -115,8 +115,8 @@ pub fn page_key(&mut self, key: Key) -> bool
   holds two optional slots (slot 0 first, slot 1 second; each set
   via `left_button` with an icon plus press callback, removed via
   `clear_left_button`; unset slots stay absent and out-of-range
-  slots are rejected), the toggle rides alone far right (shown by
-  default, optional via `toggle_button`). An empty left pill is
+  slots are rejected), the toggle rides alone as a 36 px circle
+  far right (shown by default, optional via `toggle_button`). An empty left pill is
   skipped entirely. `collapsible(false)` keeps the toggle visible
   but gray and ignores its clicks. Pill clicks land in
   shared pending state and apply on the next mouse-up or draw, so

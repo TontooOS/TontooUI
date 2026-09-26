@@ -77,7 +77,12 @@ the trailing edge.
 ```rust
 pub fn placement(self, placement: ToolbarPlacement) -> Self
 pub fn set_placement(&mut self, placement: ToolbarPlacement)
+pub fn round(self, round: bool) -> Self
+pub fn set_round(&mut self, round: bool)
 ```
+
+A single icon turns into a true circle with `round` (width snaps to
+`TOOLBAR_HEIGHT`, the cell centers); any other item count ignores it.
 
 ## States
 

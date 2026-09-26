@@ -261,6 +261,7 @@ impl Sidebar {
         } else {
             Vec::new()
         })
+        .round(true)
         .on_action(move |_| {
             pending.set(Some(PendingAction::Toggle));
         });
@@ -875,10 +876,10 @@ impl Sidebar {
         }
     }
 
-    /// Right pill width in logical px (toggle alone, zero hidden).
+    /// Right pill width in logical px (toggle circle, zero hidden).
     fn right_bar_w(&self) -> f32 {
         if self.show_toggle {
-            TOOLBAR_PAD_X * 2.0 + TOOLBAR_HIT
+            TOOLBAR_HEIGHT
         } else {
             0.0
         }
@@ -1464,7 +1465,7 @@ mod tests {
         let full = Sidebar::new(vec![SidebarItem::new("G", "gear")])
             .left_button(0, "chevron.left", || {})
             .left_button(1, "magnifyingglass", || {});
-        assert_eq!(full.min_bar_w(), 89.0 + 12.0 + 76.0 + 4.0 + 44.0 + 16.0);
+        assert_eq!(full.min_bar_w(), 89.0 + 12.0 + 76.0 + 4.0 + 36.0 + 16.0);
         // Hidden toggle shrinks the minimum.
         let no_toggle = Sidebar::new(vec![SidebarItem::new("G", "gear")])
             .toggle_button(false)
@@ -1656,14 +1657,15 @@ mod tests {
         (cx as f64, cy as f64)
     }
 
-    /// Toggle pill x in the expanded sidebar (single pill far right).
+    /// Toggle pill x in the expanded sidebar (single circle far right).
     fn toggle_bar_x() -> f32 {
-        SIDEBAR_W - SIDEBAR_PAD - (TOOLBAR_PAD_X * 2.0 + TOOLBAR_HIT)
+        SIDEBAR_W - SIDEBAR_PAD - TOOLBAR_HEIGHT
     }
 
-    /// Toggle cell in the expanded sidebar (single pill far right).
+    /// Toggle cell in the expanded sidebar (single circle: centered).
     fn toggle_cell() -> (f64, f64) {
-        pill_cell(toggle_bar_x(), SIDEBAR_BAR_TOP, 0)
+        let cy = SIDEBAR_BAR_TOP + TOOLBAR_HEIGHT / 2.0;
+        ((toggle_bar_x() + TOOLBAR_HEIGHT / 2.0) as f64, cy as f64)
     }
 
     /// Left pill x in the expanded sidebar (grouped left of toggle,
@@ -1678,13 +1680,12 @@ mod tests {
         pill_cell(left_bar_x(bar), SIDEBAR_BAR_TOP, 0)
     }
 
-    /// Toggle cell when collapsed (single pill at the far right edge).
+    /// Toggle cell when collapsed (single circle at the far right edge).
     fn collapsed_toggle_cell(bar: &Sidebar) -> (f64, f64) {
         let _ = bar;
-        let bar_w = TOOLBAR_PAD_X * 2.0 + TOOLBAR_HIT;
-        let bar_x = 900.0 - SIDEBAR_PAD - bar_w;
+        let bar_x = 900.0 - SIDEBAR_PAD - TOOLBAR_HEIGHT;
         let bar_y = (SIDEBAR_TOOLBAR_H - TOOLBAR_HEIGHT) / 2.0;
-        pill_cell(bar_x, bar_y, 0)
+        ((bar_x + TOOLBAR_HEIGHT / 2.0) as f64, (bar_y + TOOLBAR_HEIGHT / 2.0) as f64)
     }
 
     #[test]

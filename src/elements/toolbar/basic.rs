@@ -70,6 +70,9 @@ impl ToolbarItem {
 /// normal button action: hover tints the icon cell, pressing fires
 /// `on_action` with the item index.
 ///
+/// A single icon turns into a true circle with `round` (width snaps
+/// to the height, the cell centers).
+///
 /// The toolbar never uses the `Frosted` finish: the body is always
 /// `GlassType::Lens` (clear minified center, blur only on the rim).
 /// Hover lightens the cell in dark mode and darkens it in light mode;
@@ -77,6 +80,7 @@ impl ToolbarItem {
 pub struct BasicToolbar {
     items: Vec<ToolbarItem>,
     placement: ToolbarPlacement,
+    round: bool,
     dark: bool,
     focused: bool,
     disabled: bool,
@@ -99,6 +103,7 @@ impl BasicToolbar {
         Self {
             items: Vec::new(),
             placement: ToolbarPlacement::Leading,
+            round: false,
             dark: true,
             focused: true,
             disabled: false,
@@ -166,6 +171,18 @@ impl BasicToolbar {
         self
     }
 
+    /// Circle mode for a single icon: the pill snaps to
+    /// `TOOLBAR_HEIGHT` wide (a true circle at radius 18) with the
+    /// cell centered. Ignored for any other item count.
+    pub fn round(mut self, round: bool) -> Self {
+        self.round = round;
+        self
+    }
+
+    pub fn set_round(&mut self, round: bool) {
+        self.round = round;
+    }
+
     pub fn set_placement(&mut self, placement: ToolbarPlacement) {
         self.placement = placement;
     }
@@ -216,7 +233,14 @@ impl BasicToolbar {
         }
     }
 
+    fn is_round(&self) -> bool {
+        self.round && self.items.len() == 1
+    }
+
     fn content_width(&self) -> f32 {
+        if self.is_round() {
+            return TOOLBAR_HEIGHT;
+        }
         if self.items.is_empty() {
             return TOOLBAR_PAD_X * 2.0;
         }
@@ -227,13 +251,18 @@ impl BasicToolbar {
     fn layout_cells(&mut self) {
         self.cells.clear();
         let content = self.content_width() - TOOLBAR_PAD_X * 2.0;
-        let start_x = match self.placement {
-            ToolbarPlacement::Leading => self.x + TOOLBAR_PAD_X,
-            ToolbarPlacement::Center => {
-                self.x + (self.width - content) / 2.0
-            }
-            ToolbarPlacement::Trailing => {
-                self.x + self.width - TOOLBAR_PAD_X - content
+        let start_x = if self.is_round() {
+            // Single cell centered in the circle.
+            self.x + (self.width - TOOLBAR_HIT) / 2.0
+        } else {
+            match self.placement {
+                ToolbarPlacement::Leading => self.x + TOOLBAR_PAD_X,
+                ToolbarPlacement::Center => {
+                    self.x + (self.width - content) / 2.0
+                }
+                ToolbarPlacement::Trailing => {
+                    self.x + self.width - TOOLBAR_PAD_X - content
+                }
             }
         };
         let icon_y = self.y + (self.height - TOOLBAR_HIT) / 2.0;
@@ -501,6 +530,29 @@ mod tests {
         leading.place(&mut fonts, 0.0, 0.0, 300.0, TOOLBAR_HEIGHT);
         trailing.place(&mut fonts, 0.0, 0.0, 300.0, TOOLBAR_HEIGHT);
         assert!(leading.cells[0].0 < trailing.cells[0].0);
+    }
+
+    #[test]
+    fn round_single_snaps_to_circle() {
+        let mut fonts = FontSystem::new();
+        let mut bar =
+            BasicToolbar::from_icons(vec!["heart".to_string()]).round(true);
+        let (w, h) = bar.measure(&mut fonts);
+        assert_eq!((w, h), (TOOLBAR_HEIGHT, TOOLBAR_HEIGHT));
+        bar.place(&mut fonts, 10.0, 20.0, TOOLBAR_HEIGHT, TOOLBAR_HEIGHT);
+        // Single cell centered in the 36x36 circle.
+        assert_eq!(bar.cells[0], (14.0, 20.0 + 4.0, TOOLBAR_HIT, TOOLBAR_HIT));
+        let (cx, cy, cw, ch) = bar.cells[0];
+        assert_eq!(bar.press(cx + cw / 2.0, cy + ch / 2.0), Some(0));
+    }
+
+    #[test]
+    fn round_ignores_multiple_icons() {
+        let mut fonts = FontSystem::new();
+        let mut bar = BasicToolbar::from_icons(vec!["a".to_string(), "b".to_string()])
+            .round(true);
+        let (w, _) = bar.measure(&mut fonts);
+        assert_eq!(w, TOOLBAR_PAD_X * 2.0 + 2.0 * TOOLBAR_HIT + TOOLBAR_GAP);
     }
 
     #[test]
