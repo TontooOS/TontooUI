@@ -3,13 +3,14 @@
 Sidebar category in `src/elements/sidebars/sidebar.rs`: full-height
 app navigation in `Sidebar` with `SidebarItem` rows (tinted SF
 Symbol plus label), embedded traffic lights (replacing the
-titlebar decoration), a left `BasicToolbar` pill for back and dev
-icons plus a single far-right toggle pill. Selecting an item
-switches the right-side page, which the sidebar owns. Expanded,
-the back pill sits top right after the traffic lights and the
-toggle at the far right edge with the title left in the content;
-collapsed, both show far right in the content and the title moves
-next to the traffic lights.
+titlebar decoration), a left `BasicToolbar` pill with two optional
+slot buttons plus a single far-right toggle pill, and a
+`SearchField` row below the pills. Selecting an item switches the
+right-side page, which the sidebar owns. Expanded, the slot pill
+sits top right after the traffic lights and the toggle at the far
+right edge with the title left in the content; collapsed, both
+show far right in the content and the title moves next to the
+traffic lights.
 
 ## Geometry
 
@@ -27,6 +28,7 @@ next to the traffic lights.
 | `SIDEBAR_RESIZE_HIT` / `SIDEBAR_REOPEN_HIT` | 6 px edge grab half-width / 8 px collapsed reopen strip |
 | `SIDEBAR_CLOSE_SLOP` | 48 px below minimum snaps shut |
 | `SIDEBAR_PILL_GAP` | 12 px traffic cluster to left pill (clears glow) |
+| `SIDEBAR_SEARCH_TOP` / `SIDEBAR_SEARCH_H` | 56 px search row top / 36 px search row height |
 
 Traffic geometry (`TRAFFIC_LEFT`, `TRAFFIC_SIZE`, `TRAFFIC_GAP`)
 and colors come from [Titlebar.md](Titlebar.md); the sidebar body
@@ -52,6 +54,12 @@ pub fn width(self, px: f32) -> Self
 pub fn left_button(self, slot: usize, icon: impl Into<String>, on_press: impl FnMut() + 'static) -> Self
 pub fn set_left_button(&mut self, slot: usize, icon: impl Into<String>, on_press: impl FnMut() + 'static) -> bool
 pub fn clear_left_button(&mut self, slot: usize)
+pub fn search_field(self, show: bool) -> Self
+pub fn set_search_field(&mut self, show: bool)
+pub fn on_search(self, callback: impl FnMut(&str) + 'static) -> Self
+pub fn search_text(&self) -> &str
+pub fn set_search_text(&mut self, text: impl Into<String>)
+pub fn search_text_cursor(&self) -> bool
 pub fn toggle_button(self, show: bool) -> Self
 pub fn set_toggle_button(&mut self, show: bool)
 pub fn collapsible(self, collapsible: bool) -> Self
@@ -127,6 +135,15 @@ pub fn page_key(&mut self, key: Key) -> bool
   content left strip while collapsed reopens the same way.
   `is_resizing` reports the drag and the divider turns accent
   while hovered or held.
+- The search row (a `SearchField`, see [Textfield.md](Textfield.md))
+  shows by default below the pills (hidden via `search_field`).
+  Clicking it focuses typing there; clicking anywhere else hands
+  focus back, and `text` plus `key` reach the row only while it
+  holds focus, else the active page. Typing filters the item rows
+  live by label substring and `on_search` fires with the full text
+  on every edit; row clicks select the real item index. The app
+  returns the I-beam from `App::cursor` while
+  `search_text_cursor` holds.
 - `wants_backdrop` stays true while the Lens pills are on screen;
   return it from `App::wants_backdrop` like the toolbar demo.
 - `press` reports traffic hits for the shell `WindowCommand`
@@ -143,8 +160,9 @@ pub fn page_key(&mut self, key: Key) -> bool
 
 Run `cargo run --example sidebar`: five tinted items with text
 pages, slot 0 going back through history, slot 1 jumping to
-Notifications and the toggle collapsing. No titlebar: the sidebar
-fills the viewport and owns the decoration.
+Notifications, a live-filter search row and the toggle collapsing.
+No titlebar: the sidebar fills the viewport and owns the
+decoration.
 
 ```rust
 let mut bar = Sidebar::new(vec![
@@ -180,6 +198,7 @@ fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
 - [Titlebar.md](Titlebar.md) – traffic geometry, colors and actions
 - [Toolbar.md](Toolbar.md) – toolbar pills, cells and actions
 - [Images.md](Images.md) – SF Symbol row icons
+- [Textfield.md](Textfield.md) – search row field
 - [Groupbox.md](Groupbox.md) – sidebar body fill
 - [Form.md](Form.md) – settings pages for sidebar content
 - [Layout.md](Layout.md) – `View` protocol (`text`, `key`, `mouse_wheel`)

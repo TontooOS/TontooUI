@@ -168,8 +168,11 @@ impl App for SidebarDemo {
     }
 
     fn cursor(&self, x: f64, y: f64) -> CursorKind {
-        if self.sidebar.borrow().wants_resize_cursor(x, y) {
+        let bar = self.sidebar.borrow();
+        if bar.wants_resize_cursor(x, y) {
             CursorKind::ResizeColumn
+        } else if bar.search_text_cursor() {
+            CursorKind::Text
         } else {
             CursorKind::Default
         }

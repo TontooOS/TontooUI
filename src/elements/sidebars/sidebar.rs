@@ -15,6 +15,7 @@ use super::super::titlebar::{
     TRAFFIC_MINIMIZE, TRAFFIC_SIZE, TITLEBAR_DIVIDER_DARK, TITLEBAR_DIVIDER_LIGHT,
     TrafficAction,
 };
+use super::super::textfield::SearchField;
 use super::super::toolbar::{
     BasicToolbar, ToolbarItem, TOOLBAR_GAP, TOOLBAR_HEIGHT, TOOLBAR_HIT, TOOLBAR_PAD_X,
 };
@@ -67,6 +68,10 @@ pub const SIDEBAR_TRAFFIC_TOP: f32 = 22.0;
 /// Toolbar pills row top edge in logical px (expanded sidebar):
 /// vertically centered on the traffic lights row.
 pub const SIDEBAR_BAR_TOP: f32 = SIDEBAR_TRAFFIC_TOP + TRAFFIC_SIZE / 2.0 - TOOLBAR_HEIGHT / 2.0;
+/// Search row top edge in logical px (below the pills).
+pub const SIDEBAR_SEARCH_TOP: f32 = 56.0;
+/// Search row height in logical px.
+pub const SIDEBAR_SEARCH_H: f32 = 36.0;
 /// Items top edge in logical px.
 pub const SIDEBAR_ITEMS_TOP: f32 = 100.0;
 /// Content toolbar height in logical px.
@@ -144,6 +149,11 @@ pub struct Sidebar {
     right_bar: BasicToolbar,
     left_slots: [Option<LeftSlot>; 2],
     slot_map: Vec<usize>,
+    search: SearchField,
+    show_search: bool,
+    on_search: Option<Box<dyn FnMut(&str)>>,
+    search_last: String,
+    visible: Vec<usize>,
     pending: Rc<Cell<Option<PendingAction>>>,
     width_setting: f32,
     accent: Color,
@@ -161,6 +171,7 @@ pub struct Sidebar {
 impl Sidebar {
     pub fn new(items: Vec<SidebarItem>) -> Self {
         let pending: Rc<Cell<Option<PendingAction>>> = Rc::new(Cell::new(None));
+        let visible: Vec<usize> = (0..items.len()).collect();
         let mut bar = Self {
             items,
             pages: Vec::new(),
@@ -180,6 +191,11 @@ impl Sidebar {
             right_bar: BasicToolbar::new(),
             left_slots: [None, None],
             slot_map: Vec::new(),
+            search: SearchField::new("Search"),
+            show_search: true,
+            on_search: None,
+            search_last: String::new(),
+            visible,
             pending,
             width_setting: SIDEBAR_W,
             accent: Color::from_rgb8(0x00, 0x7a, 0xff),
@@ -352,6 +368,65 @@ impl Sidebar {
         self.sync_bars();
     }
 
+    /// Search row below the pills (default `true`). Hidden, the row
+    /// is skipped and typing reaches the page.
+    pub fn search_field(mut self, show: bool) -> Self {
+        self.set_search_field(show);
+        self
+    }
+
+    pub fn set_search_field(&mut self, show: bool) {
+        self.show_search = show;
+    }
+
+    /// Fires with the full search text on every edit (live search).
+    pub fn on_search(mut self, callback: impl FnMut(&str) + 'static) -> Self {
+        self.on_search = Some(Box::new(callback));
+        self
+    }
+
+    /// Current search text.
+    pub fn search_text(&self) -> &str {
+        self.search.text_value()
+    }
+
+    /// Programmatic search text (refilters, no `on_search`).
+    pub fn set_search_text(&mut self, text: impl Into<String>) {
+        self.search.set_text(text.into());
+        self.poll_search();
+    }
+
+    /// True while the pointer wants the I-beam over the search row.
+    pub fn search_text_cursor(&self) -> bool {
+        self.show_search && !self.collapsed && self.search.wants_text_cursor()
+    }
+
+    /// Refilter visible rows when the query changed and fire
+    /// `on_search`. Called from event paths and every draw.
+    fn poll_search(&mut self) {
+        if !self.show_search {
+            return;
+        }
+        let text = self.search.text_value().to_string();
+        if text == self.search_last {
+            return;
+        }
+        self.search_last = text.clone();
+        let query = text.to_lowercase();
+        self.visible = self
+            .items
+            .iter()
+            .enumerate()
+            .filter(|(_, item)| {
+                query.is_empty() || item.label().to_lowercase().contains(&query)
+            })
+            .map(|(index, _)| index)
+            .collect();
+        if let Some(callback) = self.on_search.as_mut() {
+            callback(&text);
+        }
+    }
+
     /// Single toggle button, far right (default `true`).
     pub fn toggle_button(mut self, show: bool) -> Self {
         self.show_toggle = show;
@@ -489,25 +564,30 @@ impl Sidebar {
         self.page_mut(self.selected)
     }
 
-    /// Live theme forwarded to item icons and labels (toolbar
-    /// pills keep their own icon grays per mode).
+    /// Live theme forwarded to item icons, labels and the search
+    /// row (toolbar pills keep their own icon grays per mode).
     pub fn set_theme(&mut self, accent: Color, dark: bool) {
         self.accent = accent;
         self.dark = dark;
+        self.search
+            .set_theme(self.glass_mode, accent, self.glass_amount);
     }
 
-    /// Glass stage for the toolbar pills (Lens finish).
+    /// Glass stage for the toolbar pills (Lens finish) and the
+    /// search row (Frosted finish).
     pub fn set_glass(&mut self, mode: ThemeMode, amount: GlassAmount) {
         self.glass_mode = mode;
         self.glass_amount = amount;
         self.left_bar.set_theme(mode, amount);
         self.right_bar.set_theme(mode, amount);
+        self.search.set_theme(mode, self.accent, amount);
     }
 
     pub fn set_focused(&mut self, focused: bool) {
         self.focused = focused;
         self.left_bar.set_focused(focused);
         self.right_bar.set_focused(focused);
+        self.search.set_focused(focused);
     }
 
     /// True while the Lens toolbar pills are on screen: return it
@@ -697,6 +777,9 @@ impl Sidebar {
         self.traffic_hover = self.traffic_index(x, y);
         self.left_bar.set_hover(x, y);
         self.right_bar.set_hover(x, y);
+        if self.show_search && !self.collapsed {
+            self.search.set_hover(x, y);
+        }
         if let Some(page) = self.active_page_mut() {
             page.set_hover(x, y);
         }
@@ -811,12 +894,17 @@ impl Sidebar {
         }
         self.left_bar.mouse_down(x, y);
         self.right_bar.mouse_down(x, y);
-        // Item rows (sidebar visible only).
+        // Search row focuses on inside clicks, deselects outside
+        // (so item clicks steal focus back).
+        if self.show_search && !self.collapsed {
+            self.search.mouse_down(x, y);
+        }
+        // Item rows (sidebar visible only, filtered by search).
         if !self.collapsed && x32 >= self.x && x32 <= self.x + self.bar_w() {
             let top = self.y + SIDEBAR_ITEMS_TOP;
             if y32 >= top {
-                let index = ((y32 - top) / SIDEBAR_ROW_H).floor() as usize;
-                if index < self.items.len() {
+                let row = ((y32 - top) / SIDEBAR_ROW_H).floor() as usize;
+                if let Some(&index) = self.visible.get(row) {
                     self.select(index);
                 }
             }
@@ -837,6 +925,10 @@ impl Sidebar {
         // Pill clicks land in shared pending state (applied here, so
         // unit tests never need a draw in between).
         self.drain_pending();
+        if self.show_search && !self.collapsed {
+            self.search.mouse_up(x, y);
+        }
+        self.poll_search();
         if let Some(page) = self.active_page_mut() {
             page.mouse_up(x, y);
         }
@@ -854,21 +946,35 @@ impl Sidebar {
         }
     }
 
-    /// Printable text for the active page (the app forwards its
-    /// `text` here).
+    /// Printable text for the search row while it holds focus,
+    /// else the active page (the app forwards its `text` here).
     pub fn page_text(&mut self, text: &str) {
-        if let Some(page) = self.active_page_mut() {
+        if self.search_focused() {
+            self.search.type_text(text);
+            self.poll_search();
+        } else if let Some(page) = self.active_page_mut() {
             page.text(text);
         }
     }
 
-    /// Key handling for the active page. Returns true when consumed.
+    /// Key handling for the search row while it holds focus, else
+    /// the active page. Returns true when consumed.
     pub fn page_key(&mut self, key: Key) -> bool {
+        if self.search_focused() {
+            let consumed = self.search.key(key);
+            self.poll_search();
+            return consumed;
+        }
         if let Some(page) = self.active_page_mut() {
             page.key(key)
         } else {
             false
         }
+    }
+
+    /// True while the search row is shown, expanded and selected.
+    fn search_focused(&self) -> bool {
+        self.show_search && !self.collapsed && self.search.is_selected()
     }
 
     fn page_rect(&self) -> (f32, f32, f32, f32) {
@@ -897,6 +1003,8 @@ impl Sidebar {
         }
         // Advance the collapse slide plus fade.
         self.update_progress(self.collapse_t0.elapsed().as_secs_f32());
+        // Refilter on typed text (fires `on_search` on change).
+        self.poll_search();
         let p = self.anim_p;
         let cross = p > 0.001 && p < 0.999;
         let bar_w = self.bar_w();
@@ -1004,8 +1112,13 @@ impl Sidebar {
     fn render_items(&mut self, scene: &mut Scene, fonts: &mut FontSystem, images: &mut ImageLoader<'_>) {
         let scale = fonts.scale as f64;
         let text = self.eff(self.text_color());
-        for (i, item) in self.items.iter().enumerate() {
-            let ry = self.y + SIDEBAR_ITEMS_TOP + i as f32 * SIDEBAR_ROW_H;
+        // Search row first (clipped plus faded with the body).
+        if self.show_search {
+            self.search.draw(scene, fonts, images);
+        }
+        for (row, &i) in self.visible.iter().enumerate() {
+            let item = &self.items[i];
+            let ry = self.y + SIDEBAR_ITEMS_TOP + row as f32 * SIDEBAR_ROW_H;
             if i == self.selected {
                 let wash = RoundedRect::new(
                     (self.x + 8.0) as f64 * scale,
@@ -1123,6 +1236,20 @@ impl Sidebar {
             self.right_bar.draw(scene, fonts, images);
         }
     }
+
+    /// Search row placement (skipped while hidden or collapsed).
+    fn layout_search(&mut self, fonts: &mut FontSystem) {
+        if !self.show_search || self.collapsed {
+            return;
+        }
+        self.search.place(
+            fonts,
+            self.x + SIDEBAR_PAD,
+            self.y + SIDEBAR_SEARCH_TOP,
+            (self.eff_setting() - SIDEBAR_PAD * 2.0).max(0.0),
+            SIDEBAR_SEARCH_H,
+        );
+    }
 }
 
 impl Default for Sidebar {
@@ -1146,6 +1273,7 @@ impl View for Sidebar {
         self.width = w.max(0.0);
         self.height = h.max(0.0);
         self.place_bars(fonts);
+        self.layout_search(fonts);
     }
 
     fn draw(
@@ -1340,6 +1468,68 @@ mod tests {
         shut.set_collapsed(true);
         assert!(shut.wants_resize_cursor(4.0, 300.0));
         assert!(!shut.wants_resize_cursor(100.0, 300.0));
+    }
+
+    #[test]
+    fn search_row_shown_by_default() {
+        let bar = bar();
+        let (sx, sy, sw, sh) = bar.search.rect();
+        assert_eq!((sx, sy), (SIDEBAR_PAD, SIDEBAR_SEARCH_TOP));
+        assert_eq!((sw, sh), (SIDEBAR_W - SIDEBAR_PAD * 2.0, SIDEBAR_SEARCH_H));
+    }
+
+    #[test]
+    fn search_filters_and_click_selects_real_index() {
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let seen: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
+        let capture = seen.clone();
+        let mut bar = bar().on_search(move |text| capture.borrow_mut().push(text.to_string()));
+        // Focus the row, type, filter down to Security.
+        bar.mouse_down(120.0, (SIDEBAR_SEARCH_TOP + SIDEBAR_SEARCH_H / 2.0) as f64);
+        assert!(bar.search.is_selected());
+        bar.page_text("sec");
+        assert_eq!(bar.search_text(), "sec");
+        assert_eq!(seen.borrow().as_slice(), ["sec"]);
+        // First visible row is now Security (real index 1).
+        bar.mouse_down(100.0, (SIDEBAR_ITEMS_TOP + 10.0) as f64);
+        bar.mouse_up(100.0, (SIDEBAR_ITEMS_TOP + 10.0) as f64);
+        assert_eq!(bar.selected_index(), 1);
+        // Refocus and clear: Backspace deletes, then both rows return.
+        bar.mouse_down(120.0, (SIDEBAR_SEARCH_TOP + SIDEBAR_SEARCH_H / 2.0) as f64);
+        bar.page_key(Key::Backspace);
+        bar.page_key(Key::Backspace);
+        bar.page_key(Key::Backspace);
+        assert_eq!(bar.search_text(), "");
+        bar.mouse_down(100.0, (SIDEBAR_ITEMS_TOP + 10.0) as f64);
+        bar.mouse_up(100.0, (SIDEBAR_ITEMS_TOP + 10.0) as f64);
+        assert_eq!(bar.selected_index(), 0);
+    }
+
+    #[test]
+    fn typing_reaches_page_without_search_focus() {
+        let mut bar = bar();
+        // Never focused: typing goes to the page, filter untouched.
+        assert!(!bar.search.is_selected());
+        bar.page_text("sec");
+        assert_eq!(bar.search_text(), "");
+        // Clicking an item steals focus back.
+        bar.mouse_down(120.0, (SIDEBAR_SEARCH_TOP + SIDEBAR_SEARCH_H / 2.0) as f64);
+        assert!(bar.search.is_selected());
+        bar.mouse_down(100.0, (SIDEBAR_ITEMS_TOP + 10.0) as f64);
+        bar.mouse_up(100.0, (SIDEBAR_ITEMS_TOP + 10.0) as f64);
+        assert!(!bar.search.is_selected());
+    }
+
+    #[test]
+    fn hidden_search_skips_row() {
+        let mut bar = Sidebar::new(vec![SidebarItem::new("G", "gear")]).search_field(false);
+        bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
+        bar.mouse_down(120.0, (SIDEBAR_SEARCH_TOP + SIDEBAR_SEARCH_H / 2.0) as f64);
+        bar.page_text("x");
+        assert_eq!(bar.search_text(), "");
+        assert!(!bar.search_text_cursor());
     }
 
     /// Center of a pill cell at `(bar_x, bar_y)`: leading layout,
