@@ -46,6 +46,10 @@ pub fn page(self, page: impl View + 'static) -> Self
 pub fn width(self, px: f32) -> Self
 pub fn back_button(self, show: bool) -> Self
 pub fn set_back_button(&mut self, show: bool)
+pub fn toggle_button(self, show: bool) -> Self
+pub fn set_toggle_button(&mut self, show: bool)
+pub fn collapsible(self, collapsible: bool) -> Self
+pub fn set_collapsible(&mut self, collapsible: bool)
 pub fn toolbar_button(self, icon: impl Into<String>, on_press: impl FnMut() + 'static) -> Self
 pub fn add_toolbar_button(&mut self, icon: impl Into<String>, on_press: impl FnMut() + 'static)
 pub fn on_select(self, callback: impl FnMut(usize) + 'static) -> Self
@@ -78,20 +82,21 @@ pub fn page_key(&mut self, key: Key) -> bool
   toolbar title follows the selected label until `set_title`
   overrides it (`clear_title` restores the follow mode).
 - The toolbar holds real `BasicToolbar` pills (see
-  [Toolbar.md](Toolbar.md)). Expanded, toggle sits left, back
-  centered and dev icons plus the always-visible collapse right
-  inside the sidebar top row; collapsed, toggle plus back share
-  the left pill and everything groups far right in the content.
-  Pill clicks land in shared pending state and apply on the next
-  mouse-up or draw, so unit tests never need a draw in between.
+  [Toolbar.md](Toolbar.md)): toggle plus back (each optional via
+  `toggle_button` / `back_button`) plus dev icons share the left
+  pill, collapse rides alone on the right. An empty left pill is
+  skipped entirely. `collapsible(false)` keeps the collapse pill
+  visible but gray and ignores its clicks. Pill clicks land in
+  shared pending state and apply on the next mouse-up or draw, so
+  unit tests never need a draw in between.
 - Item clicks select (firing `on_select` on change); programmatic
   `select` returns false out of range. The back button only fires
   `on_back` (history stays the app's job, see the demo).
 - Toggle and collapse both flip the column and fire `on_collapse`;
   `set_collapsed` stays silent.
-- Dev icons carry their own press callbacks, placed right before
-  collapse. The example adds one after construction so its
-  callback can hold a shared sidebar handle.
+- Dev icons carry their own press callbacks inside the left
+  pill. The example adds one after construction so its callback
+  can hold a shared sidebar handle.
 - `wants_backdrop` stays true while the Lens pills are on screen;
   return it from `App::wants_backdrop` like the toolbar demo.
 - `press` reports traffic hits for the shell `WindowCommand`
