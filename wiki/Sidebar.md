@@ -112,9 +112,10 @@ pub fn page_key(&mut self, key: Key) -> bool
   return it from `App::wants_backdrop` like the toolbar demo.
 - `press` reports traffic hits for the shell `WindowCommand`
   mapping (never forward those presses to `mouse_down`).
-  `drag_rect` cuts out the traffic cluster: expanded it spans the
-  sidebar traffic band, collapsed the content band up to the
-  far-right pill group.
+  `drag_rect` cuts out the traffic cluster and the pill group:
+  expanded it spans the sidebar traffic band up to the pills
+  (pill presses must reach the app, never start a window-drag),
+  collapsed the content band up to the far-right pill group.
 - `page_text` and `page_key` reach the active page through the
   `View` protocol; anything beyond that downcasts through
   `page_mut`.

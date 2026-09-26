@@ -544,7 +544,9 @@ impl Sidebar {
 
     /// Logical hit rect for window dragging, traffic cluster cut
     /// out so light clicks never drag. Expanded it spans the
-    /// sidebar traffic band; collapsed the content band up to the
+    /// sidebar traffic band up to the pill group (pills moved into
+    /// the traffic row, so clicks there must reach the app, never
+    /// start a drag); collapsed the content band up to the
     /// far-right pills.
     pub fn drag_rect(&self) -> (f32, f32, f32, f32) {
         let cut = TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0;
@@ -565,10 +567,21 @@ impl Sidebar {
                 SIDEBAR_TOOLBAR_H,
             )
         } else {
+            // Pill group (toggle plus left pill) sits in this band:
+            // end the drag where it starts, like collapsed does.
+            let left_w = self.left_bar_w();
+            let pills_w = SIDEBAR_PAD
+                + self.right_bar_w()
+                + if left_w > 0.0 {
+                    left_w + TOOLBAR_GAP
+                } else {
+                    0.0
+                };
+            let end = self.x + self.bar_w() - pills_w;
             (
                 self.x + cut,
                 self.y,
-                (self.bar_w() - cut).max(0.0),
+                (end - self.x - cut).max(0.0),
                 SIDEBAR_TRAFFIC_TOP + TRAFFIC_SIZE + 6.0,
             )
         }
@@ -1284,8 +1297,35 @@ mod tests {
         let (dx, dy, dw, dh) = bar.drag_rect();
         let cluster_end = TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0;
         assert_eq!(dx, cluster_end);
-        assert_eq!(dw, SIDEBAR_W - cluster_end);
+        // Drag ends where the pill group starts (toggle shown).
+        let pills_w = SIDEBAR_PAD + bar.right_bar_w();
+        assert_eq!(dw, SIDEBAR_W - pills_w - cluster_end);
         assert_eq!((dy, dh), (0.0, SIDEBAR_TRAFFIC_TOP + TRAFFIC_SIZE + 6.0));
+    }
+
+    /// Regression: pills live in the traffic band, so the expanded
+    /// drag rect must not cover them, or `window.rs` steals the
+    /// press as a window-drag and the toolbar never arms.
+    #[test]
+    fn drag_rect_leaves_pills_clickable() {
+        let mut bar = Sidebar::new(vec![SidebarItem::new("G", "gear")])
+            .left_button(0, "chevron.left", || {})
+            .left_button(1, "magnifyingglass", || {});
+        bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
+        let (dx, dy, dw, dh) = bar.drag_rect();
+        let outside = |x: f64, y: f64| {
+            x < dx as f64
+                || x > (dx + dw) as f64
+                || y < dy as f64
+                || y > (dh + dy) as f64
+        };
+        let (tx, ty) = toggle_cell();
+        assert!(outside(tx, ty), "toggle inside drag rect");
+        let (bx, by) = back_cell(&bar);
+        assert!(outside(bx, by), "slot 0 inside drag rect");
+        let dev_x = left_bar_x(&bar);
+        let (sx, sy) = pill_cell(dev_x, SIDEBAR_BAR_TOP, 1);
+        assert!(outside(sx, sy), "slot 1 inside drag rect");
     }
 
     #[test]
