@@ -22,14 +22,11 @@ use crate::renderer::text::{FontSystem, draw_layout};
 use crate::renderer::window::Key;
 use crate::theme::{GlassAmount, ThemeMode, desaturate};
 
-/// Toolbar action behind a pill icon: fixed roles plus the raw
-/// left-pill cell index (roles resolved at drain time, so later
-/// visibility flips cannot misroute a click).
+/// Toolbar action behind a pill icon: the raw left-pill cell
+/// index (roles resolved at drain time, so later visibility flips
+/// cannot misroute a click).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum PendingAction {
-    Toggle,
-    Back,
-    Collapse,
     Cell(usize),
 }
 
@@ -115,7 +112,6 @@ pub struct Sidebar {
     show_toggle: bool,
     collapsible: bool,
     left_bar: BasicToolbar,
-    right_bar: BasicToolbar,
     dev_icons: Vec<String>,
     dev_actions: Vec<Box<dyn FnMut()>>,
     pending: Rc<Cell<Option<PendingAction>>>,
@@ -148,7 +144,6 @@ impl Sidebar {
             collapsed: false,
             on_collapse: None,
             left_bar: BasicToolbar::new(),
-            right_bar: BasicToolbar::new(),
             dev_icons: Vec::new(),
             dev_actions: Vec::new(),
             pending,
@@ -168,8 +163,9 @@ impl Sidebar {
         bar
     }
 
-    /// Rebuild the pills: left holds toggle plus back (each
-    /// optional) plus the dev icons, right holds the collapse alone.
+    /// Rebuild the left pill: toggle plus back (each optional)
+    /// plus the dev icons. The single collapse pill (right) was
+    /// removed; collapsing runs through the toggle cell.
     /// Actions report through shared pending state (applied on the
     /// next mouse-up or draw).
     fn sync_bars(&mut self) {
@@ -187,30 +183,14 @@ impl Sidebar {
         self.left_bar = BasicToolbar::from_items(left).on_action(move |index| {
             pending.set(Some(PendingAction::Cell(index)));
         });
-        let pending = self.pending.clone();
-        self.right_bar = BasicToolbar::from_items(vec![ToolbarItem::icon("chevron.left.to.line")])
-            .on_action(move |_| {
-                pending.set(Some(PendingAction::Collapse));
-            });
-        self.right_bar.set_disabled(!self.collapsible);
-        for bar in [&mut self.left_bar, &mut self.right_bar] {
-            bar.set_theme(self.glass_mode, self.glass_amount);
-            bar.set_focused(self.focused);
-        }
+        self.left_bar.set_theme(self.glass_mode, self.glass_amount);
+        self.left_bar.set_focused(self.focused);
     }
 
     /// Apply one pending pill action. Left-pill cells resolve to
     /// toggle, back, then dev callbacks in pill order.
     fn drain_pending(&mut self) {
         match self.pending.take() {
-            Some(PendingAction::Toggle) | Some(PendingAction::Collapse) => {
-                self.toggle_sidebar()
-            }
-            Some(PendingAction::Back) => {
-                if let Some(callback) = self.on_back.as_mut() {
-                    callback();
-                }
-            }
             Some(PendingAction::Cell(index)) => {
                 let mut k = index;
                 if self.show_toggle {
@@ -275,8 +255,8 @@ impl Sidebar {
         self.sync_bars();
     }
 
-    /// Collapse pill enabled (default `true`). Disabled, it stays
-    /// visible but gray and ignores clicks.
+    /// Collapsible (default `true`). Disabled, the toggle cell
+    /// ignores clicks and the sidebar stays expanded.
     pub fn collapsible(mut self, collapsible: bool) -> Self {
         self.collapsible = collapsible;
         self.sync_bars();
@@ -365,7 +345,12 @@ impl Sidebar {
     }
 
     /// User collapse flip: toggles and fires `on_collapse`.
+    /// Ignored while `collapsible(false)` (the collapse pill is
+    /// gone; the toggle cell is the only UI path).
     pub fn toggle_sidebar(&mut self) {
+        if !self.collapsible {
+            return;
+        }
         self.collapsed = !self.collapsed;
         self.sync_bars();
         if let Some(callback) = self.on_collapse.as_mut() {
@@ -396,13 +381,11 @@ impl Sidebar {
         self.glass_mode = mode;
         self.glass_amount = amount;
         self.left_bar.set_theme(mode, amount);
-        self.right_bar.set_theme(mode, amount);
     }
 
     pub fn set_focused(&mut self, focused: bool) {
         self.focused = focused;
         self.left_bar.set_focused(focused);
-        self.right_bar.set_focused(focused);
     }
 
     /// True while the Lens toolbar pills are on screen: return it
@@ -505,8 +488,7 @@ impl Sidebar {
         let cut = TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0;
         if self.collapsed {
             let left_w = self.left_bar_w();
-            let pills_w = self.right_bar_w()
-                + SIDEBAR_PAD
+            let pills_w = SIDEBAR_PAD
                 + if left_w > 0.0 {
                     left_w + TOOLBAR_GAP
                 } else {
@@ -532,7 +514,6 @@ impl Sidebar {
     pub fn set_hover(&mut self, x: f32, y: f32) {
         self.traffic_hover = self.traffic_index(x, y);
         self.left_bar.set_hover(x, y);
-        self.right_bar.set_hover(x, y);
         if let Some(page) = self.active_page_mut() {
             page.set_hover(x, y);
         }
@@ -563,11 +544,6 @@ impl Sidebar {
         }
     }
 
-    /// Right pill width in logical px (collapse alone).
-    fn right_bar_w(&self) -> f32 {
-        TOOLBAR_PAD_X * 2.0 + TOOLBAR_HIT
-    }
-
     fn title_x(&self) -> f32 {
         if self.collapsed {
             self.x + TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0 + SIDEBAR_PAD
@@ -578,35 +554,20 @@ impl Sidebar {
 
     fn place_bars(&mut self, fonts: &mut FontSystem) {
         let cy = self.toolbar_cy();
+        if self.left_bar_w() <= 0.0 {
+            return;
+        }
         if self.collapsed {
-            // Far-right group in the content: left pill, gap, right.
-            let right_x = self.x + self.width - SIDEBAR_PAD - self.right_bar_w();
-            self.right_bar.place(fonts, right_x, cy, self.right_bar_w(), TOOLBAR_HEIGHT);
-            if self.left_bar_w() > 0.0 {
-                self.left_bar.place(
-                    fonts,
-                    right_x - TOOLBAR_GAP - self.left_bar_w(),
-                    cy,
-                    self.left_bar_w(),
-                    TOOLBAR_HEIGHT,
-                );
-            }
+            // Far-right in the content: single left pill.
+            let bar_x = self.x + self.width - SIDEBAR_PAD - self.left_bar_w();
+            self.left_bar.place(fonts, bar_x, cy, self.left_bar_w(), TOOLBAR_HEIGHT);
         } else {
-            // Sidebar top row: shared pill left, collapse right.
-            if self.left_bar_w() > 0.0 {
-                self.left_bar.place(
-                    fonts,
-                    self.x + SIDEBAR_PAD,
-                    cy,
-                    self.left_bar_w(),
-                    TOOLBAR_HEIGHT,
-                );
-            }
-            self.right_bar.place(
+            // Sidebar top row: single shared pill left.
+            self.left_bar.place(
                 fonts,
-                self.x + self.bar_w() - SIDEBAR_PAD - self.right_bar_w(),
+                self.x + SIDEBAR_PAD,
                 cy,
-                self.right_bar_w(),
+                self.left_bar_w(),
                 TOOLBAR_HEIGHT,
             );
         }
@@ -615,7 +576,6 @@ impl Sidebar {
     pub fn mouse_down(&mut self, x: f64, y: f64) {
         let (x32, y32) = (x as f32, y as f32);
         self.left_bar.mouse_down(x, y);
-        self.right_bar.mouse_down(x, y);
         // Item rows (sidebar visible only).
         if !self.collapsed && x32 >= self.x && x32 <= self.x + self.bar_w() {
             let top = self.y + SIDEBAR_ITEMS_TOP;
@@ -633,7 +593,6 @@ impl Sidebar {
 
     pub fn mouse_up(&mut self, x: f64, y: f64) {
         self.left_bar.mouse_up(x, y);
-        self.right_bar.mouse_up(x, y);
         // Pill clicks land in shared pending state (applied here, so
         // unit tests never need a draw in between).
         self.drain_pending();
@@ -644,7 +603,6 @@ impl Sidebar {
 
     pub fn mouse_move(&mut self, x: f64, y: f64) {
         self.left_bar.mouse_move(x as f32, y as f32);
-        self.right_bar.mouse_move(x as f32, y as f32);
     }
 
     /// Scroll wheel delta in logical px: forwarded to the active page.
@@ -825,7 +783,6 @@ impl Sidebar {
         if self.left_bar_w() > 0.0 {
             self.left_bar.draw(scene, fonts, images);
         }
-        self.right_bar.draw(scene, fonts, images);
     }
 }
 
@@ -935,16 +892,9 @@ mod tests {
         pill_cell(SIDEBAR_PAD, SIDEBAR_BAR_TOP, 1)
     }
 
-    /// Collapse cell in the expanded sidebar (single right pill).
-    fn collapse_cell() -> (f64, f64) {
-        let bar_w = TOOLBAR_PAD_X * 2.0 + TOOLBAR_HIT;
-        pill_cell(SIDEBAR_W - SIDEBAR_PAD - bar_w, SIDEBAR_BAR_TOP, 0)
-    }
-
-    /// Toggle cell when collapsed (left pill at the far right,
-    /// sized from the live bar widths).
+    /// Toggle cell when collapsed (single left pill far right).
     fn collapsed_toggle_cell(bar: &Sidebar) -> (f64, f64) {
-        let bar_x = 900.0 - SIDEBAR_PAD - bar.right_bar_w() - TOOLBAR_GAP - bar.left_bar_w();
+        let bar_x = 900.0 - SIDEBAR_PAD - bar.left_bar_w();
         let bar_y = (SIDEBAR_TOOLBAR_H - TOOLBAR_HEIGHT) / 2.0;
         pill_cell(bar_x, bar_y, 0)
     }
@@ -967,19 +917,10 @@ mod tests {
     }
 
     #[test]
-    fn collapse_button_collapses() {
-        let mut bar = bar();
-        let (cx, cy) = collapse_cell();
-        bar.mouse_down(cx, cy);
-        bar.mouse_up(cx, cy);
-        assert!(bar.is_collapsed());
-    }
-
-    #[test]
-    fn disabled_collapse_ignores_clicks() {
+    fn disabled_collapse_ignores_toggle() {
         let mut bar = Sidebar::new(vec![SidebarItem::new("G", "gear")]).collapsible(false);
         bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
-        let (cx, cy) = collapse_cell();
+        let (cx, cy) = toggle_cell();
         bar.mouse_down(cx, cy);
         bar.mouse_up(cx, cy);
         assert!(!bar.is_collapsed());
@@ -1084,10 +1025,9 @@ mod tests {
         let (dx, _, dw, _) = bar.drag_rect();
         let cluster_end = TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0;
         assert_eq!(dx, cluster_end);
-        // Drag ends where the far-right pills begin.
+        // Drag ends where the far-right pill begins.
         let left_w = bar.left_bar_w();
-        let pills_w = bar.right_bar_w()
-            + SIDEBAR_PAD
+        let pills_w = SIDEBAR_PAD
             + if left_w > 0.0 {
                 left_w + TOOLBAR_GAP
             } else {

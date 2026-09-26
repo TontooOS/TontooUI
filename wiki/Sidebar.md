@@ -3,12 +3,11 @@
 Sidebar category in `src/elements/sidebars/sidebar.rs`: full-height
 app navigation in `Sidebar` with `SidebarItem` rows (tinted SF
 Symbol plus label), embedded traffic lights (replacing the
-titlebar decoration), and real `BasicToolbar` pills for toggle,
-back, dev icons and collapse. Selecting an item switches the
-right-side page, which the sidebar owns. Expanded, the pills sit
-in the sidebar top row (toggle left, back centered, dev icons plus
-collapse right) with the title left in the content; collapsed,
-they show far right in the content and the title moves next to
+titlebar decoration), and a single `BasicToolbar` pill for toggle,
+back and dev icons. Selecting an item switches the
+right-side page, which the sidebar owns. Expanded, the pill sits
+in the sidebar top row with the title left in the content; collapsed,
+it shows far right in the content and the title moves next to
 the traffic lights.
 
 ## Geometry
@@ -81,18 +80,17 @@ pub fn page_key(&mut self, key: Key) -> bool
 - Pages match items by order; missing pages stay empty. The
   toolbar title follows the selected label until `set_title`
   overrides it (`clear_title` restores the follow mode).
-- The toolbar holds real `BasicToolbar` pills (see
+- The toolbar holds a single `BasicToolbar` pill (see
   [Toolbar.md](Toolbar.md)): toggle plus back (each optional via
-  `toggle_button` / `back_button`) plus dev icons share the left
-  pill, collapse rides alone on the right. An empty left pill is
-  skipped entirely. `collapsible(false)` keeps the collapse pill
-  visible but gray and ignores its clicks. Pill clicks land in
+  `toggle_button` / `back_button`) plus dev icons share the pill.
+  An empty pill is skipped entirely. `collapsible(false)` makes the
+  toggle cell ignore clicks. Pill clicks land in
   shared pending state and apply on the next mouse-up or draw, so
   unit tests never need a draw in between.
 - Item clicks select (firing `on_select` on change); programmatic
   `select` returns false out of range. The back button only fires
   `on_back` (history stays the app's job, see the demo).
-- Toggle and collapse both flip the column and fire `on_collapse`;
+- The toggle cell flips the column and fires `on_collapse`;
   `set_collapsed` stays silent.
 - Dev icons carry their own press callbacks inside the left
   pill. The example adds one after construction so its callback
@@ -103,7 +101,7 @@ pub fn page_key(&mut self, key: Key) -> bool
   mapping (never forward those presses to `mouse_down`).
   `drag_rect` cuts out the traffic cluster: expanded it spans the
   sidebar traffic band, collapsed the content band up to the
-  far-right pills.
+  far-right pill.
 - `page_text` and `page_key` reach the active page through the
   `View` protocol; anything beyond that downcasts through
   `page_mut` (see `examples/sidebar.rs` for the shared-handle
