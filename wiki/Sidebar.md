@@ -62,6 +62,14 @@ pub fn set_search_text(&mut self, text: impl Into<String>)
 pub fn search_text_cursor(&self) -> bool
 pub fn row_metrics(&self) -> (f32, f32, f32, f32)
 pub fn set_row_metrics(&mut self, row_h: f32, icon: f32, gap: f32, label: f32)
+pub fn set_selected_fill(&mut self, fill: Option<Color>)
+pub fn selected_fill(&self) -> Option<Color>
+pub fn set_item_text(&mut self, text: Option<Color>)
+pub fn item_text(&self) -> Option<Color>
+pub fn set_icon_tint(&mut self, tint: Option<Color>)
+pub fn icon_tint(&self) -> Option<Color>
+pub fn set_column_bg(&mut self, bg: Option<Color>)
+pub fn column_bg(&self) -> Option<Color>
 pub fn toggle_button(self, show: bool) -> Self
 pub fn set_toggle_button(&mut self, show: bool)
 pub fn collapsible(self, collapsible: bool) -> Self
@@ -150,6 +158,12 @@ pub fn page_key(&mut self, key: Key) -> bool
   the `SIDEBAR_*` tokens and tunes live via `set_row_metrics`
   (read back with `row_metrics`); the demo General page hosts one
   slider per metric for sizing by eye.
+- Row colors default to the theme and override live: selected wash
+  via `set_selected_fill`, labels via `set_item_text`, the default
+  icon tint via `set_icon_tint` (per-item `tint` still wins) and the
+  column background via `set_column_bg` (`None` restores the theme
+  each). The demo General page opens one shared `ColorPicker`
+  popup per color button (see [Colors.md](Colors.md)).
 - `wants_backdrop` stays true while the Lens pills are on screen;
   return it from `App::wants_backdrop` like the toolbar demo.
 - `press` reports traffic hits for the shell `WindowCommand`

@@ -158,6 +158,10 @@ pub struct Sidebar {
     row_icon: f32,
     row_gap: f32,
     row_label: f32,
+    selected_fill: Option<Color>,
+    item_text: Option<Color>,
+    icon_tint: Option<Color>,
+    column_bg: Option<Color>,
     pending: Rc<Cell<Option<PendingAction>>>,
     width_setting: f32,
     accent: Color,
@@ -204,6 +208,10 @@ impl Sidebar {
             row_icon: SIDEBAR_ICON_SIZE,
             row_gap: SIDEBAR_ICON_GAP,
             row_label: SIDEBAR_LABEL_SIZE,
+            selected_fill: None,
+            item_text: None,
+            icon_tint: None,
+            column_bg: None,
             pending,
             width_setting: SIDEBAR_W,
             accent: Color::from_rgb8(0x00, 0x7a, 0xff),
@@ -416,6 +424,43 @@ impl Sidebar {
         self.row_icon = icon.clamp(8.0, 40.0);
         self.row_gap = gap.clamp(0.0, 24.0);
         self.row_label = label.clamp(8.0, 28.0);
+    }
+
+    /// Selected-row wash override (`None` follows the theme wash).
+    pub fn set_selected_fill(&mut self, fill: Option<Color>) {
+        self.selected_fill = fill;
+    }
+
+    pub fn selected_fill(&self) -> Option<Color> {
+        self.selected_fill
+    }
+
+    /// Item label color override (`None` follows the theme text).
+    pub fn set_item_text(&mut self, text: Option<Color>) {
+        self.item_text = text;
+    }
+
+    pub fn item_text(&self) -> Option<Color> {
+        self.item_text
+    }
+
+    /// Default row icon tint override (`None` follows the accent;
+    /// per-item `SidebarItem::tint` still wins).
+    pub fn set_icon_tint(&mut self, tint: Option<Color>) {
+        self.icon_tint = tint;
+    }
+
+    pub fn icon_tint(&self) -> Option<Color> {
+        self.icon_tint
+    }
+
+    /// Column background override (`None` follows the group box fill).
+    pub fn set_column_bg(&mut self, bg: Option<Color>) {
+        self.column_bg = bg;
+    }
+
+    pub fn column_bg(&self) -> Option<Color> {
+        self.column_bg
     }
 
     /// True while the pointer wants the I-beam over the search row.
@@ -668,11 +713,11 @@ impl Sidebar {
     }
 
     fn sidebar_bg(&self) -> Color {
-        self.eff(if self.dark {
+        self.eff(self.column_bg.unwrap_or(if self.dark {
             GROUP_BG_DARK
         } else {
             GROUP_BG_LIGHT
-        })
+        }))
     }
 
     fn divider_color(&self) -> Color {
@@ -684,11 +729,11 @@ impl Sidebar {
     }
 
     fn text_color(&self) -> Color {
-        if self.dark {
+        self.item_text.unwrap_or(if self.dark {
             Color::from_rgb8(0xd8, 0xd9, 0xd9)
         } else {
             Color::from_rgb8(0x27, 0x27, 0x27)
-        }
+        })
     }
 
     fn eff(&self, color: Color) -> Color {
@@ -1152,16 +1197,16 @@ impl Sidebar {
                 scene.fill(
                     Fill::NonZero,
                     Affine::IDENTITY,
-                    &Brush::Solid(self.eff(if self.dark {
+                    &Brush::Solid(self.eff(self.selected_fill.unwrap_or(if self.dark {
                         SIDEBAR_SEL_DARK
                     } else {
                         SIDEBAR_SEL_LIGHT
-                    })),
+                    }))),
                     None,
                     &wash,
                 );
             }
-            let tint = self.eff(item.tint.unwrap_or(self.accent));
+            let tint = self.eff(item.tint.or(self.icon_tint).unwrap_or(self.accent));
             let (icon_px, gap_px, row_px) = (self.row_icon, self.row_gap, self.row_h);
             let mut icon = SFSymbolImage::new(item.icon.clone())
                 .size(icon_px)
@@ -1566,6 +1611,28 @@ mod tests {
                 SIDEBAR_LABEL_SIZE
             )
         );
+    }
+
+    #[test]
+    fn item_color_overrides_default_empty() {
+        use vello::peniko::Color;
+
+        let mut bar = bar();
+        assert_eq!(bar.selected_fill(), None);
+        assert_eq!(bar.item_text(), None);
+        assert_eq!(bar.icon_tint(), None);
+        assert_eq!(bar.column_bg(), None);
+        let pink = Color::from_rgb8(0xff, 0x2d, 0x55);
+        bar.set_selected_fill(Some(pink));
+        bar.set_item_text(Some(pink));
+        bar.set_icon_tint(Some(pink));
+        bar.set_column_bg(Some(pink));
+        assert_eq!(bar.selected_fill(), Some(pink));
+        assert_eq!(bar.item_text(), Some(pink));
+        assert_eq!(bar.icon_tint(), Some(pink));
+        assert_eq!(bar.column_bg(), Some(pink));
+        bar.set_selected_fill(None);
+        assert_eq!(bar.selected_fill(), None);
     }
 
     #[test]

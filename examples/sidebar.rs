@@ -2,8 +2,9 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use tontooui::elements::{
-    BasicText, SIDEBAR_ICON_GAP, SIDEBAR_ICON_SIZE, SIDEBAR_LABEL_SIZE, SIDEBAR_ROW_H,
-    Sidebar, SidebarItem, Slider, TrafficAction, View, VStack,
+    BasicText, Button, ColorPicker, HStack, SIDEBAR_ICON_GAP, SIDEBAR_ICON_SIZE,
+    SIDEBAR_LABEL_SIZE, SIDEBAR_ROW_H, Sidebar, SidebarItem, Slider, TrafficAction, View,
+    VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
@@ -21,6 +22,13 @@ struct SidebarDemo {
     row_icon: Rc<Cell<f64>>,
     row_gap: Rc<Cell<f64>>,
     row_label: Rc<Cell<f64>>,
+    picker: ColorPicker,
+    show_picker: Rc<Cell<bool>>,
+    pick_target: Rc<Cell<u8>>,
+    col_sel: Rc<Cell<Option<Color>>>,
+    col_text: Rc<Cell<Option<Color>>>,
+    col_icon: Rc<Cell<Option<Color>>>,
+    col_bg: Rc<Cell<Option<Color>>>,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -38,6 +46,14 @@ impl SidebarDemo {
         let row_icon: Rc<Cell<f64>> = Rc::new(Cell::new(SIDEBAR_ICON_SIZE as f64));
         let row_gap: Rc<Cell<f64>> = Rc::new(Cell::new(SIDEBAR_ICON_GAP as f64));
         let row_label: Rc<Cell<f64>> = Rc::new(Cell::new(SIDEBAR_LABEL_SIZE as f64));
+        // Shared color picker: buttons pick the target, the popup
+        // writes the cell, draw applies it (never re-entered).
+        let show_picker: Rc<Cell<bool>> = Rc::new(Cell::new(false));
+        let pick_target: Rc<Cell<u8>> = Rc::new(Cell::new(0));
+        let col_sel: Rc<Cell<Option<Color>>> = Rc::new(Cell::new(None));
+        let col_text: Rc<Cell<Option<Color>>> = Rc::new(Cell::new(None));
+        let col_icon: Rc<Cell<Option<Color>>> = Rc::new(Cell::new(None));
+        let col_bg: Rc<Cell<Option<Color>>> = Rc::new(Cell::new(None));
         // Shared so press callbacks (back, dev button, selection)
         // can reach the sidebar from `'static` closures.
         let sidebar: Rc<RefCell<Sidebar>> = Rc::new(RefCell::new(
@@ -53,6 +69,8 @@ impl SidebarDemo {
                 row_icon.clone(),
                 row_gap.clone(),
                 row_label.clone(),
+                show_picker.clone(),
+                pick_target.clone(),
             ))
             .page(Self::page("Security", "Passwords and encryption."))
             .page(Self::page("Privacy", "Tracking and permissions."))
@@ -85,6 +103,13 @@ impl SidebarDemo {
             row_icon,
             row_gap,
             row_label,
+            picker: ColorPicker::new(),
+            show_picker,
+            pick_target,
+            col_sel,
+            col_text,
+            col_icon,
+            col_bg,
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -92,12 +117,15 @@ impl SidebarDemo {
         }
     }
 
-    /// General page: sliders tuning the sidebar row sizes live.
+    /// General page: sliders tuning the sidebar row sizes live plus
+    /// color buttons opening the shared picker popup.
     fn sizes_page(
         row_h: Rc<Cell<f64>>,
         row_icon: Rc<Cell<f64>>,
         row_gap: Rc<Cell<f64>>,
         row_label: Rc<Cell<f64>>,
+        show_picker: Rc<Cell<bool>>,
+        pick_target: Rc<Cell<u8>>,
     ) -> VStack {
         fn slider(
             title: &str,
@@ -112,6 +140,43 @@ impl SidebarDemo {
                 .value_text(|v| format!("{v:.1}"))
                 .on_change(move |v| cell.set(v))
         }
+        fn color_button(
+            title: &str,
+            target: u8,
+            show_picker: Rc<Cell<bool>>,
+            pick_target: Rc<Cell<u8>>,
+        ) -> Button {
+            Button::new(title).on_press(move || {
+                pick_target.set(target);
+                show_picker.set(true);
+            })
+        }
+        let buttons = HStack::new()
+            .spacing(8.0)
+            .child(color_button(
+                "Selection",
+                0,
+                show_picker.clone(),
+                pick_target.clone(),
+            ))
+            .child(color_button(
+                "Text",
+                1,
+                show_picker.clone(),
+                pick_target.clone(),
+            ))
+            .child(color_button(
+                "Icons",
+                2,
+                show_picker.clone(),
+                pick_target.clone(),
+            ))
+            .child(color_button(
+                "Background",
+                3,
+                show_picker.clone(),
+                pick_target.clone(),
+            ));
         VStack::new()
             .spacing(16.0)
             .child(BasicText::new("General settings"))
@@ -138,6 +203,8 @@ impl SidebarDemo {
                 28.0,
                 row_label.clone(),
             ))
+            .child(BasicText::new("Row colors"))
+            .child(buttons)
     }
 
     fn page(title: &str, body: &str) -> VStack {
@@ -176,6 +243,39 @@ impl App for SidebarDemo {
                 self.row_gap.get() as f32,
                 self.row_label.get() as f32,
             );
+            // Live row colors from the shared picker popup.
+            sidebar.set_selected_fill(self.col_sel.get());
+            sidebar.set_item_text(self.col_text.get());
+            sidebar.set_icon_tint(self.col_icon.get());
+            sidebar.set_column_bg(self.col_bg.get());
+        }
+        // Shared color picker: seed with the target color, then keep
+        // the cell on the live selection.
+        if self.show_picker.take() {
+            let seed = match self.pick_target.get() {
+                0 => {
+                    let c = palette.accent.to_rgba8();
+                    self.col_sel
+                        .get()
+                        .unwrap_or(Color::from_rgba8(c.r, c.g, c.b, 40))
+                }
+                1 => self.col_text.get().unwrap_or(palette.text),
+                2 => self.col_icon.get().unwrap_or(palette.accent),
+                _ => self.col_bg.get().unwrap_or(palette.bg),
+            };
+            self.picker.set_color(seed);
+            self.picker.show();
+        }
+        if self.picker.is_visible() {
+            self.picker.set_theme(theme.mode, theme.glass);
+            self.picker.set_focused(focused);
+            let picked = self.picker.selected();
+            match self.pick_target.get() {
+                0 => self.col_sel.set(Some(picked)),
+                1 => self.col_text.set(Some(picked)),
+                2 => self.col_icon.set(Some(picked)),
+                _ => self.col_bg.set(Some(picked)),
+            }
         }
         // Back navigation: pop the trail and select the previous
         // item (`on_select` skips the push since it is already last).
@@ -202,6 +302,12 @@ impl App for SidebarDemo {
             viewport.height,
         );
         self.sidebar.borrow_mut().draw(scene, fonts, images);
+        // Frosted picker popup on top while open.
+        if self.picker.is_visible() {
+            self.picker
+                .set_viewport(viewport.x, viewport.y, viewport.width, viewport.height);
+            self.picker.draw(scene, fonts, images);
+        }
     }
 
     fn background(&self) -> Color {
@@ -210,7 +316,7 @@ impl App for SidebarDemo {
 
     fn wants_backdrop(&self) -> bool {
         // Lens toolbar pills need the blur pass while visible.
-        self.sidebar.borrow().wants_backdrop()
+        self.sidebar.borrow().wants_backdrop() || self.picker.is_visible()
     }
 
     fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
@@ -222,6 +328,11 @@ impl App for SidebarDemo {
     }
 
     fn mouse_down(&mut self, x: f64, y: f64) {
+        // Popup first while open (outside clicks dismiss it).
+        if self.picker.is_visible() {
+            self.picker.mouse_down(x, y);
+            return;
+        }
         // Bind first: the borrow guard would otherwise live into the
         // else branch and panic on the second borrow.
         let traffic = self.sidebar.borrow_mut().press(x, y);
@@ -239,6 +350,10 @@ impl App for SidebarDemo {
     }
 
     fn mouse_move(&mut self, x: f64, y: f64) {
+        if self.picker.is_visible() {
+            self.picker.mouse_move(x, y);
+            return;
+        }
         self.sidebar.borrow_mut().set_hover(x as f32, y as f32);
     }
 
@@ -254,6 +369,10 @@ impl App for SidebarDemo {
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {
+        if self.picker.is_visible() {
+            self.picker.mouse_up(x, y);
+            return;
+        }
         self.sidebar.borrow_mut().mouse_up(x, y);
     }
 
