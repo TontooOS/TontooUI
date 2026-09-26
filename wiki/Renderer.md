@@ -142,6 +142,7 @@ pub enum Key {
 pub enum CursorKind {
     Default,
     Text,
+    ResizeColumn,
 }
 ```
 

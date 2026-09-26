@@ -35,8 +35,18 @@ enum PendingAction {
 
 /// Sidebar width in logical px.
 pub const SIDEBAR_W: f32 = 240.0;
-/// Minimum sidebar width in logical px.
-pub const SIDEBAR_MIN_W: f32 = 220.0;
+/// Absolute minimum sidebar width floor in logical px (the live
+/// minimum is larger while pills are shown, see `min_bar_w`).
+pub const SIDEBAR_MIN_W: f32 = 120.0;
+/// Maximum sidebar width in logical px for edge drags and `width`.
+pub const SIDEBAR_MAX_W: f32 = 480.0;
+/// Resize grab half-width in logical px around the column edge.
+pub const SIDEBAR_RESIZE_HIT: f32 = 6.0;
+/// Reopen strip width in logical px at the content left edge while
+/// collapsed.
+pub const SIDEBAR_REOPEN_HIT: f32 = 8.0;
+/// Dragging further than this below the minimum snaps shut.
+pub const SIDEBAR_CLOSE_SLOP: f32 = 48.0;
 /// Item row height in logical px.
 pub const SIDEBAR_ROW_H: f32 = 46.0;
 /// Sidebar inset in logical px.
@@ -123,6 +133,8 @@ pub struct Sidebar {
     collapse_anim: Option<TweenAnim<f32>>,
     collapse_t0: Instant,
     anim_p: f32,
+    resizing: bool,
+    resize_hover: bool,
     show_toggle: bool,
     collapsible: bool,
     left_bar: BasicToolbar,
@@ -159,6 +171,8 @@ impl Sidebar {
             collapse_anim: None,
             collapse_t0: Instant::now(),
             anim_p: 0.0,
+            resizing: false,
+            resize_hover: false,
             left_bar: BasicToolbar::new(),
             right_bar: BasicToolbar::new(),
             left_slots: [None, None],
@@ -246,11 +260,52 @@ impl Sidebar {
         self
     }
 
-    /// Sidebar width in logical px (clamped to the minimum, ignored
-    /// while collapsed).
+    /// Sidebar width in logical px (clamped to the live minimum
+    /// and maximum, ignored while collapsed).
     pub fn width(mut self, px: f32) -> Self {
-        self.width_setting = px.max(SIDEBAR_MIN_W);
+        self.width_setting = px.clamp(self.min_bar_w(), SIDEBAR_MAX_W);
         self
+    }
+
+    /// Sidebar width in logical px at runtime (clamped to the live
+    /// minimum and maximum).
+    pub fn set_width(&mut self, px: f32) {
+        self.width_setting = px.clamp(self.min_bar_w(), SIDEBAR_MAX_W);
+    }
+
+    /// Current sidebar width setting in logical px.
+    pub fn width_value(&self) -> f32 {
+        self.eff_setting()
+    }
+
+    /// Live minimum column width: fits traffic plus every shown
+    /// pill, never below the absolute floor. Shrinks when the dev
+    /// hides slots or the toggle.
+    pub fn min_bar_w(&self) -> f32 {
+        let cluster = TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0;
+        let mut min = cluster + SIDEBAR_PAD;
+        if self.right_bar_w() > 0.0 {
+            min = min.max(SIDEBAR_PAD + self.right_bar_w() + SIDEBAR_PAD);
+        }
+        if self.left_bar_w() > 0.0 {
+            min = min.max(cluster + TOOLBAR_GAP + self.left_bar_w() + SIDEBAR_PAD);
+            if self.right_bar_w() > 0.0 {
+                min = min.max(
+                    cluster
+                        + TOOLBAR_GAP
+                        + self.left_bar_w()
+                        + TOOLBAR_GAP
+                        + self.right_bar_w()
+                        + SIDEBAR_PAD,
+                );
+            }
+        }
+        min.max(SIDEBAR_MIN_W)
+    }
+
+    /// Width setting clamped to the live range.
+    fn eff_setting(&self) -> f32 {
+        self.width_setting.clamp(self.min_bar_w(), SIDEBAR_MAX_W)
     }
 
     /// Left-pill button in slot 0 or 1: icon plus press callback.
@@ -462,7 +517,49 @@ impl Sidebar {
     /// Animated column width: full while expanded, zero while
     /// collapsed, sliding between during the fade.
     fn bar_w(&self) -> f32 {
-        self.width_setting * (1.0 - self.anim_p)
+        self.eff_setting() * (1.0 - self.anim_p)
+    }
+
+    /// True while an edge resize drag runs.
+    pub fn is_resizing(&self) -> bool {
+        self.resizing
+    }
+
+    /// True when the pointer should show the column-resize cursor:
+    /// over the edge while expanded, the strip while collapsed, or
+    /// mid-drag. The app maps this to `CursorKind::ResizeColumn`.
+    pub fn wants_resize_cursor(&self, x: f64, y: f64) -> bool {
+        self.resizing || self.resize_hit(x as f32, y as f32)
+    }
+
+    /// Resize grab test: the column edge band while expanded, the
+    /// content left strip while collapsed.
+    fn resize_hit(&self, x: f32, y: f32) -> bool {
+        if y < self.y || y > self.y + self.height {
+            return false;
+        }
+        if self.collapsed {
+            x >= self.x && x <= self.x + SIDEBAR_REOPEN_HIT
+        } else {
+            (x - (self.x + self.eff_setting())).abs() <= SIDEBAR_RESIZE_HIT
+        }
+    }
+
+    /// Follow the pointer while resizing. Dragging past the minimum
+    /// snaps shut; from collapsed, grabbing the strip reopens.
+    fn drag_resize(&mut self, x: f32) {
+        let min = self.min_bar_w();
+        let w = x - self.x;
+        if self.collapsed {
+            self.width_setting = w.clamp(min, SIDEBAR_MAX_W);
+            return;
+        }
+        if w < min - SIDEBAR_CLOSE_SLOP {
+            self.resizing = false;
+            self.toggle_sidebar();
+            return;
+        }
+        self.width_setting = w.clamp(min, SIDEBAR_MAX_W);
     }
 
     fn sidebar_bg(&self) -> Color {
@@ -588,6 +685,12 @@ impl Sidebar {
     }
 
     pub fn set_hover(&mut self, x: f32, y: f32) {
+        // Mid-drag the pointer drives the width, not hover states.
+        if self.resizing {
+            self.drag_resize(x);
+            return;
+        }
+        self.resize_hover = self.resize_hit(x, y);
         self.traffic_hover = self.traffic_index(x, y);
         self.left_bar.set_hover(x, y);
         self.right_bar.set_hover(x, y);
@@ -690,6 +793,19 @@ impl Sidebar {
 
     pub fn mouse_down(&mut self, x: f64, y: f64) {
         let (x32, y32) = (x as f32, y as f32);
+        // Edge resize starts here and swallows the press (pills and
+        // page never see it). From collapsed, grabbing the strip
+        // reopens with the collapse animation in reverse.
+        if self.resize_hit(x32, y32) {
+            if self.collapsed {
+                if !self.collapsible {
+                    return;
+                }
+                self.toggle_sidebar();
+            }
+            self.resizing = true;
+            return;
+        }
         self.left_bar.mouse_down(x, y);
         self.right_bar.mouse_down(x, y);
         // Item rows (sidebar visible only).
@@ -708,6 +824,11 @@ impl Sidebar {
     }
 
     pub fn mouse_up(&mut self, x: f64, y: f64) {
+        // A resize drag ends here; nothing was armed below.
+        if self.resizing {
+            self.resizing = false;
+            return;
+        }
         self.left_bar.mouse_up(x, y);
         self.right_bar.mouse_up(x, y);
         // Pill clicks land in shared pending state (applied here, so
@@ -831,12 +952,19 @@ impl Sidebar {
             None,
             &Rect::new(px(self.x), px(self.y), px(self.x + bar_w), px(self.y + self.height)),
         );
-        // Divider between sidebar and content.
+        // Divider between sidebar and content: accent plus wider
+        // while the resize edge hovers or drags.
         let dx = self.x + bar_w;
+        let grabbing = self.resizing || self.resize_hover;
+        let (divider_w, divider_c) = if grabbing {
+            (2.0, self.eff(self.accent))
+        } else {
+            (1.0, self.divider_color())
+        };
         scene.stroke(
-            &Stroke::new(1.0 * scale),
+            &Stroke::new(divider_w as f64 * scale),
             Affine::IDENTITY,
-            &Brush::Solid(self.divider_color()),
+            &Brush::Solid(divider_c),
             None,
             &Line::new((px(dx), px(self.y)), (px(dx), px(self.y + self.height))),
         );
@@ -1127,6 +1255,88 @@ mod tests {
         assert_eq!(bar.bar_w(), 0.0);
         bar.set_collapsed(false);
         assert_eq!(bar.bar_w(), SIDEBAR_W);
+    }
+
+    #[test]
+    fn min_width_fits_shown_pills() {
+        // No slots: traffic plus margin, floored.
+        assert_eq!(bar().min_bar_w(), SIDEBAR_MIN_W);
+        // Both slots plus toggle: cluster, pills, gaps and inset.
+        let full = Sidebar::new(vec![SidebarItem::new("G", "gear")])
+            .left_button(0, "chevron.left", || {})
+            .left_button(1, "magnifyingglass", || {});
+        assert_eq!(full.min_bar_w(), 89.0 + 4.0 + 76.0 + 4.0 + 44.0 + 16.0);
+        // Hidden toggle shrinks the minimum.
+        let no_toggle = Sidebar::new(vec![SidebarItem::new("G", "gear")])
+            .toggle_button(false)
+            .left_button(0, "chevron.left", || {})
+            .left_button(1, "magnifyingglass", || {});
+        assert_eq!(no_toggle.min_bar_w(), 89.0 + 4.0 + 76.0 + 16.0);
+    }
+
+    #[test]
+    fn width_builder_clamps_to_live_range() {
+        let wide = Sidebar::new(vec![SidebarItem::new("G", "gear")]).width(1000.0);
+        assert_eq!(wide.width_value(), SIDEBAR_MAX_W);
+        let narrow = Sidebar::new(vec![SidebarItem::new("G", "gear")]).width(10.0);
+        assert_eq!(narrow.width_value(), SIDEBAR_MIN_W);
+    }
+
+    #[test]
+    fn edge_drag_resizes_live() {
+        let mut bar = bar();
+        bar.mouse_down(240.0, 300.0);
+        assert!(bar.is_resizing());
+        bar.set_hover(320.0, 300.0);
+        assert_eq!(bar.bar_w(), 320.0);
+        bar.mouse_up(320.0, 300.0);
+        assert!(!bar.is_resizing());
+        assert_eq!(bar.width_value(), 320.0);
+    }
+
+    #[test]
+    fn edge_drag_clamps_to_max() {
+        let mut bar = bar();
+        bar.mouse_down(240.0, 300.0);
+        bar.set_hover(800.0, 300.0);
+        bar.mouse_up(800.0, 300.0);
+        assert_eq!(bar.width_value(), SIDEBAR_MAX_W);
+    }
+
+    #[test]
+    fn edge_drag_past_min_snaps_shut() {
+        let mut bar = bar();
+        bar.mouse_down(240.0, 300.0);
+        // Minimum is 120 here; 50 is past the close slop.
+        bar.set_hover(50.0, 300.0);
+        assert!(bar.is_collapsed());
+        assert!(bar.is_animating());
+        assert!(!bar.is_resizing());
+    }
+
+    #[test]
+    fn collapsed_strip_grab_reopens() {
+        let mut bar = bar();
+        bar.set_collapsed(true);
+        bar.mouse_down(4.0, 300.0);
+        assert!(bar.is_resizing());
+        assert!(!bar.is_collapsed());
+        bar.set_hover(300.0, 300.0);
+        bar.mouse_up(300.0, 300.0);
+        assert!(!bar.is_resizing());
+        assert_eq!(bar.width_value(), 300.0);
+    }
+
+    #[test]
+    fn resize_cursor_only_over_edge() {
+        let open = bar();
+        assert!(open.wants_resize_cursor(240.0, 300.0));
+        assert!(open.wants_resize_cursor(245.0, 300.0));
+        assert!(!open.wants_resize_cursor(100.0, 300.0));
+        let mut shut = bar();
+        shut.set_collapsed(true);
+        assert!(shut.wants_resize_cursor(4.0, 300.0));
+        assert!(!shut.wants_resize_cursor(100.0, 300.0));
     }
 
     /// Center of a pill cell at `(bar_x, bar_y)`: leading layout,

@@ -23,6 +23,9 @@ next to the traffic lights.
 | `SIDEBAR_TRAFFIC_TOP` / `SIDEBAR_BAR_TOP` / `SIDEBAR_ITEMS_TOP` | 22 px lights top / pills row centered on lights / 100 px items top |
 | `SIDEBAR_TOOLBAR_H` | 64 px content toolbar height (collapsed pills row) |
 | `SIDEBAR_COLLAPSE_SECONDS` | 0.22 s collapse slide plus fade (`CubicOut`) |
+| `SIDEBAR_MIN_W` / `SIDEBAR_MAX_W` | 120 px absolute floor / 480 px drag cap |
+| `SIDEBAR_RESIZE_HIT` / `SIDEBAR_REOPEN_HIT` | 6 px edge grab half-width / 8 px collapsed reopen strip |
+| `SIDEBAR_CLOSE_SLOP` | 48 px below minimum snaps shut |
 
 Traffic geometry (`TRAFFIC_LEFT`, `TRAFFIC_SIZE`, `TRAFFIC_GAP`)
 and colors come from [Titlebar.md](Titlebar.md); the sidebar body
@@ -60,6 +63,11 @@ pub fn selected_index(&self) -> usize
 pub fn select(&mut self, index: usize) -> bool
 pub fn is_collapsed(&self) -> bool
 pub fn is_animating(&self) -> bool
+pub fn is_resizing(&self) -> bool
+pub fn wants_resize_cursor(&self, x: f64, y: f64) -> bool
+pub fn min_bar_w(&self) -> f32
+pub fn set_width(&mut self, px: f32)
+pub fn width_value(&self) -> f32
 pub fn update_progress(&mut self, elapsed: f32)
 pub fn collapse_sample(from: f32, to: f32, elapsed: f32) -> (f32, bool)
 pub fn set_collapsed(&mut self, collapsed: bool)
@@ -108,6 +116,16 @@ pub fn page_key(&mut self, key: Key) -> bool
   the flight, `update_progress` advances it (`draw` feeds the live
   clock, tests feed fake time) and `collapse_sample` samples the
   curve purely.
+- Hovering the column edge shows the resize cursor
+  (`wants_resize_cursor` maps to `CursorKind::ResizeColumn` in
+  `App::cursor`, see the demo); holding and dragging resizes live
+  between `min_bar_w` and `SIDEBAR_MAX_W`. `min_bar_w` fits
+  traffic plus every shown pill and shrinks when the dev hides
+  slots or the toggle, never below `SIDEBAR_MIN_W`. Dragging past
+  the minimum snaps shut with the collapse animation; grabbing the
+  content left strip while collapsed reopens the same way.
+  `is_resizing` reports the drag and the divider turns accent
+  while hovered or held.
 - `wants_backdrop` stays true while the Lens pills are on screen;
   return it from `App::wants_backdrop` like the toolbar demo.
 - `press` reports traffic hits for the shell `WindowCommand`

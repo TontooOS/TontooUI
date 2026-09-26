@@ -6,7 +6,7 @@ use tontooui::elements::{
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
-use tontooui::renderer::window::{App, Key, Viewport, WindowCommand, run};
+use tontooui::renderer::window::{App, CursorKind, Key, Viewport, WindowCommand, run};
 use tontooui::theme::{ThemeMode, ThemeWatcher};
 use vello::Scene;
 use vello::peniko::Color;
@@ -165,6 +165,14 @@ impl App for SidebarDemo {
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.sidebar.borrow_mut().set_hover(x as f32, y as f32);
+    }
+
+    fn cursor(&self, x: f64, y: f64) -> CursorKind {
+        if self.sidebar.borrow().wants_resize_cursor(x, y) {
+            CursorKind::ResizeColumn
+        } else {
+            CursorKind::Default
+        }
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {

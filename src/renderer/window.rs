@@ -67,6 +67,7 @@ pub enum CursorKind {
     #[default]
     Default,
     Text,
+    ResizeColumn,
 }
 
 /// Touch contact phases forwarded to the app.
@@ -116,7 +117,8 @@ pub trait App {
     fn set_modifiers(&mut self, _ctrl: bool, _shift: bool) {}
     /// Pointer shape at the given logical position. Called after
     /// every pointer move; default is the arrow. Text fields return
-    /// `Text` while hovered so the cursor turns into an I-beam.
+    /// `Text` while hovered so the cursor turns into an I-beam;
+    /// the sidebar returns `ResizeColumn` over its resize edge.
     fn cursor(&self, _x: f64, _y: f64) -> CursorKind {
         CursorKind::Default
     }
@@ -528,6 +530,7 @@ impl<V: App> ApplicationHandler for Shell<V> {
                     active.window.set_cursor(match cursor {
                         CursorKind::Default => CursorIcon::Default,
                         CursorKind::Text => CursorIcon::Text,
+                        CursorKind::ResizeColumn => CursorIcon::EwResize,
                     });
                 }
             }
