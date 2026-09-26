@@ -3,10 +3,13 @@
 Sidebar category in `src/elements/sidebars/sidebar.rs`: full-height
 app navigation in `Sidebar` with `SidebarItem` rows (tinted SF
 Symbol plus label), embedded traffic lights (replacing the
-titlebar decoration), and a content toolbar with toggle, back,
-title, dev buttons and collapse. Selecting an item switches the
-right-side page, which the sidebar owns; collapsing hides the
-column and lets the content fill the width.
+titlebar decoration), and real `BasicToolbar` pills for toggle,
+back, dev icons and collapse. Selecting an item switches the
+right-side page, which the sidebar owns. Expanded, the pills sit
+in the sidebar top row (toggle left, back centered, dev icons plus
+collapse right) with the title left in the content; collapsed,
+they show far right in the content and the title moves next to
+the traffic lights.
 
 ## Geometry
 
@@ -17,8 +20,8 @@ column and lets the content fill the width.
 | `SIDEBAR_PAD` | 16 px sidebar inset |
 | `SIDEBAR_ICON_SIZE` / `SIDEBAR_ICON_GAP` | 22 px icon box / 12 px gap |
 | `SIDEBAR_LABEL_SIZE` / `SIDEBAR_TITLE_SIZE` | 17 px item labels / 19 px semibold toolbar title |
-| `SIDEBAR_TRAFFIC_TOP` / `SIDEBAR_ITEMS_TOP` | 22 px lights top / 84 px items top |
-| `SIDEBAR_TOOLBAR_H` / `SIDEBAR_TOOLBAR_BTN` / `SIDEBAR_TOOLBAR_GAP` | 64 px bar / 40 px circle buttons / 12 px gap |
+| `SIDEBAR_TRAFFIC_TOP` / `SIDEBAR_BAR_TOP` / `SIDEBAR_ITEMS_TOP` | 22 px lights top / 48 px pills row / 100 px items top |
+| `SIDEBAR_TOOLBAR_H` | 64 px content toolbar height (collapsed pills row) |
 
 Traffic geometry (`TRAFFIC_LEFT`, `TRAFFIC_SIZE`, `TRAFFIC_GAP`)
 and colors come from [Titlebar.md](Titlebar.md); the sidebar body
@@ -74,11 +77,13 @@ pub fn page_key(&mut self, key: Key) -> bool
 - Pages match items by order; missing pages stay empty. The
   toolbar title follows the selected label until `set_title`
   overrides it (`clear_title` restores the follow mode).
-- The content toolbar holds two real `BasicToolbar` pills (see
-  [Toolbar.md](Toolbar.md)): toggle plus back on the left, dev
-  icons plus the always-visible collapse on the right. Pill clicks
-  land in shared pending state and apply on the next mouse-up or
-  draw, so unit tests never need a draw in between.
+- The toolbar holds real `BasicToolbar` pills (see
+  [Toolbar.md](Toolbar.md)). Expanded, toggle sits left, back
+  centered and dev icons plus the always-visible collapse right
+  inside the sidebar top row; collapsed, toggle plus back share
+  the left pill and everything groups far right in the content.
+  Pill clicks land in shared pending state and apply on the next
+  mouse-up or draw, so unit tests never need a draw in between.
 - Item clicks select (firing `on_select` on change); programmatic
   `select` returns false out of range. The back button only fires
   `on_back` (history stays the app's job, see the demo).
@@ -90,9 +95,10 @@ pub fn page_key(&mut self, key: Key) -> bool
 - `wants_backdrop` stays true while the Lens pills are on screen;
   return it from `App::wants_backdrop` like the toolbar demo.
 - `press` reports traffic hits for the shell `WindowCommand`
-  mapping (never forward those presses to `mouse_down`);
-  `drag_rect` is the sidebar top strip minus the traffic cluster
-  (content toolbar drags are out of scope for the base version).
+  mapping (never forward those presses to `mouse_down`).
+  `drag_rect` cuts out the traffic cluster: expanded it spans the
+  sidebar traffic band, collapsed the content band up to the
+  far-right pills.
 - `page_text` and `page_key` reach the active page through the
   `View` protocol; anything beyond that downcasts through
   `page_mut` (see `examples/sidebar.rs` for the shared-handle
@@ -136,8 +142,7 @@ fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
 ## Cross References
 
 - [Titlebar.md](Titlebar.md) – traffic geometry, colors and actions
-- [Toolbar.md](Toolbar.md) – icon button building blocks
-- [Button.md](Button.md) – circle toolbar buttons
+- [Toolbar.md](Toolbar.md) – toolbar pills, cells and actions
 - [Images.md](Images.md) – SF Symbol row icons
 - [Groupbox.md](Groupbox.md) – sidebar body fill
 - [Form.md](Form.md) – settings pages for sidebar content
