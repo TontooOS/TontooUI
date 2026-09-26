@@ -3,3 +3,4 @@
 3. When i want to Resize the window it dosent work
 4. The Shadows that TontooUI makes are Completly black for Windows
 5. View / Elements can be outside the Main App Window (in the shadow Thing) in the textfield demo starts at the Glass / Search text field / input
+6. The Close minimize, Maximize buttons are not correct
