@@ -6,10 +6,10 @@ Symbol plus label), embedded traffic lights (replacing the
 titlebar decoration), a left `BasicToolbar` pill for back and dev
 icons plus a single far-right toggle pill. Selecting an item
 switches the right-side page, which the sidebar owns. Expanded,
-the back pill sits top left in the sidebar and the toggle top
-right with the title left in the content; collapsed, both show
-far right in the content and the title moves next to the traffic
-lights.
+the back pill sits top right after the traffic lights and the
+toggle at the far right edge with the title left in the content;
+collapsed, both show far right in the content and the title moves
+next to the traffic lights.
 
 ## Geometry
 

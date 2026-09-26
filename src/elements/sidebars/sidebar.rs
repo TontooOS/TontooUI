@@ -572,6 +572,12 @@ impl Sidebar {
         }
     }
 
+    /// Right edge x of the traffic cluster (pills start after it,
+    /// never on top of the lights).
+    fn traffic_end(&self) -> f32 {
+        self.x + TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0
+    }
+
     fn place_bars(&mut self, fonts: &mut FontSystem) {
         let cy = self.toolbar_cy();
         if self.collapsed {
@@ -593,24 +599,19 @@ impl Sidebar {
                 self.left_bar.place(fonts, bar_x, cy, self.left_bar_w(), TOOLBAR_HEIGHT);
             }
         } else {
-            // Sidebar top row: pill left, single toggle right.
-            if self.left_bar_w() > 0.0 {
-                self.left_bar.place(
-                    fonts,
-                    self.x + SIDEBAR_PAD,
-                    cy,
-                    self.left_bar_w(),
-                    TOOLBAR_HEIGHT,
-                );
-            }
+            // Sidebar top row: back pill after traffic, single
+            // toggle at the right edge (grouped with a gap).
             if self.right_bar_w() > 0.0 {
-                self.right_bar.place(
-                    fonts,
-                    self.x + self.bar_w() - SIDEBAR_PAD - self.right_bar_w(),
-                    cy,
-                    self.right_bar_w(),
-                    TOOLBAR_HEIGHT,
-                );
+                let right_x = self.x + self.bar_w() - SIDEBAR_PAD - self.right_bar_w();
+                self.right_bar.place(fonts, right_x, cy, self.right_bar_w(), TOOLBAR_HEIGHT);
+                if self.left_bar_w() > 0.0 {
+                    let min_x = self.traffic_end() + TOOLBAR_GAP;
+                    let bar_x = (right_x - TOOLBAR_GAP - self.left_bar_w()).max(min_x);
+                    self.left_bar.place(fonts, bar_x, cy, self.left_bar_w(), TOOLBAR_HEIGHT);
+                }
+            } else if self.left_bar_w() > 0.0 {
+                let bar_x = self.traffic_end() + TOOLBAR_GAP;
+                self.left_bar.place(fonts, bar_x, cy, self.left_bar_w(), TOOLBAR_HEIGHT);
             }
         }
     }
@@ -930,15 +931,26 @@ mod tests {
         (cx as f64, cy as f64)
     }
 
+    /// Toggle pill x in the expanded sidebar (single pill far right).
+    fn toggle_bar_x() -> f32 {
+        SIDEBAR_W - SIDEBAR_PAD - (TOOLBAR_PAD_X * 2.0 + TOOLBAR_HIT)
+    }
+
     /// Toggle cell in the expanded sidebar (single pill far right).
     fn toggle_cell() -> (f64, f64) {
-        let bar_w = TOOLBAR_PAD_X * 2.0 + TOOLBAR_HIT;
-        pill_cell(SIDEBAR_W - SIDEBAR_PAD - bar_w, SIDEBAR_BAR_TOP, 0)
+        pill_cell(toggle_bar_x(), SIDEBAR_BAR_TOP, 0)
+    }
+
+    /// Left pill x in the expanded sidebar (grouped left of toggle,
+    /// never on top of traffic).
+    fn left_bar_x(bar: &Sidebar) -> f32 {
+        let min_x = TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0 + TOOLBAR_GAP;
+        (toggle_bar_x() - TOOLBAR_GAP - bar.left_bar_w()).max(min_x)
     }
 
     /// Back cell in the expanded sidebar (left pill first icon).
-    fn back_cell() -> (f64, f64) {
-        pill_cell(SIDEBAR_PAD, SIDEBAR_BAR_TOP, 0)
+    fn back_cell(bar: &Sidebar) -> (f64, f64) {
+        pill_cell(left_bar_x(bar), SIDEBAR_BAR_TOP, 0)
     }
 
     /// Toggle cell when collapsed (single pill at the far right edge).
@@ -989,7 +1001,9 @@ mod tests {
             .on_back(move || taps.set(taps.get() + 1));
         bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
         // Back is the first left-pill icon (toggle lives far right).
-        let (bx, by) = pill_cell(SIDEBAR_PAD, SIDEBAR_BAR_TOP, 0);
+        // Toggle hidden: the pill sits right after traffic.
+        let min_x = TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0 + TOOLBAR_GAP;
+        let (bx, by) = pill_cell(min_x, SIDEBAR_BAR_TOP, 0);
         bar.mouse_down(bx, by);
         bar.mouse_up(bx, by);
         assert_eq!(count.get(), 1);
@@ -1017,7 +1031,7 @@ mod tests {
         let count: Rc<Cell<u32>> = Rc::new(Cell::new(0));
         let taps = count.clone();
         let mut bar = bar().on_back(move || taps.set(taps.get() + 1));
-        let (bx, by) = back_cell();
+        let (bx, by) = back_cell(&bar);
         bar.mouse_down(bx, by);
         bar.mouse_up(bx, by);
         assert_eq!(count.get(), 1);
@@ -1040,7 +1054,8 @@ mod tests {
         bar.add_toolbar_button("magnifyingglass", move || taps.set(taps.get() + 1));
         bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
         // Dev icons follow back in the left pill.
-        let (bx, by) = pill_cell(SIDEBAR_PAD, SIDEBAR_BAR_TOP, 1);
+        let dev_x = left_bar_x(&bar);
+        let (bx, by) = pill_cell(dev_x, SIDEBAR_BAR_TOP, 1);
         bar.mouse_down(bx, by);
         bar.mouse_up(bx, by);
         assert_eq!(count.get(), 1);
