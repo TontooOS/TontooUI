@@ -15,6 +15,7 @@ struct SidebarDemo {
     sidebar: Rc<RefCell<Sidebar>>,
     history: Rc<RefCell<Vec<usize>>>,
     go_back: Rc<Cell<bool>>,
+    jump_to: Rc<Cell<Option<usize>>>,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -25,6 +26,7 @@ impl SidebarDemo {
     fn new() -> Self {
         let history: Rc<RefCell<Vec<usize>>> = Rc::new(RefCell::new(vec![0]));
         let go_back: Rc<Cell<bool>> = Rc::new(Cell::new(false));
+        let jump_to: Rc<Cell<Option<usize>>> = Rc::new(Cell::new(None));
         // Shared so press callbacks (back, dev button, selection)
         // can reach the sidebar from `'static` closures.
         let sidebar: Rc<RefCell<Sidebar>> = Rc::new(RefCell::new(
@@ -55,23 +57,23 @@ impl SidebarDemo {
             }),
         ));
         // Dev toolbar button: jumps to Notifications. Added after
-        // construction so the callback can hold the sidebar handle.
+        // construction; the callback only sets a flag (selecting
+        // here would re-enter the borrowed sidebar, draw applies it).
         sidebar.borrow_mut().add_toolbar_button(
             Button::new("")
                 .shape(ButtonShape::Circle)
                 .icon("magnifyingglass")
                 .icon_size(20.0)
                 .on_press({
-                    let sidebar = sidebar.clone();
-                    move || {
-                        sidebar.borrow_mut().select(3);
-                    }
+                    let jump_to = jump_to.clone();
+                    move || jump_to.set(Some(3))
                 }),
         );
         Self {
             sidebar,
             history,
             go_back,
+            jump_to,
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
@@ -118,6 +120,11 @@ impl App for SidebarDemo {
             };
             self.sidebar.borrow_mut().select(previous);
         }
+        // Dev search button: jump applied here, never re-entered
+        // from the press callback itself.
+        if let Some(index) = self.jump_to.take() {
+            self.sidebar.borrow_mut().select(index);
+        }
         // No titlebar: the sidebar owns the decoration (traffic
         // lights live in it) and fills the whole viewport.
         self.sidebar.borrow_mut().place(
@@ -143,7 +150,10 @@ impl App for SidebarDemo {
     }
 
     fn mouse_down(&mut self, x: f64, y: f64) {
-        if let Some(action) = self.sidebar.borrow_mut().press(x, y) {
+        // Bind first: the borrow guard would otherwise live into the
+        // else branch and panic on the second borrow.
+        let traffic = self.sidebar.borrow_mut().press(x, y);
+        if let Some(action) = traffic {
             match action {
                 TrafficAction::Close => self.command = Some(WindowCommand::Close),
                 TrafficAction::Minimize => self.command = Some(WindowCommand::Minimize),
