@@ -49,8 +49,9 @@ pub const SIDEBAR_LABEL_SIZE: f32 = 17.0;
 pub const SIDEBAR_TITLE_SIZE: f32 = 19.0;
 /// Traffic lights top edge in logical px.
 pub const SIDEBAR_TRAFFIC_TOP: f32 = 22.0;
-/// Toolbar pills row top edge in logical px (expanded sidebar).
-pub const SIDEBAR_BAR_TOP: f32 = 48.0;
+/// Toolbar pills row top edge in logical px (expanded sidebar):
+/// vertically centered on the traffic lights row.
+pub const SIDEBAR_BAR_TOP: f32 = SIDEBAR_TRAFFIC_TOP + TRAFFIC_SIZE / 2.0 - TOOLBAR_HEIGHT / 2.0;
 /// Items top edge in logical px.
 pub const SIDEBAR_ITEMS_TOP: f32 = 100.0;
 /// Content toolbar height in logical px.

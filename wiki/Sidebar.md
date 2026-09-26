@@ -20,7 +20,7 @@ lights.
 | `SIDEBAR_PAD` | 16 px sidebar inset |
 | `SIDEBAR_ICON_SIZE` / `SIDEBAR_ICON_GAP` | 22 px icon box / 12 px gap |
 | `SIDEBAR_LABEL_SIZE` / `SIDEBAR_TITLE_SIZE` | 17 px item labels / 19 px semibold toolbar title |
-| `SIDEBAR_TRAFFIC_TOP` / `SIDEBAR_BAR_TOP` / `SIDEBAR_ITEMS_TOP` | 22 px lights top / 48 px pills row / 100 px items top |
+| `SIDEBAR_TRAFFIC_TOP` / `SIDEBAR_BAR_TOP` / `SIDEBAR_ITEMS_TOP` | 22 px lights top / pills row centered on lights / 100 px items top |
 | `SIDEBAR_TOOLBAR_H` | 64 px content toolbar height (collapsed pills row) |
 
 Traffic geometry (`TRAFFIC_LEFT`, `TRAFFIC_SIZE`, `TRAFFIC_GAP`)
