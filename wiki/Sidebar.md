@@ -44,16 +44,14 @@ Icon tint defaults to the theme accent.
 pub fn new(items: Vec<SidebarItem>) -> Self
 pub fn page(self, page: impl View + 'static) -> Self
 pub fn width(self, px: f32) -> Self
-pub fn back_button(self, show: bool) -> Self
-pub fn set_back_button(&mut self, show: bool)
+pub fn left_button(self, slot: usize, icon: impl Into<String>, on_press: impl FnMut() + 'static) -> Self
+pub fn set_left_button(&mut self, slot: usize, icon: impl Into<String>, on_press: impl FnMut() + 'static) -> bool
+pub fn clear_left_button(&mut self, slot: usize)
 pub fn toggle_button(self, show: bool) -> Self
 pub fn set_toggle_button(&mut self, show: bool)
 pub fn collapsible(self, collapsible: bool) -> Self
 pub fn set_collapsible(&mut self, collapsible: bool)
-pub fn toolbar_button(self, icon: impl Into<String>, on_press: impl FnMut() + 'static) -> Self
-pub fn add_toolbar_button(&mut self, icon: impl Into<String>, on_press: impl FnMut() + 'static)
 pub fn on_select(self, callback: impl FnMut(usize) + 'static) -> Self
-pub fn on_back(self, callback: impl FnMut() + 'static) -> Self
 pub fn on_collapse(self, callback: impl FnMut(bool) + 'static) -> Self
 pub fn set_title(&mut self, title: impl Into<String>)
 pub fn clear_title(&mut self)
@@ -82,21 +80,22 @@ pub fn page_key(&mut self, key: Key) -> bool
   toolbar title follows the selected label until `set_title`
   overrides it (`clear_title` restores the follow mode).
 - The toolbar holds two `BasicToolbar` pills (see
-  [Toolbar.md](Toolbar.md)): back (optional via `back_button`) plus
-  dev icons share the left pill, the toggle rides alone far right
-  (optional via `toggle_button`). An empty left pill is skipped
-  entirely. `collapsible(false)` keeps the toggle visible but gray
-  and ignores its clicks. Pill clicks land in
+  [Toolbar.md](Toolbar.md)), both fixed at the top: the left pill
+  holds two optional slots (slot 0 first, slot 1 second; each set
+  via `left_button` with an icon plus press callback, removed via
+  `clear_left_button`; unset slots stay absent and out-of-range
+  slots are rejected), the toggle rides alone far right (shown by
+  default, optional via `toggle_button`). An empty left pill is
+  skipped entirely. `collapsible(false)` keeps the toggle visible
+  but gray and ignores its clicks. Pill clicks land in
   shared pending state and apply on the next mouse-up or draw, so
   unit tests never need a draw in between.
 - Item clicks select (firing `on_select` on change); programmatic
-  `select` returns false out of range. The back button only fires
-  `on_back` (history stays the app's job, see the demo).
+  `select` returns false out of range. Slot callbacks only fire
+  their own press action (history stays the app's job, see the
+  demo: slot 0 goes back, slot 1 jumps to Notifications).
 - The single toggle flips the column and fires `on_collapse`;
   `set_collapsed` stays silent.
-- Dev icons carry their own press callbacks inside the left
-  pill. The example adds one after construction so its callback
-  can hold a shared sidebar handle.
 - `wants_backdrop` stays true while the Lens pills are on screen;
   return it from `App::wants_backdrop` like the toolbar demo.
 - `press` reports traffic hits for the shell `WindowCommand`
@@ -106,22 +105,22 @@ pub fn page_key(&mut self, key: Key) -> bool
   far-right pill group.
 - `page_text` and `page_key` reach the active page through the
   `View` protocol; anything beyond that downcasts through
-  `page_mut` (see `examples/sidebar.rs` for the shared-handle
-  pattern).
+  `page_mut`.
 
 ## Usage / Example
 
 Run `cargo run --example sidebar`: five tinted items with text
-pages, back history, a dev search button jumping to Notifications
-and collapse. No titlebar: the sidebar fills the viewport and owns
-the decoration.
+pages, slot 0 going back through history, slot 1 jumping to
+Notifications and the toggle collapsing. No titlebar: the sidebar
+fills the viewport and owns the decoration.
 
 ```rust
 let mut bar = Sidebar::new(vec![
     SidebarItem::new("General", "gear"),
     SidebarItem::new("Storage", "internaldrive"),
 ])
-.page(settings_form);
+.page(settings_form)
+.left_button(0, "chevron.left", || go_back());
 bar.set_theme(accent, true);
 ```
 

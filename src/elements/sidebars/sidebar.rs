@@ -94,29 +94,34 @@ impl SidebarItem {
     }
 }
 
+/// One optional left-pill button: icon plus press callback.
+/// Slot 0 renders first, slot 1 second; unset slots stay absent.
+struct LeftSlot {
+    icon: String,
+    on_press: Box<dyn FnMut()>,
+}
+
 /// App sidebar: full-height navigation column with embedded traffic
 /// lights (replacing the titlebar decoration), icon items and a
-/// content toolbar with back, title, dev buttons and a single far-
-/// right toggle. Selecting an item switches the right-side page,
-/// which the sidebar owns (one page per item; missing pages stay
-/// empty). Collapsing hides the column and lets the content fill
-/// the width; the toggle button reopens it.
+/// content toolbar with two optional slot buttons, title and a
+/// single far-right toggle. Selecting an item switches the
+/// right-side page, which the sidebar owns (one page per item;
+/// missing pages stay empty). Collapsing hides the column and lets
+/// the content fill the width; the toggle button reopens it.
 pub struct Sidebar {
     items: Vec<SidebarItem>,
     pages: Vec<Box<dyn View>>,
     selected: usize,
     on_select: Option<Box<dyn FnMut(usize)>>,
     title: Option<String>,
-    show_back: bool,
-    on_back: Option<Box<dyn FnMut()>>,
     collapsed: bool,
     on_collapse: Option<Box<dyn FnMut(bool)>>,
     show_toggle: bool,
     collapsible: bool,
     left_bar: BasicToolbar,
     right_bar: BasicToolbar,
-    dev_icons: Vec<String>,
-    dev_actions: Vec<Box<dyn FnMut()>>,
+    left_slots: [Option<LeftSlot>; 2],
+    slot_map: Vec<usize>,
     pending: Rc<Cell<Option<PendingAction>>>,
     width_setting: f32,
     accent: Color,
@@ -140,16 +145,14 @@ impl Sidebar {
             selected: 0,
             on_select: None,
             title: None,
-            show_back: true,
             show_toggle: true,
             collapsible: true,
-            on_back: None,
             collapsed: false,
             on_collapse: None,
             left_bar: BasicToolbar::new(),
             right_bar: BasicToolbar::new(),
-            dev_icons: Vec::new(),
-            dev_actions: Vec::new(),
+            left_slots: [None, None],
+            slot_map: Vec::new(),
             pending,
             width_setting: SIDEBAR_W,
             accent: Color::from_rgb8(0x00, 0x7a, 0xff),
@@ -167,18 +170,26 @@ impl Sidebar {
         bar
     }
 
-    /// Rebuild the pills: left holds back (optional) plus the dev
-    /// icons, right holds the toggle alone (optional, far right).
-    /// Actions report through shared pending state (applied on the
-    /// next mouse-up or draw).
+    /// Rebuild the pills: left holds the two optional slots (slot
+    /// 0 first, slot 1 second; unset slots stay absent), right
+    /// holds the toggle alone (optional, far right). Both pills sit
+    /// fixed at the top: traffic row when expanded, toolbar row
+    /// when collapsed. Actions report through shared pending state
+    /// (applied on the next mouse-up or draw).
     fn sync_bars(&mut self) {
-        let mut left = Vec::new();
-        if self.show_back {
-            left.push(ToolbarItem::icon("chevron.left"));
-        }
-        for name in &self.dev_icons {
-            left.push(ToolbarItem::icon(name.clone()));
-        }
+        let icons: Vec<(usize, String)> = self
+            .left_slots
+            .iter()
+            .enumerate()
+            .filter_map(|(slot, entry)| {
+                entry.as_ref().map(|button| (slot, button.icon.clone()))
+            })
+            .collect();
+        self.slot_map = icons.iter().map(|(slot, _)| *slot).collect();
+        let left: Vec<ToolbarItem> = icons
+            .into_iter()
+            .map(|(_, icon)| ToolbarItem::icon(icon))
+            .collect();
         let pending = self.pending.clone();
         self.left_bar = BasicToolbar::from_items(left).on_action(move |index| {
             pending.set(Some(PendingAction::Cell(index)));
@@ -201,25 +212,17 @@ impl Sidebar {
     }
 
     /// Apply one pending pill action. Left-pill cells resolve to
-    /// back, then dev callbacks in pill order.
+    /// their slot callback in pill order.
     fn drain_pending(&mut self) {
         match self.pending.take() {
             Some(PendingAction::Toggle) => {
                 self.toggle_sidebar()
             }
             Some(PendingAction::Cell(index)) => {
-                let mut k = index;
-                if self.show_back {
-                    if k == 0 {
-                        if let Some(callback) = self.on_back.as_mut() {
-                            callback();
-                        }
-                        return;
+                if let Some(&slot) = self.slot_map.get(index) {
+                    if let Some(button) = self.left_slots[slot].as_mut() {
+                        (button.on_press)();
                     }
-                    k -= 1;
-                }
-                if let Some(action) = self.dev_actions.get_mut(k) {
-                    action();
                 }
             }
             None => {}
@@ -240,15 +243,44 @@ impl Sidebar {
         self
     }
 
-    /// Back button in the left pill (default `true`).
-    pub fn back_button(mut self, show: bool) -> Self {
-        self.show_back = show;
-        self.sync_bars();
+    /// Left-pill button in slot 0 or 1: icon plus press callback.
+    /// Unset slots stay absent; out-of-range slots are ignored.
+    pub fn left_button(
+        mut self,
+        slot: usize,
+        icon: impl Into<String>,
+        on_press: impl FnMut() + 'static,
+    ) -> Self {
+        self.set_left_button(slot, icon, on_press);
         self
     }
 
-    pub fn set_back_button(&mut self, show: bool) {
-        self.show_back = show;
+    /// Set a left-pill button after construction. Returns false for
+    /// out-of-range slots (only 0 and 1 exist).
+    pub fn set_left_button(
+        &mut self,
+        slot: usize,
+        icon: impl Into<String>,
+        on_press: impl FnMut() + 'static,
+    ) -> bool {
+        if slot >= self.left_slots.len() {
+            return false;
+        }
+        self.left_slots[slot] = Some(LeftSlot {
+            icon: icon.into(),
+            on_press: Box::new(on_press),
+        });
+        self.sync_bars();
+        true
+    }
+
+    /// Remove a left-pill button; the slot stays absent until set
+    /// again. No-op for out-of-range slots.
+    pub fn clear_left_button(&mut self, slot: usize) {
+        if slot >= self.left_slots.len() {
+            return;
+        }
+        self.left_slots[slot] = None;
         self.sync_bars();
     }
 
@@ -283,34 +315,10 @@ impl Sidebar {
         self
     }
 
-    /// Fires when the back button is pressed (history is the app's
-    /// job).
-    pub fn on_back(mut self, callback: impl FnMut() + 'static) -> Self {
-        self.on_back = Some(Box::new(callback));
-        self
-    }
-
     /// Fires with the collapsed state on every user collapse flip.
     pub fn on_collapse(mut self, callback: impl FnMut(bool) + 'static) -> Self {
         self.on_collapse = Some(Box::new(callback));
         self
-    }
-
-    /// Extra icon in the left pill, after back, with its own
-    /// press callback.
-    pub fn toolbar_button(mut self, icon: impl Into<String>, on_press: impl FnMut() + 'static) -> Self {
-        self.dev_icons.push(icon.into());
-        self.dev_actions.push(Box::new(on_press));
-        self.sync_bars();
-        self
-    }
-
-    /// Add a toolbar icon after construction (for callbacks that
-    /// need a shared handle to the sidebar itself).
-    pub fn add_toolbar_button(&mut self, icon: impl Into<String>, on_press: impl FnMut() + 'static) {
-        self.dev_icons.push(icon.into());
-        self.dev_actions.push(Box::new(on_press));
-        self.sync_bars();
     }
 
     /// Fixed toolbar title (follows the selected item label when
@@ -540,9 +548,9 @@ impl Sidebar {
         }
     }
 
-    /// Left pill icon count (back when shown, then devs).
+    /// Left pill icon count (set slots only).
     fn left_count(&self) -> usize {
-        (if self.show_back { 1 } else { 0 }) + self.dev_icons.len()
+        self.left_slots.iter().flatten().count()
     }
 
     /// Left pill width in logical px, zero when empty.
@@ -990,7 +998,7 @@ mod tests {
     }
 
     #[test]
-    fn hidden_toggle_moves_back_first() {
+    fn hidden_toggle_keeps_slot_first() {
         use std::cell::Cell;
         use std::rc::Rc;
 
@@ -998,9 +1006,9 @@ mod tests {
         let taps = count.clone();
         let mut bar = Sidebar::new(vec![SidebarItem::new("G", "gear")])
             .toggle_button(false)
-            .on_back(move || taps.set(taps.get() + 1));
+            .left_button(0, "chevron.left", move || taps.set(taps.get() + 1));
         bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
-        // Back is the first left-pill icon (toggle lives far right).
+        // Slot 0 is the first left-pill icon (toggle lives far right).
         // Toggle hidden: the pill sits right after traffic.
         let min_x = TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0 + TOOLBAR_GAP;
         let (bx, by) = pill_cell(min_x, SIDEBAR_BAR_TOP, 0);
@@ -1011,9 +1019,7 @@ mod tests {
 
     #[test]
     fn empty_left_pill_is_skipped() {
-        let mut bar = Sidebar::new(vec![SidebarItem::new("G", "gear")])
-            .toggle_button(false)
-            .back_button(false);
+        let mut bar = Sidebar::new(vec![SidebarItem::new("G", "gear")]).toggle_button(false);
         bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
         assert_eq!(bar.left_bar_w(), 0.0);
         // Click where the pill would sit: nothing happens.
@@ -1024,36 +1030,48 @@ mod tests {
     }
 
     #[test]
-    fn back_button_fires_when_shown() {
+    fn slot_button_fires_and_clears() {
         use std::cell::Cell;
         use std::rc::Rc;
 
         let count: Rc<Cell<u32>> = Rc::new(Cell::new(0));
         let taps = count.clone();
-        let mut bar = bar().on_back(move || taps.set(taps.get() + 1));
+        let mut bar = Sidebar::new(vec![SidebarItem::new("G", "gear")])
+            .left_button(0, "chevron.left", move || taps.set(taps.get() + 1));
+        bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
         let (bx, by) = back_cell(&bar);
         bar.mouse_down(bx, by);
         bar.mouse_up(bx, by);
         assert_eq!(count.get(), 1);
-        // Hidden back never fires (left pill stays empty there).
-        let mut hidden = Sidebar::new(vec![SidebarItem::new("G", "gear")]).back_button(false);
-        hidden.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
-        hidden.mouse_down(bx, by);
-        hidden.mouse_up(bx, by);
+        // Cleared slot never fires (left pill stays empty there).
+        bar.clear_left_button(0);
+        bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
+        assert_eq!(bar.left_bar_w(), 0.0);
+        bar.mouse_down(bx, by);
+        bar.mouse_up(bx, by);
         assert_eq!(count.get(), 1);
     }
 
     #[test]
-    fn dev_icon_fires_its_callback() {
+    fn out_of_range_slot_is_rejected() {
+        let mut bar = Sidebar::new(vec![SidebarItem::new("G", "gear")]);
+        assert!(!bar.set_left_button(2, "x", || {}));
+        bar.clear_left_button(7);
+        assert_eq!(bar.left_bar_w(), 0.0);
+    }
+
+    #[test]
+    fn second_slot_fires_its_callback() {
         use std::cell::Cell;
         use std::rc::Rc;
 
         let count: Rc<Cell<u32>> = Rc::new(Cell::new(0));
         let taps = count.clone();
-        let mut bar = bar();
-        bar.add_toolbar_button("magnifyingglass", move || taps.set(taps.get() + 1));
+        let mut bar = Sidebar::new(vec![SidebarItem::new("G", "gear")])
+            .left_button(0, "chevron.left", || {})
+            .left_button(1, "magnifyingglass", move || taps.set(taps.get() + 1));
         bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
-        // Dev icons follow back in the left pill.
+        // Slot 1 is the second icon in the left pill.
         let dev_x = left_bar_x(&bar);
         let (bx, by) = pill_cell(dev_x, SIDEBAR_BAR_TOP, 1);
         bar.mouse_down(bx, by);

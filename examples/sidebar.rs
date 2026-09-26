@@ -51,18 +51,15 @@ impl SidebarDemo {
                     }
                 }
             })
-            .on_back({
+            .left_button(0, "chevron.left", {
                 let go_back = go_back.clone();
                 move || go_back.set(true)
+            })
+            .left_button(1, "magnifyingglass", {
+                let jump_to = jump_to.clone();
+                move || jump_to.set(Some(3))
             }),
         ));
-        // Dev toolbar icon: jumps to Notifications. Added after
-        // construction; the callback only sets a flag (selecting
-        // here would re-enter the borrowed sidebar, draw applies it).
-        sidebar.borrow_mut().add_toolbar_button("magnifyingglass", {
-            let jump_to = jump_to.clone();
-            move || jump_to.set(Some(3))
-        });
         Self {
             sidebar,
             history,
