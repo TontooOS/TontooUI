@@ -1,10 +1,11 @@
 use std::any::Any;
 use std::cell::Cell;
 use std::rc::Rc;
+use std::time::Instant;
 
 use vello::Scene;
-use vello::kurbo::{Affine, Circle, Line, RoundedRect, Stroke};
-use vello::peniko::{Brush, Color, Fill};
+use vello::kurbo::{Affine, Circle, Line, Rect, RoundedRect, Stroke};
+use vello::peniko::{BlendMode, Brush, Color, Fill};
 
 use super::super::groupbox::{GROUP_BG_DARK, GROUP_BG_LIGHT};
 use super::super::images::SFSymbolImage;
@@ -17,6 +18,7 @@ use super::super::titlebar::{
 use super::super::toolbar::{
     BasicToolbar, ToolbarItem, TOOLBAR_GAP, TOOLBAR_HEIGHT, TOOLBAR_HIT, TOOLBAR_PAD_X,
 };
+use crate::animation::{Easing, Tween, TweenAnim};
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, draw_layout};
 use crate::renderer::window::Key;
@@ -56,6 +58,8 @@ pub const SIDEBAR_BAR_TOP: f32 = SIDEBAR_TRAFFIC_TOP + TRAFFIC_SIZE / 2.0 - TOOL
 pub const SIDEBAR_ITEMS_TOP: f32 = 100.0;
 /// Content toolbar height in logical px.
 pub const SIDEBAR_TOOLBAR_H: f32 = 64.0;
+/// Collapse/expand slide plus fade in seconds.
+pub const SIDEBAR_COLLAPSE_SECONDS: f32 = 0.22;
 /// Selected row fill in dark mode.
 const SIDEBAR_SEL_DARK: Color = Color::from_rgba8(255, 255, 255, 28);
 /// Selected row fill in light mode.
@@ -116,6 +120,9 @@ pub struct Sidebar {
     title: Option<String>,
     collapsed: bool,
     on_collapse: Option<Box<dyn FnMut(bool)>>,
+    collapse_anim: Option<TweenAnim<f32>>,
+    collapse_t0: Instant,
+    anim_p: f32,
     show_toggle: bool,
     collapsible: bool,
     left_bar: BasicToolbar,
@@ -149,6 +156,9 @@ impl Sidebar {
             collapsible: true,
             collapsed: false,
             on_collapse: None,
+            collapse_anim: None,
+            collapse_t0: Instant::now(),
+            anim_p: 0.0,
             left_bar: BasicToolbar::new(),
             right_bar: BasicToolbar::new(),
             left_slots: [None, None],
@@ -354,25 +364,60 @@ impl Sidebar {
         self.collapsed
     }
 
-    /// Collapse programmatically (no callback; use
-    /// `toggle_sidebar` for the user path).
+    /// Collapse programmatically (no callback, no animation: snaps
+    /// at once; use `toggle_sidebar` for the user path).
     pub fn set_collapsed(&mut self, collapsed: bool) {
         self.collapsed = collapsed;
+        self.anim_p = if collapsed { 1.0 } else { 0.0 };
+        self.collapse_anim = None;
         self.sync_bars();
     }
 
-    /// User collapse flip: toggles and fires `on_collapse`.
-    /// Ignored while `collapsible(false)` (the collapse pill is
-    /// gone; the toggle cell is the only UI path).
+    /// User collapse flip: slides plus fades toward the new state
+    /// and fires `on_collapse`. Ignored while `collapsible(false)`
+    /// (the collapse pill is gone; the toggle cell is the only UI
+    /// path). `is_collapsed` flips at once; the visuals catch up
+    /// over `SIDEBAR_COLLAPSE_SECONDS`.
     pub fn toggle_sidebar(&mut self) {
         if !self.collapsible {
             return;
         }
         self.collapsed = !self.collapsed;
+        let target = if self.collapsed { 1.0 } else { 0.0 };
+        self.collapse_anim = Some(TweenAnim::new(
+            Tween::new(self.anim_p, target, SIDEBAR_COLLAPSE_SECONDS).easing(Easing::CubicOut),
+        ));
+        self.collapse_t0 = Instant::now();
         self.sync_bars();
         if let Some(callback) = self.on_collapse.as_mut() {
             callback(self.collapsed);
         }
+    }
+
+    /// Collapse progress 0 (expanded) to 1 (collapsed) for a
+    /// from/to pair. Pure sampling helper for tests.
+    pub fn collapse_sample(from: f32, to: f32, elapsed: f32) -> (f32, bool) {
+        Tween::new(from, to, SIDEBAR_COLLAPSE_SECONDS)
+            .easing(Easing::CubicOut)
+            .sample(elapsed)
+    }
+
+    /// Advance the collapse animation to `elapsed` seconds since the
+    /// last flip. `draw` feeds the live clock; tests feed fake time.
+    pub fn update_progress(&mut self, elapsed: f32) {
+        let (done, value) = match self.collapse_anim.as_mut() {
+            Some(anim) => (anim.update(elapsed), *anim.value()),
+            None => return,
+        };
+        if done {
+            self.collapse_anim = None;
+        }
+        self.anim_p = value;
+    }
+
+    /// True while the collapse animation runs.
+    pub fn is_animating(&self) -> bool {
+        self.collapse_anim.is_some()
     }
 
     /// Mutable page access for downcasting (concrete event
@@ -414,12 +459,10 @@ impl Sidebar {
         true
     }
 
+    /// Animated column width: full while expanded, zero while
+    /// collapsed, sliding between during the fade.
     fn bar_w(&self) -> f32 {
-        if self.collapsed {
-            0.0
-        } else {
-            self.width_setting
-        }
+        self.width_setting * (1.0 - self.anim_p)
     }
 
     fn sidebar_bg(&self) -> Color {
@@ -540,8 +583,8 @@ impl Sidebar {
         }
     }
 
-    fn toolbar_cy(&self) -> f32 {
-        if self.collapsed {
+    fn toolbar_cy_for(&self, collapsed: bool) -> f32 {
+        if collapsed {
             self.y + (SIDEBAR_TOOLBAR_H - TOOLBAR_HEIGHT) / 2.0
         } else {
             self.y + SIDEBAR_BAR_TOP
@@ -572,12 +615,12 @@ impl Sidebar {
         }
     }
 
-    fn title_x(&self) -> f32 {
-        if self.collapsed {
-            self.x + TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0 + SIDEBAR_PAD
-        } else {
-            self.content_x() + SIDEBAR_PAD
-        }
+    fn title_x(&self, p: f32) -> f32 {
+        // Title slides between content (expanded) and traffic
+        // (collapsed) while the column fades.
+        let expanded_x = self.content_x() + SIDEBAR_PAD;
+        let collapsed_x = self.traffic_end() + SIDEBAR_PAD;
+        expanded_x * (1.0 - p) + collapsed_x * p
     }
 
     /// Right edge x of the traffic cluster (pills start after it,
@@ -587,8 +630,16 @@ impl Sidebar {
     }
 
     fn place_bars(&mut self, fonts: &mut FontSystem) {
-        let cy = self.toolbar_cy();
-        if self.collapsed {
+        let collapsed = self.collapsed;
+        self.place_bars_for(fonts, collapsed);
+    }
+
+    /// Place both pills for either end state (the crossfade draws
+    /// both layouts mid-flight, then restores the target one for
+    /// hit-testing).
+    fn place_bars_for(&mut self, fonts: &mut FontSystem, collapsed: bool) {
+        let cy = self.toolbar_cy_for(collapsed);
+        if collapsed {
             // Far-right group in the content: left pill, gap, toggle.
             if self.right_bar_w() > 0.0 {
                 let right_x = self.x + self.width - SIDEBAR_PAD - self.right_bar_w();
@@ -707,33 +758,39 @@ impl Sidebar {
         if self.width <= 0.0 || self.height <= 0.0 {
             return;
         }
-        let scale = fonts.scale as f64;
-        let px = |v: f32| v as f64 * scale;
+        // Advance the collapse slide plus fade.
+        self.update_progress(self.collapse_t0.elapsed().as_secs_f32());
+        let p = self.anim_p;
+        let cross = p > 0.001 && p < 0.999;
         let bar_w = self.bar_w();
         // Sidebar body (full height, square: the shell rounds the window).
         if bar_w > 0.0 {
-            scene.fill(
-                Fill::NonZero,
-                Affine::IDENTITY,
-                &Brush::Solid(self.sidebar_bg()),
-                None,
-                &vello::kurbo::Rect::new(px(self.x), px(self.y), px(self.x + bar_w), px(self.y + self.height)),
-            );
-            // Divider between sidebar and content.
-            let dx = self.x + bar_w;
-            scene.stroke(
-                &Stroke::new(1.0 * scale),
-                Affine::IDENTITY,
-                &Brush::Solid(self.divider_color()),
-                None,
-                &Line::new((px(dx), px(self.y)), (px(dx), px(self.y + self.height))),
-            );
-            self.render_items(scene, fonts, images);
+            if cross {
+                // Shrinking column: clip to the live width and fade out.
+                let scale = fonts.scale as f64;
+                let clip = Rect::new(
+                    self.x as f64 * scale,
+                    self.y as f64 * scale,
+                    (self.x + bar_w) as f64 * scale,
+                    (self.y + self.height) as f64 * scale,
+                );
+                scene.push_layer(
+                    Fill::NonZero,
+                    BlendMode::default(),
+                    (1.0 - p).clamp(0.0, 1.0),
+                    Affine::IDENTITY,
+                    &clip,
+                );
+                self.paint_body(scene, fonts, images, bar_w);
+                scene.pop_layer();
+            } else {
+                self.paint_body(scene, fonts, images, bar_w);
+            }
         }
         // Traffic on top of everything (sidebar top when expanded,
         // content top-left when collapsed).
         self.render_traffic(scene, fonts);
-        self.render_toolbar(scene, fonts, images);
+        self.render_toolbar(scene, fonts, images, p, cross);
         // Active page below the toolbar.
         let (px0, py0, pw, ph) = self.page_rect();
         if pw > 0.0 && ph > 0.0 {
@@ -742,6 +799,35 @@ impl Sidebar {
                 page.draw(scene, fonts, images);
             }
         }
+    }
+
+    /// Sidebar body paint: background, content divider and items.
+    fn paint_body(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+        bar_w: f32,
+    ) {
+        let scale = fonts.scale as f64;
+        let px = |v: f32| v as f64 * scale;
+        scene.fill(
+            Fill::NonZero,
+            Affine::IDENTITY,
+            &Brush::Solid(self.sidebar_bg()),
+            None,
+            &Rect::new(px(self.x), px(self.y), px(self.x + bar_w), px(self.y + self.height)),
+        );
+        // Divider between sidebar and content.
+        let dx = self.x + bar_w;
+        scene.stroke(
+            &Stroke::new(1.0 * scale),
+            Affine::IDENTITY,
+            &Brush::Solid(self.divider_color()),
+            None,
+            &Line::new((px(dx), px(self.y)), (px(dx), px(self.y + self.height))),
+        );
+        self.render_items(scene, fonts, images);
     }
 
     fn render_traffic(&self, scene: &mut Scene, fonts: &FontSystem) {
@@ -820,7 +906,14 @@ impl Sidebar {
         }
     }
 
-    fn render_toolbar(&mut self, scene: &mut Scene, fonts: &mut FontSystem, images: &mut ImageLoader<'_>) {
+    fn render_toolbar(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+        p: f32,
+        cross: bool,
+    ) {
         // Pending pill actions apply here too (clicks handled
         // between frames still land before the next paint).
         self.drain_pending();
@@ -830,10 +923,55 @@ impl Sidebar {
         draw_layout(
             scene,
             &layout,
-            self.title_x(),
+            self.title_x(p),
             self.y + (SIDEBAR_TOOLBAR_H - th / fonts.scale) / 2.0,
             fonts.scale,
         );
+        if cross && !images.is_capture_pass() {
+            // Crossfade mid-flight: expanded pills out, collapsed
+            // pills in, then restore the target layout so hit cells
+            // match what the user sees at rest.
+            let target = self.collapsed;
+            let scale = fonts.scale as f64;
+            let area = Rect::new(
+                self.x as f64 * scale,
+                self.y as f64 * scale,
+                (self.x + self.width) as f64 * scale,
+                (self.y + self.height) as f64 * scale,
+            );
+            self.place_bars_for(fonts, false);
+            scene.push_layer(
+                Fill::NonZero,
+                BlendMode::default(),
+                (1.0 - p).clamp(0.0, 1.0),
+                Affine::IDENTITY,
+                &area,
+            );
+            self.draw_pills(scene, fonts, images);
+            scene.pop_layer();
+            self.place_bars_for(fonts, true);
+            scene.push_layer(
+                Fill::NonZero,
+                BlendMode::default(),
+                p.clamp(0.0, 1.0),
+                Affine::IDENTITY,
+                &area,
+            );
+            self.draw_pills(scene, fonts, images);
+            scene.pop_layer();
+            self.place_bars_for(fonts, target);
+        } else {
+            self.draw_pills(scene, fonts, images);
+        }
+    }
+
+    /// Draw both pills at their placed rects.
+    fn draw_pills(
+        &mut self,
+        scene: &mut Scene,
+        fonts: &mut FontSystem,
+        images: &mut ImageLoader<'_>,
+    ) {
         if self.left_bar_w() > 0.0 {
             self.left_bar.draw(scene, fonts, images);
         }
@@ -928,6 +1066,54 @@ mod tests {
         let mut bar = bar();
         bar.mouse_down(100.0, (SIDEBAR_ITEMS_TOP + SIDEBAR_ROW_H + 10.0) as f64);
         assert_eq!(bar.selected_index(), 1);
+    }
+
+    #[test]
+    fn collapse_sample_eases_out() {
+        let (start, running) = Sidebar::collapse_sample(0.0, 1.0, 0.0);
+        assert_eq!(start, 0.0);
+        assert!(!running);
+        // CubicOut rushes ahead: halfway through time means 7/8 done.
+        let (mid, running) = Sidebar::collapse_sample(0.0, 1.0, SIDEBAR_COLLAPSE_SECONDS / 2.0);
+        assert!((mid - 0.875).abs() < 1e-6);
+        assert!(!running);
+        let (end, done) =
+            Sidebar::collapse_sample(0.0, 1.0, SIDEBAR_COLLAPSE_SECONDS + 1.0);
+        assert_eq!(end, 1.0);
+        assert!(done);
+    }
+
+    #[test]
+    fn toggle_animates_width_and_fade() {
+        let mut bar = bar();
+        bar.toggle_sidebar();
+        assert!(bar.is_collapsed());
+        assert!(bar.is_animating());
+        // Mid-flight: column shrinks, content follows.
+        bar.update_progress(SIDEBAR_COLLAPSE_SECONDS / 2.0);
+        assert!(bar.is_animating());
+        let mid_w = bar.bar_w();
+        assert!(mid_w > 0.0 && mid_w < SIDEBAR_W);
+        assert_eq!(bar.page_rect().0, mid_w);
+        // End: snapped shut, animation cleared.
+        bar.update_progress(SIDEBAR_COLLAPSE_SECONDS + 1.0);
+        assert!(!bar.is_animating());
+        assert_eq!(bar.bar_w(), 0.0);
+        // Expand reverses back to full width.
+        bar.toggle_sidebar();
+        assert!(!bar.is_collapsed());
+        bar.update_progress(SIDEBAR_COLLAPSE_SECONDS + 1.0);
+        assert_eq!(bar.bar_w(), SIDEBAR_W);
+    }
+
+    #[test]
+    fn set_collapsed_snaps_without_animation() {
+        let mut bar = bar();
+        bar.set_collapsed(true);
+        assert!(!bar.is_animating());
+        assert_eq!(bar.bar_w(), 0.0);
+        bar.set_collapsed(false);
+        assert_eq!(bar.bar_w(), SIDEBAR_W);
     }
 
     /// Center of a pill cell at `(bar_x, bar_y)`: leading layout,

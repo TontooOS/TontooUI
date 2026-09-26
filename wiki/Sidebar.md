@@ -22,6 +22,7 @@ next to the traffic lights.
 | `SIDEBAR_LABEL_SIZE` / `SIDEBAR_TITLE_SIZE` | 17 px item labels / 19 px semibold toolbar title |
 | `SIDEBAR_TRAFFIC_TOP` / `SIDEBAR_BAR_TOP` / `SIDEBAR_ITEMS_TOP` | 22 px lights top / pills row centered on lights / 100 px items top |
 | `SIDEBAR_TOOLBAR_H` | 64 px content toolbar height (collapsed pills row) |
+| `SIDEBAR_COLLAPSE_SECONDS` | 0.22 s collapse slide plus fade (`CubicOut`) |
 
 Traffic geometry (`TRAFFIC_LEFT`, `TRAFFIC_SIZE`, `TRAFFIC_GAP`)
 and colors come from [Titlebar.md](Titlebar.md); the sidebar body
@@ -58,6 +59,9 @@ pub fn clear_title(&mut self)
 pub fn selected_index(&self) -> usize
 pub fn select(&mut self, index: usize) -> bool
 pub fn is_collapsed(&self) -> bool
+pub fn is_animating(&self) -> bool
+pub fn update_progress(&mut self, elapsed: f32)
+pub fn collapse_sample(from: f32, to: f32, elapsed: f32) -> (f32, bool)
 pub fn set_collapsed(&mut self, collapsed: bool)
 pub fn toggle_sidebar(&mut self)
 pub fn page_mut(&mut self, index: usize) -> Option<&mut dyn View>
@@ -95,7 +99,15 @@ pub fn page_key(&mut self, key: Key) -> bool
   their own press action (history stays the app's job, see the
   demo: slot 0 goes back, slot 1 jumps to Notifications).
 - The single toggle flips the column and fires `on_collapse`;
-  `set_collapsed` stays silent.
+  `set_collapsed` stays silent and snaps at once. `toggle_sidebar`
+  slides plus fades over `SIDEBAR_COLLAPSE_SECONDS` (`CubicOut`,
+  same `Tween` idiom as the alerts): the column shrinks from the
+  right edge while its body fades, both pill layouts crossfade and
+  the title plus page slide with the live width. `is_collapsed`
+  flips at once while the visuals catch up; `is_animating` reports
+  the flight, `update_progress` advances it (`draw` feeds the live
+  clock, tests feed fake time) and `collapse_sample` samples the
+  curve purely.
 - `wants_backdrop` stays true while the Lens pills are on screen;
   return it from `App::wants_backdrop` like the toolbar demo.
 - `press` reports traffic hits for the shell `WindowCommand`
