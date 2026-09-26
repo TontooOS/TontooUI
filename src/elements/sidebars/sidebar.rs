@@ -69,11 +69,11 @@ pub const SIDEBAR_TRAFFIC_TOP: f32 = 22.0;
 /// vertically centered on the traffic lights row.
 pub const SIDEBAR_BAR_TOP: f32 = SIDEBAR_TRAFFIC_TOP + TRAFFIC_SIZE / 2.0 - TOOLBAR_HEIGHT / 2.0;
 /// Search row top edge in logical px (below the pills).
-pub const SIDEBAR_SEARCH_TOP: f32 = 56.0;
+pub const SIDEBAR_SEARCH_TOP: f32 = 60.0;
 /// Search row height in logical px.
 pub const SIDEBAR_SEARCH_H: f32 = 36.0;
 /// Items top edge in logical px.
-pub const SIDEBAR_ITEMS_TOP: f32 = 100.0;
+pub const SIDEBAR_ITEMS_TOP: f32 = 108.0;
 /// Content toolbar height in logical px.
 pub const SIDEBAR_TOOLBAR_H: f32 = 64.0;
 /// Collapse/expand slide plus fade in seconds.

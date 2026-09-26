@@ -21,14 +21,14 @@ traffic lights.
 | `SIDEBAR_PAD` | 16 px sidebar inset |
 | `SIDEBAR_ICON_SIZE` / `SIDEBAR_ICON_GAP` | 22 px icon box / 12 px gap |
 | `SIDEBAR_LABEL_SIZE` / `SIDEBAR_TITLE_SIZE` | 17 px item labels / 19 px semibold toolbar title |
-| `SIDEBAR_TRAFFIC_TOP` / `SIDEBAR_BAR_TOP` / `SIDEBAR_ITEMS_TOP` | 22 px lights top / pills row centered on lights / 100 px items top |
+| `SIDEBAR_TRAFFIC_TOP` / `SIDEBAR_BAR_TOP` / `SIDEBAR_ITEMS_TOP` | 22 px lights top / pills row centered on lights / 108 px items top |
 | `SIDEBAR_TOOLBAR_H` | 64 px content toolbar height (collapsed pills row) |
 | `SIDEBAR_COLLAPSE_SECONDS` | 0.22 s collapse slide plus fade (`CubicOut`) |
 | `SIDEBAR_MIN_W` / `SIDEBAR_MAX_W` | 120 px absolute floor / 480 px drag cap |
 | `SIDEBAR_RESIZE_HIT` / `SIDEBAR_REOPEN_HIT` | 6 px edge grab half-width / 8 px collapsed reopen strip |
 | `SIDEBAR_CLOSE_SLOP` | 48 px below minimum snaps shut |
 | `SIDEBAR_PILL_GAP` | 12 px traffic cluster to left pill (clears glow) |
-| `SIDEBAR_SEARCH_TOP` / `SIDEBAR_SEARCH_H` | 56 px search row top / 36 px search row height |
+| `SIDEBAR_SEARCH_TOP` / `SIDEBAR_SEARCH_H` | 60 px search row top / 36 px search row height |
 
 Traffic geometry (`TRAFFIC_LEFT`, `TRAFFIC_SIZE`, `TRAFFIC_GAP`)
 and colors come from [Titlebar.md](Titlebar.md); the sidebar body
