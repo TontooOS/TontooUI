@@ -49,18 +49,18 @@ pub const SIDEBAR_REOPEN_HIT: f32 = 8.0;
 /// Dragging further than this below the minimum snaps shut.
 pub const SIDEBAR_CLOSE_SLOP: f32 = 48.0;
 /// Item row height in logical px.
-pub const SIDEBAR_ROW_H: f32 = 28.0;
+pub const SIDEBAR_ROW_H: f32 = 34.5;
 /// Sidebar inset in logical px.
 pub const SIDEBAR_PAD: f32 = 16.0;
 /// Gap between the traffic cluster and the left pill in logical
 /// px (clears the light glow plus glass reflection).
 pub const SIDEBAR_PILL_GAP: f32 = 12.0;
 /// Row icon box in logical px.
-pub const SIDEBAR_ICON_SIZE: f32 = 16.0;
+pub const SIDEBAR_ICON_SIZE: f32 = 22.0;
 /// Gap between icon and label in logical px.
-pub const SIDEBAR_ICON_GAP: f32 = 8.0;
+pub const SIDEBAR_ICON_GAP: f32 = 10.0;
 /// Item label size in logical px.
-pub const SIDEBAR_LABEL_SIZE: f32 = 11.0;
+pub const SIDEBAR_LABEL_SIZE: f32 = 14.0;
 /// Content toolbar title size in logical px.
 pub const SIDEBAR_TITLE_SIZE: f32 = 19.0;
 /// Traffic lights top edge in logical px.
@@ -209,7 +209,7 @@ impl Sidebar {
             row_gap: SIDEBAR_ICON_GAP,
             row_label: SIDEBAR_LABEL_SIZE,
             selected_fill: None,
-            item_text: None,
+            item_text: Some(Color::WHITE),
             icon_tint: None,
             column_bg: None,
             pending,
@@ -1618,8 +1618,9 @@ mod tests {
         use vello::peniko::Color;
 
         let mut bar = bar();
+        // Labels default to full white; everything else is unset.
+        assert_eq!(bar.item_text(), Some(Color::WHITE));
         assert_eq!(bar.selected_fill(), None);
-        assert_eq!(bar.item_text(), None);
         assert_eq!(bar.icon_tint(), None);
         assert_eq!(bar.column_bg(), None);
         let pink = Color::from_rgb8(0xff, 0x2d, 0x55);

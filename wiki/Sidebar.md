@@ -17,10 +17,10 @@ traffic lights.
 | Token | Value |
 |---|---|
 | `SIDEBAR_W` / `SIDEBAR_MIN_W` | 240 px default width / 220 px minimum |
-| `SIDEBAR_ROW_H` | 28 px item rows |
+| `SIDEBAR_ROW_H` | 34.5 px item rows |
 | `SIDEBAR_PAD` | 16 px sidebar inset |
-| `SIDEBAR_ICON_SIZE` / `SIDEBAR_ICON_GAP` | 16 px icon box / 8 px gap |
-| `SIDEBAR_LABEL_SIZE` / `SIDEBAR_TITLE_SIZE` | 11 px item labels / 19 px semibold toolbar title |
+| `SIDEBAR_ICON_SIZE` / `SIDEBAR_ICON_GAP` | 22 px icon box / 10 px gap |
+| `SIDEBAR_LABEL_SIZE` / `SIDEBAR_TITLE_SIZE` | 14 px item labels / 19 px semibold toolbar title |
 | `SIDEBAR_TRAFFIC_TOP` / `SIDEBAR_BAR_TOP` / `SIDEBAR_ITEMS_TOP` | 22 px lights top / pills row centered on lights / 108 px items top |
 | `SIDEBAR_TOOLBAR_H` | 64 px content toolbar height (collapsed pills row) |
 | `SIDEBAR_COLLAPSE_SECONDS` | 0.22 s collapse slide plus fade (`CubicOut`) |
@@ -158,7 +158,9 @@ pub fn page_key(&mut self, key: Key) -> bool
   the `SIDEBAR_*` tokens and tunes live via `set_row_metrics`
   (read back with `row_metrics`); the demo General page hosts one
   slider per metric for sizing by eye.
-- Row colors default to the theme and override live: selected wash
+- Row colors: labels default to full white; selected wash,
+  default icon tint and column background default to the theme.
+  All override live via selected wash
   via `set_selected_fill`, labels via `set_item_text`, the default
   icon tint via `set_icon_tint` (per-item `tint` still wins) and the
   column background via `set_column_bg` (`None` restores the theme
