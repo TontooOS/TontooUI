@@ -85,3 +85,9 @@ fn main() {
 
 See [Renderer.md](Renderer.md) for the shell and [Layout.md](Layout.md)
 for the `View` tree.
+
+## Changelog
+
+- 2026-09-26: `UrlImage` downloads through NetworkKit
+  (`networkkit::http`) instead of a direct `ureq` client. The `ureq`
+  dependency is removed.

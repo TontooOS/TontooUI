@@ -102,15 +102,15 @@ pub fn rect(&self) -> (f32, f32, f32, f32)
 ```
 
 - The download starts lazily on the first draw on a background
-  thread (`ureq` blocking client + `mpsc` channel), so the UI never
+  thread (NetworkKit blocking client + `mpsc` channel), so the UI never
   stalls. Each frame polls the channel without blocking.
 - While loading the frame shows a centered `Spinner` (the existing
   progress element, recolorable via `spinner_color`). Once the bytes
   arrive they decode through the cached `ImageLoader::raster` path
   under the `url:` key and draw like `AppImage`.
 - HTTP error statuses become `Error {code}` text (e.g. `Error 404`
-  via `ureq::Error::StatusCode`); transport failures and undecodable
-  bodies become plain `Error`. `state_value` returns `loading`,
+  via a non-2xx `networkkit::http::HttpResponse`); transport failures
+  become plain `Error`. `state_value` returns `loading`,
   `loaded` or `error`; `retry` restarts the download.
 - No network happens in unit tests: state transitions and error
   text are covered without requests.

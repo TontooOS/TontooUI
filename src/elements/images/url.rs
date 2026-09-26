@@ -22,7 +22,7 @@ enum UrlState {
 }
 
 /// Raster image from an `https://` (or `http://`) URL. The download
-/// runs on a background thread (`ureq`, blocking client) so the UI
+/// runs on a background thread (NetworkKit blocking client) so the UI
 /// never stalls: the frame shows a `Spinner` while loading, the image
 /// once decoded, and `Error {code}` text when the server answers with
 /// an HTTP error status. Display-only (no mouse handling).
@@ -172,12 +172,9 @@ impl UrlImage {
         self.rx = Some(rx);
         let url = self.url.clone();
         std::thread::spawn(move || {
-            let result = match ureq::get(&url).call() {
-                Ok(mut res) => match res.body_mut().read_to_vec() {
-                    Ok(bytes) => Ok(bytes),
-                    Err(_) => Err(None),
-                },
-                Err(ureq::Error::StatusCode(code)) => Err(Some(code)),
+            let result = match networkkit::http::HttpRequest::get(&url).send() {
+                Ok(resp) if resp.is_success() => Ok(resp.body.clone()),
+                Ok(resp) => Err(Some(resp.status)),
                 Err(_) => Err(None),
             };
             let _ = tx.send(result);
