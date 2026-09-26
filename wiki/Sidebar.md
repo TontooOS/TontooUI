@@ -26,6 +26,7 @@ next to the traffic lights.
 | `SIDEBAR_MIN_W` / `SIDEBAR_MAX_W` | 120 px absolute floor / 480 px drag cap |
 | `SIDEBAR_RESIZE_HIT` / `SIDEBAR_REOPEN_HIT` | 6 px edge grab half-width / 8 px collapsed reopen strip |
 | `SIDEBAR_CLOSE_SLOP` | 48 px below minimum snaps shut |
+| `SIDEBAR_PILL_GAP` | 12 px traffic cluster to left pill (clears glow) |
 
 Traffic geometry (`TRAFFIC_LEFT`, `TRAFFIC_SIZE`, `TRAFFIC_GAP`)
 and colors come from [Titlebar.md](Titlebar.md); the sidebar body

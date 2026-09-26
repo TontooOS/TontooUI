@@ -51,6 +51,9 @@ pub const SIDEBAR_CLOSE_SLOP: f32 = 48.0;
 pub const SIDEBAR_ROW_H: f32 = 46.0;
 /// Sidebar inset in logical px.
 pub const SIDEBAR_PAD: f32 = 16.0;
+/// Gap between the traffic cluster and the left pill in logical
+/// px (clears the light glow plus glass reflection).
+pub const SIDEBAR_PILL_GAP: f32 = 12.0;
 /// Row icon box in logical px.
 pub const SIDEBAR_ICON_SIZE: f32 = 22.0;
 /// Gap between icon and label in logical px.
@@ -288,11 +291,11 @@ impl Sidebar {
             min = min.max(SIDEBAR_PAD + self.right_bar_w() + SIDEBAR_PAD);
         }
         if self.left_bar_w() > 0.0 {
-            min = min.max(cluster + TOOLBAR_GAP + self.left_bar_w() + SIDEBAR_PAD);
+            min = min.max(cluster + SIDEBAR_PILL_GAP + self.left_bar_w() + SIDEBAR_PAD);
             if self.right_bar_w() > 0.0 {
                 min = min.max(
                     cluster
-                        + TOOLBAR_GAP
+                        + SIDEBAR_PILL_GAP
                         + self.left_bar_w()
                         + TOOLBAR_GAP
                         + self.right_bar_w()
@@ -780,12 +783,12 @@ impl Sidebar {
                 let right_x = self.x + self.bar_w() - SIDEBAR_PAD - self.right_bar_w();
                 self.right_bar.place(fonts, right_x, cy, self.right_bar_w(), TOOLBAR_HEIGHT);
                 if self.left_bar_w() > 0.0 {
-                    let min_x = self.traffic_end() + TOOLBAR_GAP;
+                    let min_x = self.traffic_end() + SIDEBAR_PILL_GAP;
                     let bar_x = (right_x - TOOLBAR_GAP - self.left_bar_w()).max(min_x);
                     self.left_bar.place(fonts, bar_x, cy, self.left_bar_w(), TOOLBAR_HEIGHT);
                 }
             } else if self.left_bar_w() > 0.0 {
-                let bar_x = self.traffic_end() + TOOLBAR_GAP;
+                let bar_x = self.traffic_end() + SIDEBAR_PILL_GAP;
                 self.left_bar.place(fonts, bar_x, cy, self.left_bar_w(), TOOLBAR_HEIGHT);
             }
         }
@@ -1265,13 +1268,13 @@ mod tests {
         let full = Sidebar::new(vec![SidebarItem::new("G", "gear")])
             .left_button(0, "chevron.left", || {})
             .left_button(1, "magnifyingglass", || {});
-        assert_eq!(full.min_bar_w(), 89.0 + 4.0 + 76.0 + 4.0 + 44.0 + 16.0);
+        assert_eq!(full.min_bar_w(), 89.0 + 12.0 + 76.0 + 4.0 + 44.0 + 16.0);
         // Hidden toggle shrinks the minimum.
         let no_toggle = Sidebar::new(vec![SidebarItem::new("G", "gear")])
             .toggle_button(false)
             .left_button(0, "chevron.left", || {})
             .left_button(1, "magnifyingglass", || {});
-        assert_eq!(no_toggle.min_bar_w(), 89.0 + 4.0 + 76.0 + 16.0);
+        assert_eq!(no_toggle.min_bar_w(), 89.0 + 12.0 + 76.0 + 16.0);
     }
 
     #[test]
@@ -1361,7 +1364,7 @@ mod tests {
     /// Left pill x in the expanded sidebar (grouped left of toggle,
     /// never on top of traffic).
     fn left_bar_x(bar: &Sidebar) -> f32 {
-        let min_x = TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0 + TOOLBAR_GAP;
+        let min_x = TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0 + SIDEBAR_PILL_GAP;
         (toggle_bar_x() - TOOLBAR_GAP - bar.left_bar_w()).max(min_x)
     }
 
@@ -1419,7 +1422,7 @@ mod tests {
         bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
         // Slot 0 is the first left-pill icon (toggle lives far right).
         // Toggle hidden: the pill sits right after traffic.
-        let min_x = TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0 + TOOLBAR_GAP;
+        let min_x = TRAFFIC_LEFT + TRAFFIC_SIZE * 3.0 + TRAFFIC_GAP * 2.0 + SIDEBAR_PILL_GAP;
         let (bx, by) = pill_cell(min_x, SIDEBAR_BAR_TOP, 0);
         bar.mouse_down(bx, by);
         bar.mouse_up(bx, by);
