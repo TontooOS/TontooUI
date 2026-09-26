@@ -381,10 +381,17 @@ impl App for SidebarDemo {
     }
 
     fn text(&mut self, text: &str) {
+        if self.picker.is_visible() && self.picker.hex_focused() {
+            self.picker.type_text(text);
+            return;
+        }
         self.sidebar.borrow_mut().page_text(text);
     }
 
     fn key(&mut self, key: Key) {
+        if self.picker.is_visible() && self.picker.key(key) {
+            return;
+        }
         self.sidebar.borrow_mut().page_key(key);
     }
 

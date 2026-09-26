@@ -123,12 +123,21 @@ pub fn card_rect(&self) -> (f32, f32, f32, f32)
 pub fn wheel_rect(&self) -> (f32, f32, f32)
 pub fn brightness_rect(&self) -> (f32, f32, f32, f32)
 pub fn opacity_rect(&self) -> (f32, f32, f32, f32)
+pub fn hex_rect(&self) -> (f32, f32, f32, f32)
+pub fn copy_rect(&self) -> (f32, f32, f32, f32)
+pub fn hex_of(color: Color) -> String
+pub fn parse_hex(text: &str) -> Option<(Hsv, f32)>
+pub fn hex_value(&self) -> String
+pub fn hex_focused(&self) -> bool
+pub fn copy_hex(&self) -> bool
 pub fn point_to_hs(&self, x: f32, y: f32) -> (f32, f32)
 pub fn hs_point(&self) -> (f32, f32)
 pub fn rect(&self) -> (f32, f32, f32, f32)
 pub fn mouse_down(&mut self, x: f64, y: f64)
 pub fn mouse_move(&mut self, x: f64, y: f64)
 pub fn mouse_up(&mut self, x: f64, y: f64)
+pub fn type_text(&mut self, content: &str)
+pub fn key(&mut self, key: Key) -> bool
 ```
 
 | Token | Value |
@@ -145,6 +154,8 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
 | `PICKER_PILL` | `#1E1E20` percent pill fill |
 | `PICKER_CHECK_A` / `PICKER_CHECK_B` | `#C0C0C0` / `#808080` checker squares |
 | `PICKER_CHECK` | 10 px checker size |
+| `PICKER_HEX_H` / `PICKER_HEX_GAP` / `PICKER_COPY_W` | 32 px hex row / 8 px field gap / 72 px copy button |
+| `PICKER_HEX_SIZE` | 14 px hex text |
 
 - Menu-like frosted popup (`GlassType::Frosted`): hue/saturation
   wheel with a crosshair (baked 256 px texture, white center glow),
@@ -158,6 +169,14 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
   into opaque right. Knob centers travel inset by the knob radius
   and the crosshair clamps inside the disc, so rings never leave
   their bars.
+- Bottom row: editable hex field plus copy button. Clicking the
+  field focuses it (unfocused it mirrors the selection as
+  `#rrggbb`, with alpha bytes while translucent); typing ASCII
+  hex applies live once 6/8 digits parse, Backspace deletes,
+  Enter applies plus defocuses, Escape defocuses, Paste inserts
+  filtered clipboard text. The copy button (or the Copy key)
+  writes the display hex to the clipboard. The app forwards its
+  `text` plus `key` while the field holds focus (see both demos).
   Skips itself in the backdrop capture pass, so the frost samples
   only what sits behind it — the app opts in with
   `wants_backdrop` while visible (see the demo, like the date

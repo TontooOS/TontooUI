@@ -263,6 +263,18 @@ impl App for ColorsDemo {
         self.focused = focused;
         self.bar.set_focused(focused);
     }
+
+    fn text(&mut self, text: &str) {
+        if self.picker.is_visible() {
+            self.picker.type_text(text);
+        }
+    }
+
+    fn key(&mut self, key: tontooui::renderer::window::Key) {
+        if self.picker.is_visible() {
+            self.picker.key(key);
+        }
+    }
 }
 
 fn main() {

@@ -7,8 +7,10 @@ use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
 
 use super::super::glass::{GlassContainer, GlassType};
 use super::super::layout::View;
+use crate::elements::textfield::{TEXTFIELD_ACCENT, caret_blink, clipboard};
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::{FontSystem, draw_layout};
+use crate::renderer::window::Key;
 use crate::theme::{GlassAmount, ThemeMode, desaturate};
 
 /// Panel padding in logical px.
@@ -29,6 +31,14 @@ pub const PICKER_RADIUS: f32 = 20.0;
 pub const PICKER_LABEL_SIZE: f32 = 13.0;
 /// Percent pill width in logical px.
 pub const PICKER_PILL_W: f32 = 64.0;
+/// Hex row height in logical px.
+pub const PICKER_HEX_H: f32 = 32.0;
+/// Gap between hex field and copy button in logical px.
+pub const PICKER_HEX_GAP: f32 = 8.0;
+/// Copy button width in logical px.
+pub const PICKER_COPY_W: f32 = 72.0;
+/// Hex text size in logical px.
+pub const PICKER_HEX_SIZE: f32 = 14.0;
 /// Label gray on the frosted panel.
 pub const PICKER_LABEL_GRAY: Color = Color::from_rgba8(255, 255, 255, 160);
 /// Percent pill fill.
@@ -178,6 +188,9 @@ pub struct ColorPicker {
     pct_text: String,
     pct_layout: Option<parley::Layout<crate::renderer::text::SolidBrush>>,
     label_layout: Option<parley::Layout<crate::renderer::text::SolidBrush>>,
+    copy_layout: Option<parley::Layout<crate::renderer::text::SolidBrush>>,
+    hex_edit: String,
+    hex_focused: bool,
     layout_scale: f32,
     dirty: bool,
 }
@@ -202,6 +215,9 @@ impl ColorPicker {
             pct_text: "100 %".to_string(),
             pct_layout: None,
             label_layout: None,
+            copy_layout: None,
+            hex_edit: String::new(),
+            hex_focused: false,
             layout_scale: 0.0,
             dirty: true,
         }
@@ -275,6 +291,7 @@ impl ColorPicker {
     pub fn dismiss(&mut self) {
         self.visible = false;
         self.drag = None;
+        self.hex_focused = false;
     }
 
     pub fn is_visible(&self) -> bool {
@@ -292,6 +309,8 @@ impl ColorPicker {
             + PICKER_LABEL_SIZE * 1.25
             + PICKER_ROW_GAP
             + PICKER_BAR_H
+            + PICKER_ROW_GAP
+            + PICKER_HEX_H
             + PICKER_PAD
     }
 
@@ -346,6 +365,88 @@ impl ColorPicker {
             w - PICKER_PAD * 2.0 - PICKER_PILL_W - 8.0,
             PICKER_BAR_H,
         )
+    }
+
+    /// Hex field rect in logical px (bottom row, left part).
+    pub fn hex_rect(&self) -> (f32, f32, f32, f32) {
+        let (x, y, w, _) = self.card_rect();
+        let (_, oy, _, oh) = self.opacity_rect();
+        let hy = oy + oh + PICKER_ROW_GAP;
+        (
+            x + PICKER_PAD,
+            hy,
+            w - PICKER_PAD * 2.0 - PICKER_COPY_W - PICKER_HEX_GAP,
+            PICKER_HEX_H,
+        )
+    }
+
+    /// Copy button rect in logical px (bottom row, right part).
+    pub fn copy_rect(&self) -> (f32, f32, f32, f32) {
+        let (x, y, w, _) = self.card_rect();
+        let (_, oy, _, oh) = self.opacity_rect();
+        let hy = oy + oh + PICKER_ROW_GAP;
+        (
+            x + w - PICKER_PAD - PICKER_COPY_W,
+            hy,
+            PICKER_COPY_W,
+            PICKER_HEX_H,
+        )
+    }
+
+    /// Display hex of a color: `#rrggbb`, with alpha bytes while
+    /// translucent.
+    pub fn hex_of(color: Color) -> String {
+        let c = color.to_rgba8();
+        if c.a == 255 {
+            format!("#{:02x}{:02x}{:02x}", c.r, c.g, c.b)
+        } else {
+            format!("#{:02x}{:02x}{:02x}{:02x}", c.r, c.g, c.b, c.a)
+        }
+    }
+
+    /// Parse `#rrggbb` or `#rrggbbAA` (`#` optional) into HSV plus
+    /// alpha. Returns `None` for anything else.
+    pub fn parse_hex(text: &str) -> Option<(Hsv, f32)> {
+        let text = text.strip_prefix('#').unwrap_or(text);
+        if text.len() != 6 && text.len() != 8 {
+            return None;
+        }
+        let bytes: Option<Vec<u8>> = text
+            .as_bytes()
+            .chunks(2)
+            .map(|pair| {
+                std::str::from_utf8(pair)
+                    .ok()
+                    .and_then(|hex| u8::from_str_radix(hex, 16).ok())
+            })
+            .collect();
+        let bytes = bytes?;
+        let (r, g, b, a) = match bytes.as_slice() {
+            [r, g, b] => (*r, *g, *b, 255),
+            [r, g, b, a] => (*r, *g, *b, *a),
+            _ => return None,
+        };
+        Some((
+            rgb_to_hsv(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0),
+            a as f32 / 255.0,
+        ))
+    }
+
+    /// Display hex of the selection (what the copy button copies).
+    pub fn hex_value(&self) -> String {
+        Self::hex_of(self.selected())
+    }
+
+    /// True while the hex field holds typing focus.
+    pub fn hex_focused(&self) -> bool {
+        self.hex_focused
+    }
+
+    /// Copy the display hex to the clipboard. Returns false when the
+    /// system clipboard is unreachable (the fallback buffer still
+    /// keeps it for in-app paste).
+    pub fn copy_hex(&self) -> bool {
+        clipboard::set(&self.hex_value())
     }
 
     /// Map a wheel point to hue/saturation (clamped inside).
@@ -426,8 +527,18 @@ impl ColorPicker {
             let (ox, _, ow, _) = self.opacity_rect();
             self.opacity = Self::slider_t(ox, ow, x);
             self.fire();
+        } else if Self::in_rect(x, y, self.hex_rect()) {
+            // Focus the hex field with a fresh buffer (unfocused it
+            // mirrors the live selection).
+            self.hex_edit.clear();
+            self.hex_focused = true;
+            self.drag = None;
+        } else if Self::in_rect(x, y, self.copy_rect()) {
+            self.copy_hex();
+            self.drag = None;
         } else if !Self::in_rect(x, y, self.card_rect()) {
             // Outside click dismisses, keeping the selection.
+            self.hex_focused = false;
             self.dismiss();
         }
     }
@@ -459,10 +570,74 @@ impl ColorPicker {
         self.drag = None;
     }
 
+    /// Type into the hex field while it holds focus: ASCII hex only,
+    /// capped at 8 digits; a complete 6/8-digit code applies live.
+    pub fn type_text(&mut self, content: &str) {
+        if !self.visible || !self.hex_focused {
+            return;
+        }
+        let mut changed = false;
+        for c in content.chars() {
+            if self.hex_edit.len() >= 8 {
+                break;
+            }
+            if c.is_ascii_hexdigit() {
+                self.hex_edit.push(c.to_ascii_lowercase());
+                changed = true;
+            }
+        }
+        if changed {
+            self.apply_hex_edit();
+        }
+    }
+
+    /// Hex field keys: Backspace deletes, Enter applies plus
+    /// defocuses, Escape defocuses, Paste inserts filtered clipboard
+    /// text, Copy copies the display hex. Returns true when consumed.
+    pub fn key(&mut self, key: Key) -> bool {
+        if !self.visible || !self.hex_focused {
+            return false;
+        }
+        match key {
+            Key::Backspace => {
+                self.hex_edit.pop();
+                self.apply_hex_edit();
+            }
+            Key::Enter => {
+                self.apply_hex_edit();
+                self.hex_focused = false;
+            }
+            Key::Escape => {
+                self.hex_focused = false;
+            }
+            Key::Paste => {
+                if let Some(text) = clipboard::get() {
+                    self.type_text(&text);
+                }
+            }
+            Key::Copy => {
+                self.copy_hex();
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    /// Apply the typed buffer when it parses (6/8 digits), else keep
+    /// the previous color and let the user finish typing.
+    fn apply_hex_edit(&mut self) {
+        if let Some((hsv, alpha)) = Self::parse_hex(&self.hex_edit) {
+            self.hsv = hsv;
+            self.opacity = alpha;
+            self.fire();
+        }
+    }
+
     fn ensure_labels(&mut self, fonts: &mut FontSystem) {
         if !self.dirty
             && self.pct_layout.is_some()
             && self.label_layout.is_some()
+            && self.copy_layout.is_some()
             && self.layout_scale == fonts.scale
         {
             return;
@@ -484,6 +659,7 @@ impl ColorPicker {
             Color::WHITE,
             None,
         ));
+        self.copy_layout = Some(fonts.layout_text("Copy", PICKER_LABEL_SIZE, Color::WHITE, None));
         self.layout_scale = fonts.scale;
         self.dirty = false;
     }
@@ -679,6 +855,86 @@ impl View for ColorPicker {
                 fonts.scale,
             );
         }
+
+        // Hex row: editable `#rrggbb[AA]` field plus copy button.
+        // Unfocused it mirrors the live selection; focused it shows
+        // the typed buffer with a caret.
+        let (hx, hy, hw, hh) = self.hex_rect();
+        let hex_body = RoundedRect::new(px(hx), px(hy), px(hx + hw), px(hy + hh), px(10.0));
+        scene.fill(
+            Fill::NonZero,
+            Affine::IDENTITY,
+            &Brush::Solid(self.eff(PICKER_PILL)),
+            None,
+            &hex_body,
+        );
+        let hex_ring = if self.hex_focused {
+            TEXTFIELD_ACCENT
+        } else {
+            Color::from_rgba8(255, 255, 255, 36)
+        };
+        scene.stroke(
+            &Stroke::new(px(2.0)),
+            Affine::IDENTITY,
+            &Brush::Solid(self.eff(hex_ring)),
+            None,
+            &hex_body,
+        );
+        let hex_text = if self.hex_focused {
+            format!("#{}", self.hex_edit)
+        } else {
+            self.hex_value()
+        };
+        let hex_layout = fonts.layout_text(&hex_text, PICKER_HEX_SIZE, Color::WHITE, None);
+        let (htw, hth) = FontSystem::layout_size(&hex_layout);
+        let htx = hx + 12.0;
+        draw_layout(
+            scene,
+            &hex_layout,
+            htx,
+            hy + (hh - hth / fonts.scale) / 2.0,
+            fonts.scale,
+        );
+        if self.hex_focused && caret_blink() {
+            let cx = htx + htw / fonts.scale;
+            scene.fill(
+                Fill::NonZero,
+                Affine::IDENTITY,
+                &Brush::Solid(Color::WHITE),
+                None,
+                &Rect::new(
+                    px(cx),
+                    px(hy + 7.0),
+                    px(cx + 2.0),
+                    px(hy + hh - 7.0),
+                ),
+            );
+        }
+        let (ccx, ccy, ccw, cch) = self.copy_rect();
+        let copy_body = RoundedRect::new(
+            px(ccx),
+            px(ccy),
+            px(ccx + ccw),
+            px(ccy + cch),
+            px(10.0),
+        );
+        scene.fill(
+            Fill::NonZero,
+            Affine::IDENTITY,
+            &Brush::Solid(self.eff(PICKER_PILL)),
+            None,
+            &copy_body,
+        );
+        if let Some(layout) = self.copy_layout.as_ref() {
+            let (tw, th) = FontSystem::layout_size(layout);
+            draw_layout(
+                scene,
+                layout,
+                ccx + (ccw - tw / fonts.scale) / 2.0,
+                ccy + (cch - th / fonts.scale) / 2.0,
+                fonts.scale,
+            );
+        }
     }
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
@@ -851,5 +1107,89 @@ mod tests {
         let (cx, cy, r) = picker.wheel_rect();
         picker.mouse_down((cx + r) as f64, cy as f64);
         assert_eq!(picker.selected().to_rgba8(), before.to_rgba8());
+    }
+
+    #[test]
+    fn hex_formats_selection() {
+        assert_eq!(
+            ColorPicker::hex_of(Color::from_rgb8(255, 0, 0)),
+            "#ff0000"
+        );
+        assert_eq!(
+            ColorPicker::hex_of(Color::from_rgba8(0x30, 0xb0, 0xc7, 200)),
+            "#30b0c7c8"
+        );
+        assert_eq!(ColorPicker::parse_hex("#ff0000").map(|(_, a)| a), Some(1.0));
+        assert!(ColorPicker::parse_hex("#xyz").is_none());
+        assert!(ColorPicker::parse_hex("#12345").is_none());
+    }
+
+    #[test]
+    fn hex_row_sits_inside_panel() {
+        let mut picker = ColorPicker::new();
+        picker.set_viewport(0.0, 0.0, 800.0, 600.0);
+        let (_, _, pw, ph) = picker.card_rect();
+        let (hx, hy, hw, hh) = picker.hex_rect();
+        let (ccx, ccy, ccw, cch) = picker.copy_rect();
+        for (rx, ry, rw, rh) in [(hx, hy, hw, hh), (ccx, ccy, ccw, cch)] {
+            let (px, py, _, _) = picker.card_rect();
+            assert!(rx >= px && ry >= py);
+            assert!(rx + rw <= px + pw + 1e-4);
+            assert!(ry + rh <= py + ph + 1e-4);
+        }
+        // Copy button right of the field, same row.
+        assert_eq!(ccy, hy);
+        assert_eq!(cch, hh);
+        assert!(ccx >= hx + hw);
+    }
+
+    #[test]
+    fn hex_typing_applies_live_and_reports() {
+        use crate::renderer::window::Key;
+        use std::cell::RefCell;
+        use std::rc::Rc;
+
+        let seen: Rc<RefCell<Option<Color>>> = Rc::new(RefCell::new(None));
+        let out = seen.clone();
+        let mut picker = ColorPicker::new().on_change(move |c| {
+            *out.borrow_mut() = Some(c);
+        });
+        picker.set_viewport(0.0, 0.0, 800.0, 600.0);
+        picker.show();
+        // Typing needs focus from a field click (default is cyan).
+        assert!(!picker.hex_focused());
+        picker.type_text("00ff00");
+        assert_eq!(picker.hex_value(), "#00ffff");
+        let (hx, hy, hw, hh) = picker.hex_rect();
+        picker.mouse_down((hx + hw / 2.0) as f64, (hy + hh / 2.0) as f64);
+        assert!(picker.hex_focused());
+        picker.type_text("00ff00");
+        let picked = seen.borrow().expect("reported").to_rgba8();
+        assert_eq!((picked.r, picked.g, picked.b), (0, 255, 0));
+        // Short garbage never applies.
+        picker.type_text("zz");
+        assert_eq!(picker.hex_value(), "#00ff00");
+        // Backspace deletes, Escape defocuses.
+        assert!(picker.key(Key::Backspace));
+        assert_eq!(picker.hex_value(), "#00ff00");
+        assert!(picker.key(Key::Escape));
+        assert!(!picker.hex_focused());
+        assert!(!picker.key(Key::Backspace));
+    }
+
+    #[test]
+    fn copy_button_writes_clipboard() {
+        let _guard = crate::elements::textfield::clipboard::test_lock();
+        let mut picker = ColorPicker::new();
+        picker.set_viewport(0.0, 0.0, 800.0, 600.0);
+        picker.show();
+        picker.set_color(Color::from_rgb8(0x12, 0x34, 0x56));
+        let (ccx, ccy, ccw, cch) = picker.copy_rect();
+        picker.mouse_down((ccx + ccw / 2.0) as f64, (ccy + cch / 2.0) as f64);
+        assert!(picker.is_visible());
+        assert_eq!(
+            crate::elements::textfield::clipboard::get().as_deref(),
+            Some("#123456")
+        );
     }
 }
