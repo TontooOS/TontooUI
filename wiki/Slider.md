@@ -64,7 +64,9 @@ three mouse methods from the app (see `examples/slider.rs`); the `View`
 work nested inside `VStack` / `HStack` pages (hover moves drive a held
 knob there).
 
-While held the knob turns into the shared liquid glass lens
+While held the knob grows 20 % with a 0.18 s `CubicOut` ease
+(`SLIDER_EXPAND_SECONDS`, reverses mid-flight) and turns into the
+shared liquid glass lens
 (`fill_lens_glass`): clear magnified center plus a thin 4 px blurred rim,
 frost tint, bevel and chroma; on the capture pass the knob (and its shadow)
 is omitted so the blur sees the track behind it. Without a backdrop pass

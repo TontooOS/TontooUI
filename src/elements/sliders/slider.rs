@@ -29,6 +29,8 @@ pub const SLIDER_HEADER_SIZE: f32 = 15.0;
 pub const SLIDER_SMALL_SIZE: f32 = 11.0;
 /// Click-to-point animation time in seconds.
 pub const SLIDER_ANIM_SECONDS: f32 = 0.25;
+/// Press-expand animation time in seconds (knob grows while held).
+pub const SLIDER_EXPAND_SECONDS: f32 = 0.18;
 
 /// Track fill for light mode.
 pub const SLIDER_TRACK_LIGHT: Color = Color::from_rgb8(0xe5, 0xe5, 0xe5);
@@ -63,6 +65,9 @@ pub struct Slider {
     focused: bool,
     dragging: bool,
     knob_expand: f32,
+    expand_anim: Option<TweenAnim<f32>>,
+    expand_time: f32,
+    expand_to: Option<f32>,
     anim: Option<TweenAnim<f64>>,
     anim_time: f32,
     last_draw: Option<Instant>,
@@ -103,6 +108,9 @@ impl Slider {
             focused: true,
             dragging: false,
             knob_expand: 0.0,
+            expand_anim: None,
+            expand_time: 0.0,
+            expand_to: None,
             anim: None,
             anim_time: 0.0,
             last_draw: None,
@@ -316,11 +324,30 @@ impl Slider {
             None => 0.0,
         };
         self.last_draw = Some(now);
+        // Press-expand eases toward held/released (restarts from the
+        // live value, so mid-flight reversals stay smooth).
         let expand_target = if self.dragging { 1.0f32 } else { 0.0 };
-        let expand_speed = 14.0;
-        self.knob_expand += (expand_target - self.knob_expand).min(expand_speed * dt).max(-expand_speed * dt);
-        if (self.knob_expand - expand_target).abs() < 0.005 {
-            self.knob_expand = expand_target;
+        if self.expand_to != Some(expand_target)
+            && (self.knob_expand - expand_target).abs() > 0.0005
+        {
+            self.expand_anim = Some(TweenAnim::new(
+                Tween::new(self.knob_expand, expand_target, SLIDER_EXPAND_SECONDS)
+                    .easing(Easing::CubicOut),
+            ));
+            self.expand_to = Some(expand_target);
+            self.expand_time = 0.0;
+        }
+        if self.expand_anim.is_some() {
+            self.expand_time += dt;
+            let (done, value) = match self.expand_anim.as_mut() {
+                Some(anim) => (anim.update(self.expand_time), *anim.value()),
+                None => (true, self.knob_expand),
+            };
+            if done {
+                self.expand_anim = None;
+                self.expand_to = None;
+            }
+            self.knob_expand = value;
         }
         if self.anim.is_some() && !self.dragging {
             self.anim_time += dt;
@@ -726,6 +753,35 @@ mod tests {
         assert!(!slider.is_dragging());
         assert!(slider.anim.is_some());
         View::mouse_up(&mut slider, 380.0, tcy as f64);
+    }
+
+    #[test]
+    fn press_expand_eases_out_and_back() {
+        use std::time::Duration;
+
+        let mut slider = slider();
+        let kx = slider.knob_x(10.0);
+        let tcy = slider.tcy;
+        View::mouse_down(&mut slider, kx as f64, tcy as f64);
+        assert!(slider.is_dragging());
+        let t0 = Instant::now();
+        slider.advance(t0);
+        assert_eq!(slider.knob_expand, 0.0);
+        // Halfway through time rushes ahead (CubicOut).
+        slider.advance(t0 + Duration::from_millis(90));
+        let mid = slider.knob_expand;
+        assert!(mid > 0.5 && mid < 1.0, "mid was {mid}");
+        slider.advance(t0 + Duration::from_millis(90 + 200));
+        assert_eq!(slider.knob_expand, 1.0);
+        // Release eases back down.
+        View::mouse_up(&mut slider, kx as f64, tcy as f64);
+        let t1 = Instant::now();
+        slider.advance(t1);
+        slider.advance(t1 + Duration::from_millis(90));
+        let back = slider.knob_expand;
+        assert!(back > 0.0 && back < 1.0, "back was {back}");
+        slider.advance(t1 + Duration::from_millis(90 + 200));
+        assert_eq!(slider.knob_expand, 0.0);
     }
 
     #[test]
