@@ -17,10 +17,10 @@ traffic lights.
 | Token | Value |
 |---|---|
 | `SIDEBAR_W` / `SIDEBAR_MIN_W` | 240 px default width / 220 px minimum |
-| `SIDEBAR_ROW_H` | 24 px item rows |
+| `SIDEBAR_ROW_H` | 28 px item rows |
 | `SIDEBAR_PAD` | 16 px sidebar inset |
-| `SIDEBAR_ICON_SIZE` / `SIDEBAR_ICON_GAP` | 14 px icon box / 6 px gap |
-| `SIDEBAR_LABEL_SIZE` / `SIDEBAR_TITLE_SIZE` | 9.5 px item labels / 19 px semibold toolbar title |
+| `SIDEBAR_ICON_SIZE` / `SIDEBAR_ICON_GAP` | 16 px icon box / 8 px gap |
+| `SIDEBAR_LABEL_SIZE` / `SIDEBAR_TITLE_SIZE` | 11 px item labels / 19 px semibold toolbar title |
 | `SIDEBAR_TRAFFIC_TOP` / `SIDEBAR_BAR_TOP` / `SIDEBAR_ITEMS_TOP` | 22 px lights top / pills row centered on lights / 108 px items top |
 | `SIDEBAR_TOOLBAR_H` | 64 px content toolbar height (collapsed pills row) |
 | `SIDEBAR_COLLAPSE_SECONDS` | 0.22 s collapse slide plus fade (`CubicOut`) |
