@@ -223,7 +223,7 @@ pub fn mouse_down(&mut self, x: f64, y: f64)
 pub fn rect(&self) -> (f32, f32, f32, f32)
 ```
 
-- Toolbar-like frosted glass capsule with a magnifier icon and a
+- Toolbar-like clear (`Lens`) glass capsule with a magnifier icon and a
   single-line input on top. Same editing contract as the basic
   field, no accent ring (the glass carries the look). The frost
   needs the shell blur pass: the app opts in with `wants_backdrop`

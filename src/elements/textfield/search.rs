@@ -25,7 +25,7 @@ pub const SEARCH_PAD_X: f32 = 14.0;
 /// Search icon-text gap in logical px.
 pub const SEARCH_GAP: f32 = 8.0;
 
-/// Toolbar-like search field: frosted glass capsule with a magnifier
+/// Toolbar-like search field: clear (`Lens`) glass capsule with a magnifier
 /// icon and a single-line text input on top (like the reference
 /// pill). Click inside to select (caret to end); ESC or a click
 /// outside deselects. Typing, Backspace and caret keys arrive
@@ -49,7 +49,7 @@ impl SearchField {
         Self {
             core: FieldCore::new(placeholder.into()),
             icon: SFSymbolImage::new("magnifyingglass").size(SEARCH_ICON_SIZE),
-            glass: GlassContainer::new().glass_type(GlassType::Frosted),
+            glass: GlassContainer::new().glass_type(GlassType::Lens),
             dark: true,
             focused: true,
             x: 0.0,
