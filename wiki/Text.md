@@ -2,11 +2,12 @@
 
 Text category in `src/elements/text/`: `BasicText` in `text.rs` is a
 label with a `TextStyle` size (`style.rs`) and a `TextForeground`
-color or gradient (`foreground.rs`). The underlying `FontSystem` API
-in `src/renderer/text.rs` (`layout_text`, `layout_text_weighted`,
-`draw_layout`) is unchanged: solid colors reuse `draw_layout`, only
-gradients take a custom draw loop painting the same glyph runs with
-a horizontal gradient brush.
+color or gradient (`foreground.rs`). The underlying CoreText API in
+`src/renderer/text.rs` (`layout_text_aligned`,
+`layout_rich_text_aligned`, `draw_layout`) draws every frame: solid
+colors reuse `draw_layout`, only gradients take a custom draw path
+painting the same frame with a horizontal gradient brush
+(`draw_frame_mapped`).
 
 ## BasicText
 
@@ -37,8 +38,8 @@ pub enum TextAlignment {
 }
 ```
 
-`Center`/`Trailing` center each wrapped line via Parley (`Layout::align`)
-and shift unbounded text inside the placed rect.
+`Center`/`Trailing` center each wrapped line via CoreText
+(`CTTextAlignment`) and shift unbounded text inside the placed rect.
 
 ## Style
 
@@ -183,13 +184,12 @@ pub fn parse_markdown(source: &str) -> Vec<Span>
 
 - Links render in the accent color (default theme blue, `accent()`
   overrides), underlined, and hit-test exactly on their glyphs
-  (`Cluster::from_point_exact`): padding never counts as a link.
+  (CoreText `hit_byte`): padding never counts as a link.
 - `line_limit(n)` keeps the longest char-prefix plus "…" fitting `n`
   lines (binary search over one re-layout per probe, on dirty only).
-- Decorations paint from Parley run metrics
-  (`underline_offset`/`underline_size`, `strikethrough_offset`/
-  `strikethrough_size`); decoration colors fall back to the span
-  color, then the base foreground.
+- Decorations paint from CoreText run metrics (`decorations()`);
+  decoration colors fall back to the span color, then the base
+  foreground.
 - Base `foreground`/`style`/`alignment`/`width` builders mirror
   `BasicText`. Gradient foregrounds paint default runs; explicit
   colors keep theirs.
@@ -249,7 +249,7 @@ let handset = LabeledText::new("Handset", "phone")
 
 ## Cross References
 
-- [Renderer.md](Renderer.md) – `FontSystem` layout and backdrop
-  pipeline (unchanged base API)
+- [Renderer.md](Renderer.md) – `FontSystem` layout and CoreText
+  pipeline (aligned and rich layout API)
 - [Layout.md](Layout.md) – `View` protocol (`measure`, `place`, `draw`)
 - [Theme.md](Theme.md) – palette behind `Primary`/`Secondary`

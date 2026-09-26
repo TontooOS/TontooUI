@@ -1,14 +1,13 @@
 use std::any::Any;
 
-use parley::{Alignment, AlignmentOptions, Layout, PositionedLayoutItem};
 use vello::Scene;
-use vello::peniko::{Brush, Color, ColorStop, Fill, Gradient};
+use vello::peniko::{Brush, Color, ColorStop, Gradient};
 
 use super::super::layout::View;
 use super::foreground::{ResolvedForeground, TextForeground};
 use super::style::TextStyle;
 use crate::renderer::images::ImageLoader;
-use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
+use crate::renderer::text::{CTFrame, CTTextAlignment, FontSystem, draw_layout};
 use crate::theme::ThemeMode;
 
 /// Horizontal text alignment inside the placed rect.
@@ -27,10 +26,10 @@ pub enum TextAlignment {
 /// color or gradient. Single line by default; `width` fixes the box
 /// so longer content wraps (each line follows `alignment`).
 ///
-/// Built on the unchanged `FontSystem` API (`layout_text_weighted`
-/// plus `draw_layout` for solid colors). Only gradients take a custom
-/// draw loop that paints the same glyph runs with a horizontal
-/// gradient brush across the text bounds.
+/// Built on CoreText (`FontSystem::layout_text_aligned` plus
+/// `draw_layout` for solid colors). Only gradients take a custom
+/// draw loop that paints the same frame with a horizontal gradient
+/// brush across the text bounds.
 pub struct BasicText {
     content: String,
     style: TextStyle,
@@ -43,7 +42,7 @@ pub struct BasicText {
     y: f32,
     width: f32,
     height: f32,
-    layout: Option<Layout<SolidBrush>>,
+    layout: Option<CTFrame>,
     layout_scale: f32,
     dirty: bool,
 }
@@ -194,23 +193,18 @@ impl BasicText {
             ResolvedForeground::Solid(color) => color,
             ResolvedForeground::Gradient(_) => Color::WHITE,
         };
-        let mut layout = fonts.layout_text_weighted(
+        let mut layout = fonts.layout_text_aligned(
             &self.content,
             self.style.size(),
             bake,
             self.style.weight(),
             self.wrap_width,
+            match self.alignment {
+                TextAlignment::Leading => CTTextAlignment::Leading,
+                TextAlignment::Center => CTTextAlignment::Center,
+                TextAlignment::Trailing => CTTextAlignment::Trailing,
+            },
         );
-        if self.wrap_width.is_some() {
-            layout.align(
-                match self.alignment {
-                    TextAlignment::Leading => Alignment::Start,
-                    TextAlignment::Center => Alignment::Center,
-                    TextAlignment::Trailing => Alignment::End,
-                },
-                AlignmentOptions::default(),
-            );
-        }
         self.layout = Some(layout);
         self.layout_scale = fonts.scale;
         self.dirty = false;
@@ -297,37 +291,18 @@ pub(crate) fn gradient_brush(
     )
 }
 
-/// Same glyph loop as `draw_layout`, but every run paints `brush`
+/// Same frame loop as `draw_layout`, but every run paints `brush`
 /// instead of its baked solid color. Origin snapped to physical
 /// pixels and hinting enabled, same as `draw_layout`.
 pub(crate) fn draw_with_brush(
     scene: &mut Scene,
-    layout: &Layout<SolidBrush>,
+    frame: &CTFrame,
     x: f32,
     y: f32,
     scale: f32,
     brush: &Brush,
 ) {
-    let ox = (x * scale).round();
-    let oy = (y * scale).round();
-    for line in layout.lines() {
-        for item in line.items() {
-            if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
-                let run = glyph_run.run();
-                let glyphs = glyph_run.positioned_glyphs().map(|glyph| vello::Glyph {
-                    id: glyph.id,
-                    x: ox + glyph.x,
-                    y: oy + glyph.y,
-                });
-                scene
-                    .draw_glyphs(run.font())
-                    .font_size(run.font_size())
-                    .hint(true)
-                    .brush(brush)
-                    .draw(Fill::NonZero, glyphs);
-            }
-        }
-    }
+    crate::renderer::text::draw_with_brush(scene, frame, x, y, scale, brush);
 }
 
 impl View for BasicText {

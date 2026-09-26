@@ -1,13 +1,12 @@
 use std::any::Any;
 
-use parley::Layout;
 use vello::Scene;
 use vello::kurbo::{Affine, BezPath, Circle, Line, Point, RoundedRect, RoundedRectRadii, Stroke};
 use vello::peniko::{Brush, Color, Fill};
 
 use super::layout::View;
 use crate::renderer::images::ImageLoader;
-use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
+use crate::renderer::text::{CTFrame, FontSystem, draw_layout};
 use crate::renderer::window::WINDOW_CORNER_RADIUS;
 
 /// Opaque titlebar background, dark / light. Dark is lighter than the
@@ -79,7 +78,7 @@ pub struct Titlebar {
     bg: Color,
     text_color: Color,
     divider_color: Color,
-    layout: Option<Layout<SolidBrush>>,
+    layout: Option<CTFrame>,
     layout_scale: f32,
     dirty: bool,
 }

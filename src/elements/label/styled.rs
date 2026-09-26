@@ -1,6 +1,5 @@
 use std::any::Any;
 
-use parley::Layout;
 use vello::Scene;
 use vello::kurbo::{Affine, Circle};
 use vello::peniko::{Brush, Color, Fill};
@@ -8,7 +7,7 @@ use vello::peniko::{Brush, Color, Fill};
 use super::super::layout::View;
 use super::LABEL_DOT;
 use crate::renderer::images::ImageLoader;
-use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
+use crate::renderer::text::{CTFrame, FontSystem, draw_layout};
 use crate::theme::{ThemeMode, desaturate};
 
 /// Label text style: title, body or a colored status (dot plus
@@ -41,7 +40,7 @@ pub struct StyledLabel {
     y: f32,
     placed_w: f32,
     placed_h: f32,
-    layout: Option<Layout<SolidBrush>>,
+    layout: Option<CTFrame>,
     layout_scale: f32,
     dirty: bool,
 }

@@ -3,7 +3,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
 
-use parley::Layout;
 use vello::Scene;
 use vello::kurbo::{Affine, Rect};
 use vello::peniko::{BlendMode, Brush, Color, Fill};
@@ -20,7 +19,7 @@ use super::{
 };
 use crate::animation::{Easing, Tween, TweenAnim};
 use crate::renderer::images::ImageLoader;
-use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
+use crate::renderer::text::{CTFrame, FontSystem, draw_layout};
 use crate::theme::{GlassAmount, ThemeMode};
 
 /// Confirmation dialog: like the other alerts (frosted card, dimmed
@@ -50,7 +49,7 @@ pub struct ConfirmationDialog {
     y: f32,
     placed_w: f32,
     placed_h: f32,
-    title_layout: Option<Layout<SolidBrush>>,
+    title_layout: Option<CTFrame>,
     layout_scale: f32,
     dirty: bool,
 }

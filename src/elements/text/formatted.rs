@@ -1,7 +1,6 @@
 use std::any::Any;
 use std::ops::Range;
 
-use parley::{Alignment, AlignmentOptions, Cluster, Layout, PositionedLayoutItem};
 use vello::Scene;
 use vello::kurbo::{Affine, Rect};
 use vello::peniko::{Brush, Color, Fill};
@@ -13,7 +12,10 @@ use super::span::{Span, parse_markdown};
 use super::style::TextStyle;
 use super::text::{TextAlignment, gradient_brush};
 use crate::renderer::images::ImageLoader;
-use crate::renderer::text::{FontSystem, RichSpan, SolidBrush};
+use crate::renderer::text::{
+    CTFrame, CTTextAlignment, CrispOpts, FontSystem, RichSpan, decorations,
+    draw_frame_mapped, draw_layout, hit_byte,
+};
 use crate::theme::ThemeMode;
 
 /// Formatted text: inline spans (bold, italic, code, underline,
@@ -26,9 +28,10 @@ use crate::theme::ThemeMode;
 /// `_italic_`, `***bold italic***`, `~~strikethrough~~`, `` `code` ``,
 /// `[label](url)`, `\` escapes. Unmatched markers stay literal.
 ///
-/// Built on the additive `FontSystem::layout_rich_text` (the plain
-/// `layout_text` API stays unchanged). Decorations paint from the
-/// Parley run metrics; links hit-test through `Cluster::from_point`.
+/// Built on CoreText (`FontSystem::layout_rich_text_aligned`):
+/// decorations paint from CoreText run metrics; links hit-test
+/// through CoreText (`hit_byte`, exact clusters, so padding never
+/// counts as a link).
 pub struct FormattedText {
     spans: Vec<Span>,
     markdown: Option<String>,
@@ -47,7 +50,7 @@ pub struct FormattedText {
     content: String,
     rich: Vec<RichSpan>,
     links: Vec<(Range<usize>, String)>,
-    layout: Option<Layout<SolidBrush>>,
+    layout: Option<CTFrame>,
     intrinsic: (f32, f32),
     scale: f32,
     pressed_link: Option<String>,
@@ -279,25 +282,19 @@ impl FormattedText {
         content: &str,
         rich: &[RichSpan],
         bake: Color,
-    ) -> Layout<SolidBrush> {
-        let mut layout = fonts.layout_rich_text(
+    ) -> CTFrame {
+        fonts.layout_rich_text_aligned(
             content,
             self.style.size(),
             bake,
             self.wrap_width,
             rich,
-        );
-        if self.wrap_width.is_some() {
-            layout.align(
-                match self.alignment {
-                    TextAlignment::Leading => Alignment::Start,
-                    TextAlignment::Center => Alignment::Center,
-                    TextAlignment::Trailing => Alignment::End,
-                },
-                AlignmentOptions::default(),
-            );
-        }
-        layout
+            match self.alignment {
+                TextAlignment::Leading => CTTextAlignment::Leading,
+                TextAlignment::Center => CTTextAlignment::Center,
+                TextAlignment::Trailing => CTTextAlignment::Trailing,
+            },
+        )
     }
 
     fn ensure_layout(&mut self, fonts: &mut FontSystem) {
@@ -320,7 +317,7 @@ impl FormattedText {
         // Truncation: longest char-prefix plus "…" fitting the limit.
         if let Some(limit) = self.line_limit {
             let layout = self.build_layout(fonts, &content, &rich, bake);
-            if layout.lines().count() > limit {
+            if layout.line_count() > limit {
                 let bounds: Vec<usize> = content
                     .char_indices()
                     .map(|(i, _)| i)
@@ -335,7 +332,7 @@ impl FormattedText {
                     let (rich_cut, _) = Self::clamp_parts(&rich, &links, cut);
                     let candidate = format!("{}…", content[..cut].trim_end());
                     let probe = self.build_layout(fonts, &candidate, &rich_cut, bake);
-                    if probe.lines().count() <= limit {
+                    if probe.line_count() <= limit {
                         best = mid;
                         lo = mid + 1;
                     } else if mid == 0 {
@@ -375,11 +372,10 @@ impl FormattedText {
 
     /// Byte ranges with an explicit text color (links and `color`
     /// spans). Everything else paints the base foreground.
-    fn explicit_ranges(&self) -> Vec<Range<usize>> {
+    fn explicit_colors(&self) -> Vec<Color> {
         self.rich
             .iter()
-            .filter(|span| span.color.is_some())
-            .map(|span| span.range.clone())
+            .filter_map(|span| span.color)
             .collect()
     }
 
@@ -396,12 +392,9 @@ impl FormattedText {
         let layout = self.layout.as_ref()?;
         let block = self.wrap_width.unwrap_or(self.intrinsic.0);
         let ox = self.origin_x(block).max(self.x);
-        let lx = (x - ox) * self.scale;
-        let ly = (y - self.y) * self.scale;
-        // Exact hit: no clamping to nearby clusters, so padding
-        // around the text never counts as a link.
-        let (cluster, _) = Cluster::from_point_exact(layout, lx, ly)?;
-        let at = cluster.text_range().start;
+        // Exact hit through CoreText: no clamping to nearby clusters,
+        // so padding around the text never counts as a link.
+        let at = hit_byte(layout, x - ox, y - self.y)?;
         self.links
             .iter()
             .find(|(range, _)| range.contains(&at))
@@ -446,92 +439,48 @@ impl FormattedText {
         let block = self.wrap_width.unwrap_or(self.intrinsic.0);
         let ox = self.origin_x(block).max(self.x);
         let oy = self.y;
-        // Snap to physical pixels like `draw_layout`: Parley
-        // quantizes glyphs to the pixel grid, a fractional offset
-        // would push them off-grid (blurry text).
-        let pox = (ox * scale).round();
-        let poy = (oy * scale).round();
         let layout = self.layout.as_ref().expect("layout built");
-        let limit = self.line_limit.unwrap_or(usize::MAX);
-        let explicit = self.explicit_ranges();
-        let gradient_brush = match self.foreground.resolve(self.mode(), self.focused) {
-            ResolvedForeground::Gradient(colors) => {
-                Some(gradient_brush(&colors, ox, oy, block, self.intrinsic.1, scale))
-            }
-            ResolvedForeground::Solid(_) => None,
+        let explicit = self.explicit_colors();
+        let opts = CrispOpts {
+            scale,
+            hint: true,
+            subpixel: true,
         };
-        for line in layout.lines().take(limit) {
-            for item in line.items() {
-                if let PositionedLayoutItem::GlyphRun(glyph_run) = item {
-                    let run = glyph_run.run();
-                    // Explicit-color runs keep their baked color;
-                    // default runs paint the base (or gradient) brush.
-                    let is_explicit = explicit.iter().any(|range| {
-                        range.contains(&run.text_range().start)
-                    });
-                    let brush = match (&gradient_brush, is_explicit) {
-                        (Some(g), false) => g,
-                        _ => &Brush::Solid(glyph_run.style().brush.color),
-                    };
-                    let glyphs =
-                        glyph_run.positioned_glyphs().map(|glyph| vello::Glyph {
-                            id: glyph.id,
-                            x: pox + glyph.x,
-                            y: poy + glyph.y,
-                        });
-                    scene
-                        .draw_glyphs(run.font())
-                        .font_size(run.font_size())
-                        .hint(true)
-                        .brush(brush)
-                        .draw(Fill::NonZero, glyphs);
-                    self.draw_decorations(scene, &glyph_run, pox, poy);
-                }
+        match self.foreground.resolve(self.mode(), self.focused) {
+            ResolvedForeground::Gradient(colors) => {
+                let brush = gradient_brush(&colors, ox, oy, block, self.intrinsic.1, scale);
+                // Explicit-color runs keep their baked color; default
+                // runs paint the gradient brush.
+                draw_frame_mapped(scene, layout, ox, oy, opts, &|color| {
+                    if explicit.contains(&color) {
+                        Brush::Solid(color)
+                    } else {
+                        brush.clone()
+                    }
+                });
+            }
+            ResolvedForeground::Solid(_) => {
+                draw_layout(scene, layout, ox, oy, scale);
             }
         }
+        self.draw_decorations(scene, layout, ox, oy, scale);
     }
 
-    fn draw_decorations(
-        &self,
-        scene: &mut Scene,
-        glyph_run: &parley::GlyphRun<'_, SolidBrush>,
-        px: f32,
-        py: f32,
-    ) {
-        let metrics = glyph_run.run().metrics();
-        let x0 = (px + glyph_run.offset()) as f64;
-        let x1 = x0 + glyph_run.advance() as f64;
-        if x1 <= x0 {
-            return;
-        }
-        let base = (py + glyph_run.baseline()) as f64;
-        let style = glyph_run.style();
-        if let Some(underline) = &style.underline {
-            let size = underline
-                .size
-                .unwrap_or(metrics.underline_size)
-                .max(1.0) as f64;
-            let top = base + underline.offset.unwrap_or(metrics.underline_offset) as f64;
-            let rect = Rect::new(x0, top, x1, top + size);
-            scene.fill(
-                Fill::NonZero,
-                Affine::IDENTITY,
-                &Brush::Solid(underline.brush.color),
-                None,
-                &rect,
+    /// Underline/strikethrough rects from CoreText run metrics,
+    /// offset by the snapped draw origin.
+    fn draw_decorations(&self, scene: &mut Scene, frame: &CTFrame, x: f32, y: f32, scale: f32) {
+        let (ox, oy) = ((x * scale).round(), (y * scale).round());
+        for deco in decorations(frame) {
+            let rect = Rect::new(
+                (ox + deco.x0) as f64,
+                (oy + deco.y0) as f64,
+                (ox + deco.x1) as f64,
+                (oy + deco.y1) as f64,
             );
-        }
-        if let Some(strike) = &style.strikethrough {
-            let size = strike
-                .size
-                .unwrap_or(metrics.strikethrough_size)
-                .max(1.0) as f64;
-            let top = base + strike.offset.unwrap_or(metrics.strikethrough_offset) as f64;
-            let rect = Rect::new(x0, top, x1, top + size);
             scene.fill(
                 Fill::NonZero,
                 Affine::IDENTITY,
-                &Brush::Solid(strike.brush.color),
+                &Brush::Solid(deco.color),
                 None,
                 &rect,
             );
@@ -639,7 +588,7 @@ mod tests {
         assert!(text.content.ends_with('…'));
         assert!(text.content.len() < "Word ".repeat(60).len());
         let layout = text.layout.as_ref().expect("layout built");
-        assert!(layout.lines().count() <= 2);
+        assert!(layout.line_count() <= 2);
     }
 
     #[test]

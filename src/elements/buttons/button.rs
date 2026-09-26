@@ -1,13 +1,12 @@
 use std::any::Any;
 
-use parley::Layout;
 use vello::Scene;
 use vello::kurbo::{Affine, RoundedRect};
 use vello::peniko::{Brush, Color, Fill};
 
 use super::super::layout::View;
 use crate::renderer::images::ImageLoader;
-use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
+use crate::renderer::text::{CTFrame, FontSystem, draw_layout};
 use crate::theme::desaturate;
 
 /// Light mode button fill.
@@ -74,7 +73,7 @@ pub struct Button {
     disabled: bool,
     focused: bool,
     on_press: Option<Box<dyn FnMut()>>,
-    layout: Option<Layout<SolidBrush>>,
+    layout: Option<CTFrame>,
     layout_color: Color,
     layout_scale: f32,
     dirty: bool,

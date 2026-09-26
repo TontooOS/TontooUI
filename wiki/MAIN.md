@@ -88,6 +88,11 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-26: Text stack moved to CoreText (`CTFrame` layouts,
+  `hit_byte` links, `decorations()` underlines; `parley` dependency
+  removed). `FontSystem` keeps its name and gains
+  `layout_text_aligned`, `layout_rich_text_aligned`, `framesetter`
+  and `draw_with_brush` on CoreText.
 - 2026-09-26: `UrlImage` downloads through NetworkKit
   (`networkkit::http`) instead of a direct `ureq` client. The `ureq`
   dependency is removed.

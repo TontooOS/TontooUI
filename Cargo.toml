@@ -13,12 +13,12 @@ arboard = "1"
 winit = "0.30"
 wgpu = "29"
 vello = "0.10"
-parley = "0.11"
 futures = "0.3"
 png = "0.18"
 image = "0.25"
 networkkit = { path = "../NetworkKit" }
 coreicon = { path = "../CoreIcon" }
+coretext = { path = "../CoreText" }
 
 # Settings daemon client (unix socket, TontooOS target only).
 [target.'cfg(unix)'.dependencies]

@@ -3,7 +3,6 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 
-use parley::Layout;
 use vello::Scene;
 use vello::kurbo::{Affine, BezPath, Cap, Join, Line, Rect, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, Fill};
@@ -13,7 +12,7 @@ use super::super::layout::View;
 use super::super::scrollbar::{SCROLLBAR_GRAY, SCROLLBAR_W_HOVER, Scrollbar};
 use super::super::textfield::BasicTextField;
 use crate::renderer::images::ImageLoader;
-use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
+use crate::renderer::text::{CTFrame, FontSystem, draw_layout};
 use crate::renderer::window::Key;
 use crate::theme::desaturate;
 
@@ -169,8 +168,8 @@ pub struct BasicTable {
     height: f32,
     last_click: Option<(usize, usize, Instant)>,
     hover: Option<TableHit>,
-    cell_layouts: HashMap<(usize, usize), Layout<SolidBrush>>,
-    header_layouts: Vec<Option<Layout<SolidBrush>>>,
+    cell_layouts: HashMap<(usize, usize), CTFrame>,
+    header_layouts: Vec<Option<CTFrame>>,
     layout_scale: f32,
     layout_dark: bool,
     last_vmodel: (f32, f32),

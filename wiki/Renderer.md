@@ -9,7 +9,7 @@ result to the winit surface. There is no UIKit layer and no GTK dependency.
 | Module | Path | Description |
 |---|---|---|
 | `window` | `src/renderer/window.rs` | winit event loop, surface management, `App` trait, `run` |
-| `text` | `src/renderer/text.rs` | Parley font system and scene text drawing |
+| `text` | `src/renderer/text.rs` | CoreText font system and crisp scene text drawing |
 | `frame` | `src/renderer/frame.rs` | Window frame: shadows, rounded body, edge, outline |
 | `backdrop` | `src/renderer/backdrop.rs` | Offscreen capture + separable gaussian blur for glass |
 | `images` | `src/renderer/images.rs` | SF Symbol cache, per-frame `ImageLoader`, backdrop access |
@@ -280,14 +280,16 @@ pub struct FontSystem {
 }
 ```
 
-Wraps a Parley `FontContext` (system fonts, so SF Pro resolves on TontooOS)
-and a `LayoutContext`. `scale` is the window scale factor set by the loop;
-it is passed to Parley as the display scale so glyph positions quantize to
-physical pixel boundaries, and layouts are built in physical pixels so
-glyphs stay crisp.
+Backed by CoreText (`CTFramesetter`; system fonts, so SF Pro
+resolves on TontooOS). `scale` is the window scale factor set by
+the loop; it is passed to CoreText as the display scale so glyph
+positions quantize to physical pixel boundaries, and frames are
+built in physical pixels so glyphs stay crisp. The full CoreText
+surface (`CTLine`, `CTFrame`, caret mapping, decorations) is
+re-exported here.
 
 ```rust
-pub fn layout_text(&mut self, content: &str, size: f32, color: Color, max_width: Option<f32>) -> Layout<SolidBrush>
+pub fn layout_text(&mut self, content: &str, size: f32, color: Color, max_width: Option<f32>) -> CTFrame
 ```
 
 Lays out `content` at logical `size` px. `max_width` is in logical px;
@@ -295,22 +297,40 @@ Lays out `content` at logical `size` px. `max_width` is in logical px;
 relative line height.
 
 ```rust
-pub fn layout_size(layout: &Layout<SolidBrush>) -> (f32, f32)
+pub fn layout_text_weighted(&mut self, content: &str, size: f32, color: Color, weight: f32, max_width: Option<f32>) -> CTFrame
+pub fn layout_text_aligned(&mut self, content: &str, size: f32, color: Color, weight: f32, max_width: Option<f32>, alignment: CTTextAlignment) -> CTFrame
+pub fn layout_rich_text(&mut self, content: &str, size: f32, color: Color, max_width: Option<f32>, spans: &[RichSpan]) -> CTFrame
+pub fn layout_rich_text_aligned(&mut self, content: &str, size: f32, color: Color, max_width: Option<f32>, spans: &[RichSpan], alignment: CTTextAlignment) -> CTFrame
+pub fn framesetter(&mut self) -> &mut CTFramesetter
 ```
 
-Physical width/height of a finished layout. Divide by `FontSystem::scale`
+- The `aligned` variants apply the alignment when wrapping;
+  unbounded text keeps leading alignment and the element shifts
+  the draw origin itself.
+- `layout_rich_text` bolds weight 700, switches `monospace` runs
+  and falls decoration colors back to the span color, then base.
+- `framesetter` exposes the CoreText framesetter for caret
+  mapping, custom frames and measurement.
+
+```rust
+pub fn layout_size(frame: &CTFrame) -> (f32, f32)
+```
+
+Physical width/height of a finished frame. Divide by `FontSystem::scale`
 for logical units.
 
 ```rust
-pub fn draw_layout(scene: &mut Scene, layout: &Layout<SolidBrush>, x: f32, y: f32, scale: f32)
+pub fn draw_layout(scene: &mut Scene, frame: &CTFrame, x: f32, y: f32, scale: f32)
+pub fn draw_with_brush(scene: &mut Scene, frame: &CTFrame, x: f32, y: f32, scale: f32, brush: &Brush)
 ```
 
-Draws a finished layout at logical position (`x`, `y`). The origin is
-snapped to physical pixels first (a fractional offset would push the
-quantized glyphs off-grid and blur the text, esp. at fractional window
-scales like 125%/150%), then glyph runs are recorded with
-`Scene::draw_glyphs` and hinting enabled. Only glyph runs are drawn;
-inline boxes are skipped.
+Draws a finished frame at logical position (`x`, `y`) through the
+CoreText crisp pipeline. The origin is snapped to physical pixels
+first (a fractional offset would push the quantized glyphs
+off-grid and blur the text, esp. at fractional window scales like
+125%/150%), then glyph runs are recorded with hinting enabled.
+`draw_with_brush` paints every run with one brush (gradients).
+Only glyph runs are drawn; inline boxes are skipped.
 
 ## Images
 

@@ -30,13 +30,12 @@ pub use secure::SecureField;
 
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use parley::Layout;
 use vello::Scene;
 use vello::kurbo::{Affine, Rect, RoundedRect, Stroke};
 use vello::peniko::{Brush, Color, Fill};
 
 use crate::elements::gestures::GESTURE_DOUBLE_TAP_SECONDS;
-use crate::renderer::text::{FontSystem, SolidBrush, draw_layout};
+use crate::renderer::text::{CTFrame, FontSystem, draw_layout, point_to_caret};
 use crate::renderer::window::Key;
 use crate::theme::desaturate;
 
@@ -73,7 +72,7 @@ struct UndoState {
     sel: bool,
 }
 
-/// Cached parley line ranges for multiline geometry. Line breaks
+/// Cached CoreText line ranges for multiline geometry. Line breaks
 /// only move when the text, size, wrap or scale change, so frames
 /// reuse them instead of re-laying-out every draw (the old code
 /// laid the whole text out per frame, which lagged past ~1K chars).
@@ -123,7 +122,7 @@ pub(crate) struct FieldCore {
     redo: Vec<UndoState>,
     lines_cache: LinesCache,
     on_change: Option<Box<dyn FnMut(&str)>>,
-    layout: Option<Layout<SolidBrush>>,
+    layout: Option<CTFrame>,
     layout_text: String,
     layout_color: Color,
     layout_size: f32,
@@ -600,7 +599,7 @@ impl FieldCore {
         text_color: Color,
         placeholder_color: Color,
         wrap: Option<f32>,
-    ) -> (&Layout<SolidBrush>, bool) {
+    ) -> (&CTFrame, bool) {
         let empty = self.text.is_empty();
         let content = if empty {
             self.placeholder.clone()
@@ -742,13 +741,11 @@ pub(crate) fn editor_lines(
     if text.is_empty() {
         return vec![(0, 0, size * 1.25)];
     }
-    let probe = fonts.layout_text(text, size, color, Some(wrap.max(0.0)));
+    let frame = fonts.layout_text(text, size, color, Some(wrap.max(0.0)));
+    let scale = fonts.scale;
     let mut out = Vec::new();
-    for index in 0..probe.len() {
-        if let Some(line) = probe.get(index) {
-            let range = line.text_range();
-            out.push((range.start, range.end, line.metrics().line_height));
-        }
+    for line in frame.lines() {
+        out.push((line.range.start, line.range.end, line.height * scale));
     }
     if out.is_empty() {
         out.push((0, 0, size * 1.25));
@@ -790,8 +787,8 @@ pub(crate) fn word_range(text: &str, caret: usize) -> (usize, usize) {
 
 /// Byte index at `goal_x` (text-origin coords) in single-line
 /// `echo`: nearest advance boundary (ties to the earlier one),
-/// clamped to both ends. Binary searches over char boundaries, so
-/// huge lines need O(log n) layouts, not O(n).
+/// clamped to both ends. CoreText binary-searches over grapheme
+/// boundaries, so huge lines need O(log n) layouts, not O(n).
 pub(crate) fn single_line_caret(
     fonts: &mut FontSystem,
     echo: &str,
@@ -799,39 +796,7 @@ pub(crate) fn single_line_caret(
     color: Color,
     goal_x: f32,
 ) -> usize {
-    if goal_x <= 0.0 || echo.is_empty() {
-        return 0;
-    }
-    let mut bounds = vec![0usize];
-    for (i, ch) in echo.char_indices() {
-        bounds.push(i + ch.len_utf8());
-    }
-    let goal = goal_x;
-    let advance_at = |k: usize, fonts: &mut FontSystem| -> f32 {
-        match echo.get(..bounds[k]) {
-            Some(slice) => advance_of(fonts, slice, size, color),
-            None => 0.0,
-        }
-    };
-    let mut lo = 0usize;
-    let mut hi = bounds.len() - 1;
-    while lo < hi {
-        let mid = (lo + hi + 1) / 2;
-        if advance_at(mid, fonts) <= goal {
-            lo = mid;
-        } else {
-            hi = mid - 1;
-        }
-    }
-    let mut at = bounds[lo];
-    if lo + 1 < bounds.len() {
-        let a0 = advance_at(lo, fonts);
-        let a1 = advance_at(lo + 1, fonts);
-        if goal > (a0 + a1) / 2.0 {
-            at = bounds[lo + 1];
-        }
-    }
-    at
+    point_to_caret(fonts.framesetter(), echo, size, color, goal_x)
 }
 
 /// Resolve pending press/drag points of a single-line field.

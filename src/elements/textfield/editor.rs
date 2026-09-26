@@ -28,7 +28,7 @@ pub const EDITOR_MIN_H: f32 = 120.0;
 
 /// Large multi-line text editor: wrapped text, Enter for newlines,
 /// Up/Down/Left/Right caret motion, vertical caret tracking. The
-/// caret geometry comes from parley line ranges, so wrapped lines
+/// caret geometry comes from CoreText line ranges, so wrapped lines
 /// behave. Same modal contract as the fields: click inside selects,
 /// ESC or outside clicks deselect, accent ring while selected.
 /// Multiline geometry needs fonts, so `key` takes them (unlike the
