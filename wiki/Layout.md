@@ -11,7 +11,13 @@ children share the remaining space.
 pub trait View {
     fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32);
     fn place(&mut self, fonts: &mut FontSystem, x: f32, y: f32, width: f32, height: f32);
-    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem);
+    fn draw(&mut self, scene: &mut Scene, fonts: &mut FontSystem, images: &mut ImageLoader<'_>);
+    fn mouse_down(&mut self, _x: f64, _y: f64) {}
+    fn mouse_up(&mut self, _x: f64, _y: f64) {}
+    fn set_hover(&mut self, _x: f32, _y: f32) {}
+    fn text(&mut self, _text: &str) {}
+    fn key(&mut self, _key: Key) -> bool { false }
+    fn mouse_wheel(&mut self, _dx: f64, _dy: f64) {}
     fn flex(&self) -> f32 { 0.0 }
     fn as_any_mut(&mut self) -> &mut dyn Any;
 }

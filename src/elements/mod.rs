@@ -24,6 +24,7 @@ pub mod scrollview;
 pub mod shapes;
 pub mod forms;
 pub mod outlines;
+pub mod sidebars;
 pub mod sliders;
 pub mod steppers;
 pub mod tables;
@@ -151,6 +152,12 @@ pub use outlines::{
     OUTLINE_CHEV_H, OUTLINE_CHEV_SLOT, OUTLINE_CHEV_STROKE, OUTLINE_CHEV_W,
     OUTLINE_ICON_GAP, OUTLINE_ICON_SIZE, OUTLINE_INDENT, OUTLINE_LABEL_SIZE,
     OUTLINE_ROW_H, OUTLINE_SELECTED_ALPHA,
+};
+pub use sidebars::{
+    Sidebar, SidebarItem, SIDEBAR_ICON_GAP, SIDEBAR_ICON_SIZE, SIDEBAR_ITEMS_TOP,
+    SIDEBAR_LABEL_SIZE, SIDEBAR_MIN_W, SIDEBAR_PAD, SIDEBAR_ROW_H, SIDEBAR_TITLE_SIZE,
+    SIDEBAR_TOOLBAR_BTN, SIDEBAR_TOOLBAR_GAP, SIDEBAR_TOOLBAR_H, SIDEBAR_TRAFFIC_TOP,
+    SIDEBAR_W,
 };
 pub use sliders::Slider;
 pub use steppers::{

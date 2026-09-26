@@ -6,6 +6,7 @@ use vello::peniko::{Brush, Color, Fill};
 
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
+use crate::renderer::window::Key;
 
 /// Cross-axis alignment inside stacks.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -36,6 +37,17 @@ pub trait View {
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_up(&mut self, _x: f64, _y: f64) {}
     fn set_hover(&mut self, _x: f32, _y: f32) {}
+    /// Printable text for focused inputs (containers forward to the
+    /// active child; defaults ignore).
+    fn text(&mut self, _text: &str) {}
+    /// Key handling, true when consumed (containers forward to the
+    /// active child; defaults ignore).
+    fn key(&mut self, _key: Key) -> bool {
+        false
+    }
+    /// Scroll wheel delta in logical px (containers forward to the
+    /// active child; defaults ignore).
+    fn mouse_wheel(&mut self, _dx: f64, _dy: f64) {}
     /// Share of remaining space. Zero means fixed intrinsic size.
     fn flex(&self) -> f32 {
         0.0

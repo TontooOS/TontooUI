@@ -6,9 +6,11 @@ use vello::peniko::Color;
 
 use super::super::layout::View;
 use super::{
-    EditorMetrics, FieldCore, draw_editor_multiline, editor_caret_geometry,
-    editor_caret_pos, editor_column, editor_lines, field_colors,
+    EditorMetrics, FieldCore, draw_editor_multiline, editor_caret_pos, editor_column,
+    field_colors,
 };
+#[cfg(test)]
+use super::{editor_caret_geometry, editor_lines};
 use crate::renderer::images::ImageLoader;
 use crate::renderer::text::FontSystem;
 use crate::renderer::window::Key;

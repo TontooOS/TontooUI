@@ -37,6 +37,7 @@ theme, animation and a Vello/WGPU renderer.
 | Scrollbar | [Scrollbar.md](Scrollbar.md) | Overlay side bar with fade, drag and page jump |
 | ScrollView | [ScrollView.md](ScrollView.md) | Clipped scroll container with integrated scrollbar |
 | Sheets | [Sheets.md](Sheets.md) | Modal sheet with sizes, custom background, ESC |
+| Sidebar | [Sidebar.md](Sidebar.md) | App navigation with traffic, toolbar, pages and collapse |
 | Shapes | [Shapes.md](Shapes.md) | Rectangle, circle, rounded, capsule and custom shapes |
 | Slider | [Slider.md](Slider.md) | Slider with steps, labels, ticks, glass |
 | Stepper | [Stepper.md](Stepper.md) | Basic stepper with step size, range and limit dimming |
