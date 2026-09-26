@@ -146,6 +146,22 @@ pub fn rect(&self) -> (f32, f32, f32, f32)
   the card. The badge is an SF Symbol top right with a 12 px inset
   in `badge_color` (white by default, desaturated when unfocused).
 
+## Streaming Uploads
+
+```rust
+pub fn upload_rgba(&mut self, pixels: &[u8], width: u32, height: u32) -> Option<ImageData>
+pub fn upload_frame(&mut self, seq: u64, pixels: &[u8], width: u32, height: u32) -> Option<(ImageData, u32, u32)>
+```
+
+- `upload_rgba` pushes raw RGBA8 pixels (`width * height * 4` bytes,
+  `Rgba8Unorm`) without touching the keyed raster cache. Returns `None`
+  for empty frames or size mismatches. Used by streaming producers (web
+  engine frames, video).
+- `upload_frame` adds a single-slot cache keyed by `seq`: while the
+  sequence number matches, the GPU upload is reused; a new `seq`
+  replaces the texture. The slot never grows, so 60 fps producers stay
+  allocation-flat on the cache side.
+
 ## Usage / Example
 
 ```rust

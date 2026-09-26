@@ -19,6 +19,11 @@ struct CachedImage {
 #[derive(Default)]
 pub struct ImageCache {
     map: HashMap<String, CachedImage>,
+    /// Single-slot cache for streaming frames (web views, video).
+    /// Keyed by sequence number so a 60 fps producer reuses the upload
+    /// while it is current and never grows the map.
+    frame_seq: Option<u64>,
+    frame: Option<CachedImage>,
 }
 
 impl ImageCache {
@@ -267,6 +272,50 @@ impl<'a> ImageLoader<'a> {
             .collect();
 
         let image = self.upload_texture(&pixels, width, height);
+        Some((image, width, height))
+    }
+
+    /// Upload RGBA8 pixels as a GPU texture.
+    ///
+    /// Public so streaming producers (web engine frames, video) can push
+    /// raw pixel buffers without going through the keyed raster cache.
+    /// The buffer must hold exactly `width * height * 4` bytes.
+    pub fn upload_rgba(&mut self, pixels: &[u8], width: u32, height: u32) -> Option<ImageData> {
+        if width == 0 || height == 0 {
+            return None;
+        }
+        if pixels.len() != width as usize * height as usize * 4 {
+            return None;
+        }
+        Some(self.upload_texture(pixels, width, height))
+    }
+
+    /// Upload one streaming frame, cached by sequence number.
+    ///
+    /// Returns `(image, width, height)` like [`ImageLoader::raster`], but
+    /// the cache holds a single slot: while `seq` is unchanged the upload
+    /// is reused, on a new `seq` the texture is replaced. Returns `None`
+    /// when the buffer size does not match `width * height * 4`.
+    pub fn upload_frame(
+        &mut self,
+        seq: u64,
+        pixels: &[u8],
+        width: u32,
+        height: u32,
+    ) -> Option<(ImageData, u32, u32)> {
+        if let (Some(cached_seq), Some(cached)) = (self.cache.frame_seq, self.cache.frame.clone())
+        {
+            if cached_seq == seq && cached.width == width && cached.height == height {
+                return Some((cached.image, cached.width, cached.height));
+            }
+        }
+        let image = self.upload_rgba(pixels, width, height)?;
+        self.cache.frame_seq = Some(seq);
+        self.cache.frame = Some(CachedImage {
+            image: image.clone(),
+            width,
+            height,
+        });
         Some((image, width, height))
     }
 
