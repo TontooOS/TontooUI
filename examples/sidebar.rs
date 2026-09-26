@@ -2,7 +2,8 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use tontooui::elements::{
-    BasicText, Sidebar, SidebarItem, TrafficAction, View, VStack,
+    BasicText, SIDEBAR_ICON_GAP, SIDEBAR_ICON_SIZE, SIDEBAR_LABEL_SIZE, SIDEBAR_ROW_H,
+    Sidebar, SidebarItem, Slider, TrafficAction, View, VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
@@ -16,6 +17,10 @@ struct SidebarDemo {
     history: Rc<RefCell<Vec<usize>>>,
     go_back: Rc<Cell<bool>>,
     jump_to: Rc<Cell<Option<usize>>>,
+    row_h: Rc<Cell<f64>>,
+    row_icon: Rc<Cell<f64>>,
+    row_gap: Rc<Cell<f64>>,
+    row_label: Rc<Cell<f64>>,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
@@ -27,6 +32,12 @@ impl SidebarDemo {
         let history: Rc<RefCell<Vec<usize>>> = Rc::new(RefCell::new(vec![0]));
         let go_back: Rc<Cell<bool>> = Rc::new(Cell::new(false));
         let jump_to: Rc<Cell<Option<usize>>> = Rc::new(Cell::new(None));
+        // Live row metrics tuned on the General page; draw applies
+        // them (slider callbacks never touch the sidebar directly).
+        let row_h: Rc<Cell<f64>> = Rc::new(Cell::new(SIDEBAR_ROW_H as f64));
+        let row_icon: Rc<Cell<f64>> = Rc::new(Cell::new(SIDEBAR_ICON_SIZE as f64));
+        let row_gap: Rc<Cell<f64>> = Rc::new(Cell::new(SIDEBAR_ICON_GAP as f64));
+        let row_label: Rc<Cell<f64>> = Rc::new(Cell::new(SIDEBAR_LABEL_SIZE as f64));
         // Shared so press callbacks (back, dev button, selection)
         // can reach the sidebar from `'static` closures.
         let sidebar: Rc<RefCell<Sidebar>> = Rc::new(RefCell::new(
@@ -37,7 +48,12 @@ impl SidebarDemo {
                 SidebarItem::new("Notifications", "bell.fill"),
                 SidebarItem::new("Storage", "internaldrive"),
             ])
-            .page(Self::page("General", "System appearance and behavior."))
+            .page(Self::sizes_page(
+                row_h.clone(),
+                row_icon.clone(),
+                row_gap.clone(),
+                row_label.clone(),
+            ))
             .page(Self::page("Security", "Passwords and encryption."))
             .page(Self::page("Privacy", "Tracking and permissions."))
             .page(Self::page("Notifications", "Banners, sounds and badges."))
@@ -65,11 +81,63 @@ impl SidebarDemo {
             history,
             go_back,
             jump_to,
+            row_h,
+            row_icon,
+            row_gap,
+            row_label,
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
             command: None,
         }
+    }
+
+    /// General page: sliders tuning the sidebar row sizes live.
+    fn sizes_page(
+        row_h: Rc<Cell<f64>>,
+        row_icon: Rc<Cell<f64>>,
+        row_gap: Rc<Cell<f64>>,
+        row_label: Rc<Cell<f64>>,
+    ) -> VStack {
+        fn slider(
+            title: &str,
+            initial: f64,
+            min: f64,
+            max: f64,
+            cell: Rc<Cell<f64>>,
+        ) -> Slider {
+            Slider::new(initial, min, max)
+                .step(0.5)
+                .title(title)
+                .value_text(|v| format!("{v:.1}"))
+                .on_change(move |v| cell.set(v))
+        }
+        VStack::new()
+            .spacing(16.0)
+            .child(BasicText::new("General settings"))
+            .child(BasicText::new("System appearance and behavior."))
+            .child(slider(
+                "Row height",
+                row_h.get(),
+                16.0,
+                64.0,
+                row_h.clone(),
+            ))
+            .child(slider(
+                "Icon size",
+                row_icon.get(),
+                8.0,
+                40.0,
+                row_icon.clone(),
+            ))
+            .child(slider("Icon gap", row_gap.get(), 0.0, 24.0, row_gap.clone()))
+            .child(slider(
+                "Label size",
+                row_label.get(),
+                8.0,
+                28.0,
+                row_label.clone(),
+            ))
     }
 
     fn page(title: &str, body: &str) -> VStack {
@@ -101,6 +169,13 @@ impl App for SidebarDemo {
             sidebar.set_theme(palette.accent, dark);
             sidebar.set_glass(theme.mode, theme.glass);
             sidebar.set_focused(focused);
+            // Live row sizes from the General sliders.
+            sidebar.set_row_metrics(
+                self.row_h.get() as f32,
+                self.row_icon.get() as f32,
+                self.row_gap.get() as f32,
+                self.row_label.get() as f32,
+            );
         }
         // Back navigation: pop the trail and select the previous
         // item (`on_select` skips the push since it is already last).

@@ -60,6 +60,8 @@ pub fn on_search(self, callback: impl FnMut(&str) + 'static) -> Self
 pub fn search_text(&self) -> &str
 pub fn set_search_text(&mut self, text: impl Into<String>)
 pub fn search_text_cursor(&self) -> bool
+pub fn row_metrics(&self) -> (f32, f32, f32, f32)
+pub fn set_row_metrics(&mut self, row_h: f32, icon: f32, gap: f32, label: f32)
 pub fn toggle_button(self, show: bool) -> Self
 pub fn set_toggle_button(&mut self, show: bool)
 pub fn collapsible(self, collapsible: bool) -> Self
@@ -144,6 +146,10 @@ pub fn page_key(&mut self, key: Key) -> bool
   on every edit; row clicks select the real item index. The app
   returns the I-beam from `App::cursor` while
   `search_text_cursor` holds.
+- Row geometry (height, icon box, icon gap, label size) defaults to
+  the `SIDEBAR_*` tokens and tunes live via `set_row_metrics`
+  (read back with `row_metrics`); the demo General page hosts one
+  slider per metric for sizing by eye.
 - `wants_backdrop` stays true while the Lens pills are on screen;
   return it from `App::wants_backdrop` like the toolbar demo.
 - `press` reports traffic hits for the shell `WindowCommand`

@@ -154,6 +154,10 @@ pub struct Sidebar {
     on_search: Option<Box<dyn FnMut(&str)>>,
     search_last: String,
     visible: Vec<usize>,
+    row_h: f32,
+    row_icon: f32,
+    row_gap: f32,
+    row_label: f32,
     pending: Rc<Cell<Option<PendingAction>>>,
     width_setting: f32,
     accent: Color,
@@ -196,6 +200,10 @@ impl Sidebar {
             on_search: None,
             search_last: String::new(),
             visible,
+            row_h: SIDEBAR_ROW_H,
+            row_icon: SIDEBAR_ICON_SIZE,
+            row_gap: SIDEBAR_ICON_GAP,
+            row_label: SIDEBAR_LABEL_SIZE,
             pending,
             width_setting: SIDEBAR_W,
             accent: Color::from_rgb8(0x00, 0x7a, 0xff),
@@ -389,11 +397,25 @@ impl Sidebar {
     pub fn search_text(&self) -> &str {
         self.search.text_value()
     }
-
     /// Programmatic search text (refilters, no `on_search`).
     pub fn set_search_text(&mut self, text: impl Into<String>) {
         self.search.set_text(text.into());
         self.poll_search();
+    }
+
+    /// Live row metrics: row height, icon box, icon gap, label size.
+    /// Defaults are the `SIDEBAR_*` tokens; the demo tunes them with
+    /// sliders until sizes fit.
+    pub fn row_metrics(&self) -> (f32, f32, f32, f32) {
+        (self.row_h, self.row_icon, self.row_gap, self.row_label)
+    }
+
+    /// Set all row metrics at once (each clamped to its live range).
+    pub fn set_row_metrics(&mut self, row_h: f32, icon: f32, gap: f32, label: f32) {
+        self.row_h = row_h.clamp(16.0, 64.0);
+        self.row_icon = icon.clamp(8.0, 40.0);
+        self.row_gap = gap.clamp(0.0, 24.0);
+        self.row_label = label.clamp(8.0, 28.0);
     }
 
     /// True while the pointer wants the I-beam over the search row.
@@ -903,7 +925,7 @@ impl Sidebar {
         if !self.collapsed && x32 >= self.x && x32 <= self.x + self.bar_w() {
             let top = self.y + SIDEBAR_ITEMS_TOP;
             if y32 >= top {
-                let row = ((y32 - top) / SIDEBAR_ROW_H).floor() as usize;
+                let row = ((y32 - top) / self.row_h).floor() as usize;
                 if let Some(&index) = self.visible.get(row) {
                     self.select(index);
                 }
@@ -1118,14 +1140,14 @@ impl Sidebar {
         }
         for (row, &i) in self.visible.iter().enumerate() {
             let item = &self.items[i];
-            let ry = self.y + SIDEBAR_ITEMS_TOP + row as f32 * SIDEBAR_ROW_H;
+            let ry = self.y + SIDEBAR_ITEMS_TOP + row as f32 * self.row_h;
             if i == self.selected {
                 let wash = RoundedRect::new(
                     (self.x + 8.0) as f64 * scale,
                     ry as f64 * scale,
                     (self.x + self.bar_w() - 8.0) as f64 * scale,
-                    (ry + SIDEBAR_ROW_H) as f64 * scale,
-                    8.0 * scale,
+                    (ry + self.row_h) as f64 * scale,
+                    self.row_h as f64 * 0.28 * scale,
                 );
                 scene.fill(
                     Fill::NonZero,
@@ -1140,24 +1162,25 @@ impl Sidebar {
                 );
             }
             let tint = self.eff(item.tint.unwrap_or(self.accent));
+            let (icon_px, gap_px, row_px) = (self.row_icon, self.row_gap, self.row_h);
             let mut icon = SFSymbolImage::new(item.icon.clone())
-                .size(SIDEBAR_ICON_SIZE)
+                .size(icon_px)
                 .color(tint);
             icon.place(
                 fonts,
                 self.x + SIDEBAR_PAD,
-                ry + (SIDEBAR_ROW_H - SIDEBAR_ICON_SIZE) / 2.0,
-                SIDEBAR_ICON_SIZE,
-                SIDEBAR_ICON_SIZE,
+                ry + (row_px - icon_px) / 2.0,
+                icon_px,
+                icon_px,
             );
             icon.draw(scene, fonts, images);
-            let layout = fonts.layout_text(&item.label, SIDEBAR_LABEL_SIZE, text, None);
+            let layout = fonts.layout_text(&item.label, self.row_label, text, None);
             let (_, th) = FontSystem::layout_size(&layout);
             draw_layout(
                 scene,
                 &layout,
-                self.x + SIDEBAR_PAD + SIDEBAR_ICON_SIZE + SIDEBAR_ICON_GAP,
-                ry + (SIDEBAR_ROW_H - th / fonts.scale) / 2.0,
+                self.x + SIDEBAR_PAD + icon_px + gap_px,
+                ry + (row_px - th / fonts.scale) / 2.0,
                 fonts.scale,
             );
         }
@@ -1530,6 +1553,30 @@ mod tests {
         bar.page_text("x");
         assert_eq!(bar.search_text(), "");
         assert!(!bar.search_text_cursor());
+    }
+
+    #[test]
+    fn row_metrics_default_match_tokens() {
+        assert_eq!(
+            bar().row_metrics(),
+            (
+                SIDEBAR_ROW_H,
+                SIDEBAR_ICON_SIZE,
+                SIDEBAR_ICON_GAP,
+                SIDEBAR_LABEL_SIZE
+            )
+        );
+    }
+
+    #[test]
+    fn row_metrics_clamp_and_drive_hits() {
+        let mut bar = bar();
+        bar.set_row_metrics(1000.0, 0.0, 100.0, 0.0);
+        assert_eq!(bar.row_metrics(), (64.0, 8.0, 24.0, 8.0));
+        // Taller rows move the second row down (64 px here).
+        bar.set_row_metrics(64.0, 16.0, 8.0, 11.0);
+        bar.mouse_down(100.0, (SIDEBAR_ITEMS_TOP + 64.0 + 10.0) as f64);
+        assert_eq!(bar.selected_index(), 1);
     }
 
     /// Center of a pill cell at `(bar_x, bar_y)`: leading layout,
