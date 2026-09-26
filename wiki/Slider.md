@@ -59,7 +59,10 @@ pub fn set_focused(&mut self, focused: bool)
 by real frame deltas, so Hz-independent); `mouse_move` follows while
 dragging; `mouse_up` ends the drag. The filled part, knob and ticks track
 the animated display value, labels track the logical value. Forward all
-three mouse methods from the app (see `examples/slider.rs`).
+three mouse methods from the app (see `examples/slider.rs`); the `View`
+`mouse_down` / `mouse_up` / `set_hover` do the same, so sliders also
+work nested inside `VStack` / `HStack` pages (hover moves drive a held
+knob there).
 
 While held the knob turns into the shared liquid glass lens
 (`fill_lens_glass`): clear magnified center plus a thin 4 px blurred rim,

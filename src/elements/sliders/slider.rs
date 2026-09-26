@@ -663,7 +663,86 @@ impl View for Slider {
         self.render(scene, fonts, images, Instant::now());
     }
 
+    /// View event path (containers forward here): arm the knob or
+    /// start the track animation, like the inherent `mouse_down`.
+    fn mouse_down(&mut self, x: f64, y: f64) {
+        self.mouse_down(x, y);
+    }
+
+    /// View event path: release the knob, like `mouse_up`.
+    fn mouse_up(&mut self, x: f64, y: f64) {
+        self.mouse_up(x, y);
+    }
+
+    /// View event path: held knob follows hover moves (apps forward
+    /// pointer moves as hover while containers route them here).
+    fn set_hover(&mut self, x: f32, y: f32) {
+        self.mouse_move(x as f64, y as f64);
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::renderer::text::FontSystem;
+
+    fn slider() -> Slider {
+        let mut slider = Slider::new(10.0, 0.0, 100.0);
+        let mut fonts = FontSystem::new();
+        let (_, h) = slider.measure(&mut fonts);
+        slider.place(&mut fonts, 0.0, 0.0, 400.0, h);
+        slider
+    }
+
+    /// The View event path (used inside VStack/HStack pages) must arm
+    /// the knob exactly like the inherent handlers: the slider demo
+    /// downcasts around this, containers cannot.
+    #[test]
+    fn view_path_drags_knob() {
+        let mut slider = slider();
+        let kx = slider.knob_x(10.0);
+        let tcy = slider.tcy;
+        // Press the knob through the View trait.
+        View::mouse_down(&mut slider, kx as f64, tcy as f64);
+        assert!(slider.is_dragging());
+        // Hover moves follow while held.
+        View::set_hover(&mut slider, 200.0, tcy);
+        assert_eq!(slider.value(), 50.0);
+        // Release ends the drag.
+        View::mouse_up(&mut slider, 200.0, tcy as f64);
+        assert!(!slider.is_dragging());
+    }
+
+    #[test]
+    fn view_path_track_click_animates() {
+        let mut slider = slider();
+        let tcy = slider.tcy;
+        // Far from the knob (value 10 sits near the left edge).
+        View::mouse_down(&mut slider, 380.0, tcy as f64);
+        assert!(!slider.is_dragging());
+        assert!(slider.anim.is_some());
+        View::mouse_up(&mut slider, 380.0, tcy as f64);
+    }
+
+    #[test]
+    fn view_path_reports_changes() {
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        let seen: Rc<Cell<f64>> = Rc::new(Cell::new(-1.0));
+        let capture = seen.clone();
+        let mut slider = Slider::new(10.0, 0.0, 100.0).on_change(move |v| capture.set(v));
+        let mut fonts = FontSystem::new();
+        let (_, h) = slider.measure(&mut fonts);
+        slider.place(&mut fonts, 0.0, 0.0, 400.0, h);
+        let kx = slider.knob_x(10.0);
+        let tcy = slider.tcy;
+        View::mouse_down(&mut slider, kx as f64, tcy as f64);
+        View::set_hover(&mut slider, 200.0, tcy);
+        assert_eq!(seen.get(), 50.0);
     }
 }
