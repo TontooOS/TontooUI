@@ -32,7 +32,8 @@ traffic lights.
 
 Traffic geometry (`TRAFFIC_LEFT`, `TRAFFIC_SIZE`, `TRAFFIC_GAP`)
 and colors come from [Titlebar.md](Titlebar.md); the sidebar body
-reuses the `GroupBox` fill.
+defaults to `SIDEBAR_BG_DARK` (`#1F282D`) in dark mode and the
+`GroupBox` fill in light mode.
 
 ## SidebarItem
 

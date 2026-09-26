@@ -7,7 +7,7 @@ use vello::Scene;
 use vello::kurbo::{Affine, Circle, Line, Rect, RoundedRect, Stroke};
 use vello::peniko::{BlendMode, Brush, Color, Fill};
 
-use super::super::groupbox::{GROUP_BG_DARK, GROUP_BG_LIGHT};
+use super::super::groupbox::GROUP_BG_LIGHT;
 use super::super::images::SFSymbolImage;
 use super::super::layout::View;
 use super::super::titlebar::{
@@ -82,6 +82,8 @@ pub const SIDEBAR_COLLAPSE_SECONDS: f32 = 0.22;
 const SIDEBAR_SEL_DARK: Color = Color::from_rgba8(255, 255, 255, 28);
 /// Selected row fill in light mode.
 const SIDEBAR_SEL_LIGHT: Color = Color::from_rgba8(0, 0, 0, 18);
+/// Default column background in dark mode.
+pub const SIDEBAR_BG_DARK: Color = Color::from_rgb8(0x1f, 0x28, 0x2d);
 
 /// One sidebar entry: tinted SF Symbol plus label. The tint
 /// defaults to the theme accent.
@@ -718,7 +720,7 @@ impl Sidebar {
 
     fn sidebar_bg(&self) -> Color {
         self.eff(self.column_bg.unwrap_or(if self.dark {
-            GROUP_BG_DARK
+            SIDEBAR_BG_DARK
         } else {
             GROUP_BG_LIGHT
         }))
