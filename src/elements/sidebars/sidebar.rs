@@ -1187,9 +1187,18 @@ impl Sidebar {
     fn render_items(&mut self, scene: &mut Scene, fonts: &mut FontSystem, images: &mut ImageLoader<'_>) {
         let scale = fonts.scale as f64;
         let text = self.eff(self.text_color());
-        // Search row first (clipped plus faded with the body).
+        // Search row first, hard-clipped to the live column so no
+        // pixel (body, shadow, caret) ever crosses the divider.
         if self.show_search {
+            let clip = Rect::new(
+                self.x as f64 * scale,
+                self.y as f64 * scale,
+                (self.x + self.bar_w()) as f64 * scale,
+                (self.y + self.height) as f64 * scale,
+            );
+            scene.push_clip_layer(Fill::NonZero, Affine::IDENTITY, &clip);
             self.search.draw(scene, fonts, images);
+            scene.pop_layer();
         }
         for (row, &i) in self.visible.iter().enumerate() {
             let item = &self.items[i];
