@@ -204,8 +204,8 @@ pub use toggles::{
 };
 pub use glass::{GlassContainer, GlassType};
 pub use images::{
-    AppImage, ImageFit, ImageOverlay, OverlaySource, SFSymbolImage, UrlImage,
-    IMAGE_BADGE_SIZE, IMAGE_PLACEHOLDER_DARK, IMAGE_PLACEHOLDER_LIGHT,
+    AppImage, FileImage, ImageFit, ImageOverlay, OverlaySource, SFSymbolImage,
+    UrlImage, IMAGE_BADGE_SIZE, IMAGE_PLACEHOLDER_DARK, IMAGE_PLACEHOLDER_LIGHT,
     IMAGE_RADIUS, IMAGE_SYMBOL_SIZE, IMAGE_TEXT_SIZE,
 };
 pub use text::{

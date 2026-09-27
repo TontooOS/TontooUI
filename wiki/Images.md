@@ -83,6 +83,29 @@ pub fn rect(&self) -> (f32, f32, f32, f32)
 - A missing or undecodable file draws the theme placeholder box
   (`IMAGE_PLACEHOLDER_DARK` / `IMAGE_PLACEHOLDER_LIGHT`).
 
+## FileImage
+
+```rust
+pub fn new(path: impl Into<PathBuf>, width: f32, height: f32) -> Self
+pub fn fit(self, fit: ImageFit) -> Self
+pub fn radius(self, px: f32) -> Self
+pub fn set_theme(&mut self, dark: bool)
+pub fn set_focused(&mut self, focused: bool)
+pub fn set_fit(&mut self, fit: ImageFit)
+pub fn set_radius(&mut self, px: f32)
+pub fn set_path(&mut self, path: impl Into<PathBuf>)
+pub fn path(&self) -> &PathBuf
+pub fn rect(&self) -> (f32, f32, f32, f32)
+```
+
+- Same draw path as `AppImage` (untinted `ImageLoader::raster_file`,
+  cached per path, ~2x supersampling, rounded clip), but the source is
+  an absolute file path on disk instead of an app resource name. Used
+  for user files and generated artwork (e.g. CoreIcon output in the
+  temp dir).
+- A missing or undecodable file draws the theme placeholder box
+  (`IMAGE_PLACEHOLDER_DARK` / `IMAGE_PLACEHOLDER_LIGHT`).
+
 ## UrlImage
 
 ```rust
@@ -165,13 +188,14 @@ pub fn upload_frame(&mut self, seq: u64, pixels: &[u8], width: u32, height: u32)
 ## Usage / Example
 
 ```rust
-use tontooui::elements::{AppImage, ImageOverlay, SFSymbolImage, UrlImage, View, VStack};
+use tontooui::elements::{AppImage, FileImage, ImageOverlay, SFSymbolImage, UrlImage, View, VStack};
 use vello::peniko::Color;
 
 let stack = VStack::new()
   .spacing(28.0)
   .child(SFSymbolImage::new("star.fill").size(40.0).color(Color::from_rgb8(0xff, 0x9f, 0x0a)))
   .child(AppImage::new("demo-star", 200.0, 130.0))
+  .child(FileImage::new("/tmp/icon.png", 120.0, 120.0).radius(28.0))
   .child(UrlImage::new("https://picsum.photos/400/260", 200.0, 130.0))
   .child(ImageOverlay::resource("demo-star", 220.0, 140.0).caption("Demo star").badge("heart.fill"));
 ```

@@ -75,6 +75,7 @@ pub struct Titlebar {
     hover: bool,
     focused: bool,
     modal_blocked: bool,
+    maximize_enabled: bool,
     bg: Color,
     text_color: Color,
     divider_color: Color,
@@ -94,6 +95,7 @@ impl Titlebar {
             hover: false,
             focused: true,
             modal_blocked: false,
+            maximize_enabled: true,
             bg: TITLEBAR_BG_DARK,
             text_color: TITLEBAR_TEXT_DARK,
             divider_color: TITLEBAR_DIVIDER_DARK,
@@ -180,10 +182,12 @@ impl Titlebar {
     }
 
     /// Update group hover from logical cursor position. While modal
-    /// blocked the close light never highlights.
+    /// blocked the close light never highlights; a disabled maximize
+    /// light never highlights either.
     pub fn set_hover(&mut self, x: f32, y: f32) {
         self.hover = match self.button_at(x, y) {
             Some(TrafficAction::Close) if self.modal_blocked => false,
+            Some(TrafficAction::Maximize) if !self.maximize_enabled => false,
             Some(_) => true,
             None => false,
         };
@@ -195,9 +199,12 @@ impl Titlebar {
 
     /// Whether the hover glyph on button `index` is painted: focused
     /// hover only, so unfocused lights stay plain gray. Never on a
-    /// blocked close light, even on hover.
+    /// blocked close light or a disabled maximize light, even on hover.
     fn glyph_visible(&self, index: usize) -> bool {
-        self.focused && self.hover && !(self.modal_blocked && index == 0)
+        self.focused
+            && self.hover
+            && !(self.modal_blocked && index == 0)
+            && !(index == 2 && !self.maximize_enabled)
     }
 
     /// Modal block for open alerts: the red (close) light turns gray
@@ -211,12 +218,31 @@ impl Titlebar {
         self.modal_blocked
     }
 
+    /// About-style windows without a maximize button: the green light
+    /// turns gray and stops responding, close and minimize keep working.
+    /// Reads back via `maximize_enabled`.
+    pub fn without_maximize(mut self) -> Self {
+        self.maximize_enabled = false;
+        self
+    }
+
+    /// Enable or disable the maximize light after construction.
+    pub fn set_maximize_enabled(&mut self, enabled: bool) {
+        self.maximize_enabled = enabled;
+    }
+
+    pub fn maximize_enabled(&self) -> bool {
+        self.maximize_enabled
+    }
+
     /// Click handling. Returns the traffic light action when a button was
     /// hit, otherwise `None`. While modal blocked a close hit returns
-    /// `None` (the gray light is not clickable).
+    /// `None` (the gray light is not clickable); a disabled maximize
+    /// hit returns `None` for the same reason.
     pub fn press(&mut self, x: f32, y: f32) -> Option<TrafficAction> {
         match self.button_at(x, y) {
             Some(TrafficAction::Close) if self.modal_blocked => None,
+            Some(TrafficAction::Maximize) if !self.maximize_enabled => None,
             hit => hit,
         }
     }
@@ -289,7 +315,11 @@ impl Titlebar {
                     TRAFFIC_CLOSE
                 },
                 TRAFFIC_MINIMIZE,
-                TRAFFIC_MAXIMIZE,
+                if self.maximize_enabled {
+                    TRAFFIC_MAXIMIZE
+                } else {
+                    TRAFFIC_INACTIVE
+                },
             ]
         } else {
             [TRAFFIC_INACTIVE; 3]
@@ -499,5 +529,32 @@ mod tests {
         assert!(!bar.glyph_visible(0));
         assert!(bar.glyph_visible(1));
         assert!(bar.glyph_visible(2));
+    }
+
+    #[test]
+    fn without_maximize_disables_maximize_only() {
+        let mut bar = Titlebar::new("About").without_maximize();
+        assert!(!bar.maximize_enabled());
+        bar.set_rect(0.0, 0.0, 900.0);
+        let (xx, xy) = bar.button_center(2);
+        assert_eq!(bar.press(xx, xy), None);
+        // Close and minimize keep working.
+        let (cx, cy) = bar.button_center(0);
+        assert_eq!(bar.press(cx, cy), Some(TrafficAction::Close));
+        let (mx, my) = bar.button_center(1);
+        assert_eq!(bar.press(mx, my), Some(TrafficAction::Minimize));
+        bar.set_maximize_enabled(true);
+        assert!(bar.maximize_enabled());
+        assert_eq!(bar.press(xx, xy), Some(TrafficAction::Maximize));
+    }
+
+    #[test]
+    fn disabled_maximize_hides_glyph_only() {
+        let mut bar = bar().without_maximize();
+        let (cx, cy) = bar.button_center(0);
+        bar.set_hover(cx, cy);
+        assert!(bar.glyph_visible(0));
+        assert!(bar.glyph_visible(1));
+        assert!(!bar.glyph_visible(2));
     }
 }

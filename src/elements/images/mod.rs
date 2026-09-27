@@ -1,9 +1,11 @@
 pub mod app;
+pub mod file;
 pub mod overlay;
 pub mod symbol;
 pub mod url;
 
 pub use app::AppImage;
+pub use file::FileImage;
 pub use overlay::{ImageOverlay, OverlaySource};
 pub use symbol::SFSymbolImage;
 pub use url::UrlImage;

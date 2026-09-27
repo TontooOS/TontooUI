@@ -153,6 +153,17 @@ Group hover from the logical cursor position (3 px tolerance around each
 button).
 
 ```rust
+pub fn without_maximize(self) -> Self
+pub fn set_maximize_enabled(&mut self, enabled: bool)
+pub fn maximize_enabled(&self) -> bool
+```
+
+About-style windows without a maximize button: the green light turns
+gray and stops responding (`press` returns `None` on it, no hover
+glyph), close and minimize keep working. Mirrors the modal block of
+the close light, but for maximize.
+
+```rust
 pub fn set_focused(&mut self, focused: bool)
 ```
 
@@ -160,12 +171,21 @@ Dims all buttons to `TRAFFIC_INACTIVE` when the window loses focus.
 Forward `View::set_focused` here.
 
 ```rust
+pub fn set_modal_blocked(&mut self, blocked: bool)
+pub fn modal_blocked(&self) -> bool
+```
+
+Modal block for open alerts: the red (close) light turns gray and
+stops responding, minimize/maximize keep working.
+
+```rust
 pub fn press(&mut self, x: f32, y: f32) -> Option<TrafficAction>
 ```
 
 Click handling. Map the result to a `WindowCommand` and return it from
 `View::poll_window_command`; the shell executes close, minimize and
-maximize toggle.
+maximize toggle. A blocked close hit and a disabled maximize hit both
+return `None`.
 
 ```rust
 fn mouse_move(&mut self, x: f64, y: f64) { self.bar.set_hover(x as f32, y as f32); }
