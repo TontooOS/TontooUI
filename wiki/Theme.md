@@ -147,6 +147,12 @@ Poll the watcher per frame, override `App::background`, forward the
 palette to themed views. Switch the daemon theme (`customize_set
 {"theme": "light"}`) while the app runs and watch the 0.25 s crossfade.
 
+Run `cargo run --example accent_gallery`: every accent-following
+element (buttons, toggles, slider, stepper, progress, gauge, text
+fields, pickers, menu button, outline, segments) on one page. The top
+segment switches between daemon accent ("Auto") and a local preview of
+all thirteen accents; the titlebar names the active accent and source.
+
 ## Cross References
 
 - [Renderer.md](Renderer.md) – `App::background`, frame pipeline, `View`/`App`

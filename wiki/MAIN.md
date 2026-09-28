@@ -89,6 +89,9 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-28: `accent_gallery` example. One page with every
+  accent-following element plus an accent switcher (daemon "Auto" or
+  local preview of all thirteen accents). See [Theme.md](Theme.md).
 - 2026-09-28: Push-based theme updates. `ThemeWatcher` holds one
   persistent `subscribe` connection and applies pushed
   `customize_changed` events immediately (no polling traffic while idle),
