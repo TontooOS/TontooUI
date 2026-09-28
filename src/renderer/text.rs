@@ -199,6 +199,25 @@ impl FontSystem {
         self.setter.set_family(previous);
         frame
     }
+
+    /// Register a font file into the layout context so preview
+    /// families resolve without a system install. Returns the
+    /// registered family names; `Err` when the file cannot be read.
+    pub fn register_font_file(
+        &mut self,
+        path: &std::path::Path,
+    ) -> std::io::Result<Vec<String>> {
+        self.sync();
+        self.setter.register_font_file(path)
+    }
+
+    /// Register raw font bytes into the layout context. Returns the
+    /// registered family names; empty when the data parses to no
+    /// fonts.
+    pub fn register_font_data(&mut self, data: Vec<u8>) -> Vec<String> {
+        self.sync();
+        self.setter.register_font_data(data)
+    }
 }
 
 /// Inline span style for `layout_rich_text`: a byte `range` into the

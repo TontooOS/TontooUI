@@ -89,6 +89,9 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-28: `FontPreview::from_file` and `from_data` preview
+  font files/bytes without a system install
+  (`FontSystem::register_font_file`, `register_font_data`).
 - 2026-09-28: New `FontPreview` element (family name plus sample
   line in its own family, `FontSystem::layout_text_in_family` with
   `system-ui` fallback). See [FontPreview.md](FontPreview.md).

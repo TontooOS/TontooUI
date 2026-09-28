@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::path::Path;
 
 use vello::Scene;
 use vello::peniko::Color;
@@ -72,11 +73,40 @@ impl FontPreview {
         }
     }
 
+    /// Load a font file into `fonts` and preview its first registered
+    /// family (read from the font name tables). Falls back to the
+    /// file stem when the file registers no new family (e.g. already
+    /// loaded). Returns `Err` when the file cannot be read.
+    pub fn from_file(fonts: &mut FontSystem, path: &Path) -> std::io::Result<Self> {
+        let names = fonts.register_font_file(path)?;
+        let family = names.into_iter().next().or_else(|| {
+            path.file_stem()
+                .and_then(|stem| stem.to_str())
+                .map(str::to_string)
+        });
+        Ok(Self::new(family.unwrap_or_else(|| "Font".to_string())))
+    }
+
+    /// Register raw font bytes into `fonts` and preview the first
+    /// registered family. Uses `fallback_family` when the data
+    /// registers no new family.
+    pub fn from_data(
+        fonts: &mut FontSystem,
+        data: Vec<u8>,
+        fallback_family: &str,
+    ) -> Self {
+        let names = fonts.register_font_data(data);
+        if let Some(family) = names.into_iter().next() {
+            Self::new(family)
+        } else {
+            Self::new(fallback_family)
+        }
+    }
+
     pub fn sample(mut self, sample: impl Into<String>) -> Self {
         self.set_sample(sample);
         self
     }
-
     pub fn title_size(mut self, size: f32) -> Self {
         self.set_title_size(size);
         self
@@ -389,5 +419,36 @@ mod tests {
         preview.set_theme(ThemeMode::Light);
         preview.set_focused(false);
         assert_eq!(preview.sample_value(), FONT_PREVIEW_DEFAULT_SAMPLE);
+    }
+
+    #[test]
+    fn missing_preview_file_errors() {
+        let mut fonts = FontSystem::new();
+        assert!(FontPreview::from_file(&mut fonts, Path::new("/definitely/not/here.ttf")).is_err());
+    }
+
+    #[test]
+    fn garbage_preview_data_uses_fallback() {
+        let mut fonts = FontSystem::new();
+        let preview = FontPreview::from_data(&mut fonts, b"not a font".to_vec(), "Fallback");
+        assert_eq!(preview.family_value(), "Fallback");
+        let mut preview = preview;
+        let (w, h) = preview.measure(&mut fonts);
+        assert!(w > 0.0);
+        assert!(h > 0.0);
+    }
+
+    #[test]
+    fn real_preview_file_registers_family() {
+        let path = Path::new("/usr/share/fonts/TTF/DejaVuSerifCondensed.ttf");
+        if !path.exists() {
+            return;
+        }
+        let mut fonts = FontSystem::new();
+        let mut preview = FontPreview::from_file(&mut fonts, path).expect("preview");
+        assert!(!preview.family_value().is_empty());
+        let (w, h) = preview.measure(&mut fonts);
+        assert!(w > 0.0);
+        assert!(h > 0.0);
     }
 }

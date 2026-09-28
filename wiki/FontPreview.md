@@ -20,6 +20,8 @@ handling).
 
 ```rust
 pub fn new(family: impl Into<String>) -> Self
+pub fn from_file(fonts: &mut FontSystem, path: &Path) -> std::io::Result<Self>
+pub fn from_data(fonts: &mut FontSystem, data: Vec<u8>, fallback_family: &str) -> Self
 pub fn sample(self, sample: impl Into<String>) -> Self
 pub fn title_size(self, size: f32) -> Self
 pub fn sample_size(self, size: f32) -> Self
@@ -41,6 +43,12 @@ pub fn rect(&self) -> (f32, f32, f32, f32)
 - Both lines lay out through `FontSystem::layout_text_in_family`
   in the preview family with a `system-ui` fallback, so unknown
   families degrade to the system font instead of `.notdef` boxes.
+- `from_file` loads a font file into `fonts` and previews its
+  first registered family (read from the font name tables); it
+  falls back to the file stem when nothing new registers and
+  returns `Err` when the file cannot be read. `from_data` takes
+  raw bytes with a `fallback_family` for the same case. No system
+  install is needed in either case.
 - Colors resolve `TextForeground::Primary` against the theme
   (`#D8D9D9` dark, `#272727` light), desaturated when unfocused.
 - `width` fixes the box so longer content wraps; `None` (default)
@@ -77,6 +85,17 @@ let rows: Vec<FontPreview> = registry
     .into_iter()
     .map(FontPreview::new)
     .collect();
+```
+
+Preview a font file straight from disk:
+
+```rust
+use std::path::Path;
+use tontooui::elements::FontPreview;
+use tontooui::renderer::FontSystem;
+
+let mut fonts = FontSystem::new();
+let row = FontPreview::from_file(&mut fonts, Path::new("/usr/share/fonts/MyFont.ttf"))?;
 ```
 
 ## Cross References
