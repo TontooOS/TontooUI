@@ -834,6 +834,40 @@ mod tests {
     }
 
     #[test]
+    fn nested_walk_reaches_mixed_row_children() {
+        // Mirrors the accent gallery demo: a VStack row holding an
+        // HStack with two different elements, themed through nested
+        // `child_mut` walks.
+        use super::super::gauges::Gauge;
+        use super::super::progress::LinearProgress;
+
+        let mut stack = VStack::new().spacing(0.0).child(
+            HStack::new()
+                .spacing(0.0)
+                .child(LinearProgress::new())
+                .child(Gauge::new(0.5, 0.0, 1.0)),
+        );
+        let accent = vello::peniko::Color::from_rgb8(0x00, 0xc7, 0xbe);
+        if let Some(row) = stack.child_mut::<HStack>(0) {
+            if let Some(bar) = row.child_mut::<LinearProgress>(0) {
+                bar.set_theme(accent, true);
+            }
+            if let Some(gauge) = row.child_mut::<Gauge>(1) {
+                gauge.set_theme(accent, true);
+            }
+        }
+        let row = stack.child_mut::<HStack>(0).expect("row");
+        assert_eq!(
+            row.child_mut::<LinearProgress>(0).expect("bar").theme_fill(),
+            accent
+        );
+        assert_eq!(
+            row.child_mut::<Gauge>(1).expect("gauge").theme_fill(),
+            accent
+        );
+    }
+
+    #[test]
     fn stacks_forward_focus_to_nested_children() {
         use super::super::sliders::Slider;
 

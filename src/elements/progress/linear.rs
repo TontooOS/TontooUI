@@ -151,6 +151,12 @@ impl LinearProgress {
         self.target
     }
 
+    /// Current fill (test hook: verifies theme/manual routing).
+    #[cfg(test)]
+    pub fn theme_fill(&self) -> Color {
+        self.fill
+    }
+
     /// Currently shown fill (lags behind `progress`).
     pub fn displayed(&self) -> f64 {
         self.shown

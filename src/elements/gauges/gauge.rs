@@ -164,6 +164,12 @@ impl Gauge {
         self.value
     }
 
+    /// Current fill (test hook: verifies theme/manual routing).
+    #[cfg(test)]
+    pub fn theme_fill(&self) -> Color {
+        self.fill
+    }
+
     pub fn fraction(&self) -> f32 {
         if self.max <= self.min {
             return 0.0;
