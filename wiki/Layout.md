@@ -59,13 +59,17 @@ pub fn child(self, child: impl View + 'static) -> Self
 
 Default spacing 8 px, default align `Leading`. Children stack top to
 bottom at intrinsic height; flex children share the leftover height. Width
-is capped at the stack width and positioned per `align`.
+is capped at the stack width and positioned per `align`. Children are
+clipped to the placed rect: taller content is cut off instead of
+spilling past the stack (reach it through `ScrollView`, which clips the
+same way). Unplaced stacks draw unclipped.
 
 ## HStack
 
 Same builders as `VStack`, mirrored: children sit left to right at
 intrinsic width, flex children share the leftover width, height is capped
-and positioned per `align`.
+and positioned per `align`. Children are clipped to the placed rect like
+`VStack`.
 
 ## ZStack
 
@@ -77,6 +81,7 @@ pub fn child(self, child: impl View + 'static) -> Self
 
 Overlay: every child gets the stack rect at intrinsic size, positioned per
 `align` (default `Center`) on both axes. Draw order follows child order.
+Children are clipped to the placed rect like `VStack`.
 
 ## Spacer
 

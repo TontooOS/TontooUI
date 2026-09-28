@@ -1,7 +1,7 @@
 use std::any::Any;
 
 use vello::Scene;
-use vello::kurbo::{Affine, RoundedRect};
+use vello::kurbo::{Affine, Rect, RoundedRect};
 use vello::peniko::{Brush, Color, Fill};
 
 use crate::renderer::images::ImageLoader;
@@ -60,11 +60,14 @@ pub trait View {
 
 /// Vertical stack. Children keep intrinsic size; flex children share the
 /// leftover height. Cross-axis width is capped at the stack width and
-/// positioned per `align`.
+/// positioned per `align`. Children are clipped to the placed rect, so
+/// taller content is cut off instead of spilling past the stack (reach
+/// it through `ScrollView`, which clips the same way).
 pub struct VStack {
     spacing: f32,
     align: Align,
     children: Vec<Box<dyn View>>,
+    rect: (f32, f32, f32, f32),
 }
 
 /// Horizontal stack. Mirrors `VStack` along the x axis.
@@ -72,13 +75,16 @@ pub struct HStack {
     spacing: f32,
     align: Align,
     children: Vec<Box<dyn View>>,
+    rect: (f32, f32, f32, f32),
 }
 
 /// Overlay stack. All children share the same rect at intrinsic size,
-/// positioned per `align` on both axes.
+/// positioned per `align` on both axes. Children are clipped to the
+/// placed rect like `VStack`.
 pub struct ZStack {
     align: Align,
     children: Vec<Box<dyn View>>,
+    rect: (f32, f32, f32, f32),
 }
 
 /// Flexible empty space. Takes a share of the remaining stack space
@@ -96,6 +102,7 @@ macro_rules! stack_boilerplate {
                     spacing: 8.0,
                     align: Align::Leading,
                     children: Vec::new(),
+                    rect: (0.0, 0.0, 0.0, 0.0),
                 }
             }
 
@@ -155,6 +162,7 @@ impl ZStack {
         Self {
             align: Align::Center,
             children: Vec::new(),
+            rect: (0.0, 0.0, 0.0, 0.0),
         }
     }
 
@@ -249,6 +257,48 @@ fn cross_offset(align: Align, total: f32, used: f32) -> f32 {
     }
 }
 
+/// Clip rect for a placed stack in physical px. `None` when the stack
+/// was placed empty, so unplaced stacks draw unclipped as before.
+fn stack_clip_rect(rect: (f32, f32, f32, f32), scale: f32) -> Option<Rect> {
+    let (x, y, w, h) = rect;
+    if w <= 0.0 || h <= 0.0 {
+        return None;
+    }
+    let scale = scale as f64;
+    Some(Rect::new(
+        x as f64 * scale,
+        y as f64 * scale,
+        (x + w) as f64 * scale,
+        (y + h) as f64 * scale,
+    ))
+}
+
+/// Draw stack children clipped to the placed rect. Overflow is cut off
+/// instead of spilling past the stack; scrolled content belongs in a
+/// `ScrollView`.
+fn draw_clipped(
+    rect: (f32, f32, f32, f32),
+    children: &mut [Box<dyn View>],
+    scene: &mut Scene,
+    fonts: &mut FontSystem,
+    images: &mut ImageLoader<'_>,
+) {
+    match stack_clip_rect(rect, fonts.scale) {
+        Some(clip) => {
+            scene.push_clip_layer(Fill::NonZero, Affine::IDENTITY, &clip);
+            for child in children.iter_mut() {
+                child.draw(scene, fonts, images);
+            }
+            scene.pop_layer();
+        }
+        None => {
+            for child in children.iter_mut() {
+                child.draw(scene, fonts, images);
+            }
+        }
+    }
+}
+
 impl View for VStack {
     fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
         let mut w: f32 = 0.0;
@@ -297,6 +347,7 @@ impl View for VStack {
             child.place(fonts, x + cross_offset(align, width, child_w), cy, child_w, child_h);
             cy += child_h + spacing;
         }
+        self.rect = (x, y, width, height);
     }
 
     fn draw(
@@ -305,9 +356,7 @@ impl View for VStack {
         fonts: &mut FontSystem,
         images: &mut ImageLoader<'_>,
     ) {
-        for child in self.children.iter_mut() {
-            child.draw(scene, fonts, images);
-        }
+        draw_clipped(self.rect, &mut self.children, scene, fonts, images);
     }
 
     fn mouse_down(&mut self, x: f64, y: f64) {
@@ -387,6 +436,7 @@ impl View for HStack {
             child.place(fonts, cx, y + cross_offset(align, height, child_h), child_w, child_h);
             cx += child_w + spacing;
         }
+        self.rect = (x, y, width, height);
     }
 
     fn draw(
@@ -395,9 +445,7 @@ impl View for HStack {
         fonts: &mut FontSystem,
         images: &mut ImageLoader<'_>,
     ) {
-        for child in self.children.iter_mut() {
-            child.draw(scene, fonts, images);
-        }
+        draw_clipped(self.rect, &mut self.children, scene, fonts, images);
     }
 
     fn mouse_down(&mut self, x: f64, y: f64) {
@@ -668,6 +716,7 @@ impl View for ZStack {
                 ch,
             );
         }
+        self.rect = (x, y, width, height);
     }
 
     fn draw(
@@ -676,9 +725,7 @@ impl View for ZStack {
         fonts: &mut FontSystem,
         images: &mut ImageLoader<'_>,
     ) {
-        for child in self.children.iter_mut() {
-            child.draw(scene, fonts, images);
-        }
+        draw_clipped(self.rect, &mut self.children, scene, fonts, images);
     }
 
     fn mouse_down(&mut self, x: f64, y: f64) {
@@ -771,6 +818,19 @@ mod tests {
         stack.mouse_down(cx as f64, cy as f64);
         stack.mouse_up(cx as f64, cy as f64);
         assert!(*fired.borrow());
+    }
+
+    #[test]
+    fn clip_rect_follows_placed_rect_scaled() {
+        let clip = stack_clip_rect((10.0, 20.0, 200.0, 100.0), 2.0).expect("clip");
+        assert_eq!((clip.x0, clip.y0, clip.x1, clip.y1), (20.0, 40.0, 420.0, 240.0));
+    }
+
+    #[test]
+    fn empty_placed_rect_draws_unclipped() {
+        assert!(stack_clip_rect((0.0, 0.0, 0.0, 0.0), 1.0).is_none());
+        assert!(stack_clip_rect((10.0, 20.0, 0.0, 100.0), 1.0).is_none());
+        assert!(stack_clip_rect((10.0, 20.0, 200.0, 0.0), 1.0).is_none());
     }
 
     #[test]

@@ -89,6 +89,10 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-28: Stacks clip children to the placed rect. `VStack`,
+  `HStack` and `ZStack` cut overflowing content off via a clip layer
+  (same pattern as `ScrollView`) instead of spilling past their bounds;
+  unplaced stacks draw unclipped as before. See [Layout.md](Layout.md).
 - 2026-09-28: `accent_gallery` example. One page with every
   accent-following element plus an accent switcher (daemon "Auto" or
   local preview of all thirteen accents). See [Theme.md](Theme.md).
