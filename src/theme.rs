@@ -226,8 +226,10 @@ fn lerp_palette(from: &Palette, to: &Palette, t: f32) -> Palette {
 
 /// Seconds for the theme crossfade.
 pub const THEME_FADE_SECONDS: f64 = 0.25;
-/// Seconds between daemon polls.
-pub const THEME_POLL_SECONDS: f64 = 1.0;
+/// Seconds between daemon polls. Short on purpose: every poll is one tiny
+/// revision-guarded socket roundtrip, and a 1 s interval made theme switches
+/// feel laggy (up to 1 s detection plus the fade).
+pub const THEME_POLL_SECONDS: f64 = 0.2;
 
 /// Watches the settings daemon for theme changes and crossfades the
 /// palette. Unix only (daemon socket); elsewhere it serves defaults.

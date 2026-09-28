@@ -89,6 +89,10 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-28: Faster theme switch detection. `THEME_POLL_SECONDS` is 0.2 s
+  instead of 1.0 s, so dark/light changes picked up from the daemon start
+  the crossfade almost immediately (revision-guarded, still one cheap
+  socket read per interval when idle). See [Theme.md](Theme.md).
 - 2026-09-28: Image backend moved from the third-party `image`/`png`
   crates to CoreImage (`coreimage::TiImage::load`, `from_bytes` and
   `thumbnail` in `src/renderer/images.rs`; `coreimage::codecs::png::encode`

@@ -1,7 +1,7 @@
 # Theme
 
 System theme from the settings daemon: dark/light mode plus accent color.
-`ThemeWatcher` polls the daemon (1 s interval, revision-guarded) and
+`ThemeWatcher` polls the daemon (0.2 s interval, revision-guarded) and
 crossfades the whole palette over 0.25 s, so mode switches animate live
 instead of snapping.
 
@@ -88,9 +88,9 @@ pub fn palette(&mut self, now_secs: f64) -> Palette
 ```
 
 `poll` reads `customize_get` through CoreSettings at most once per
-`THEME_POLL_SECONDS` (1.0 s) and starts a fade when the theme changed
+`THEME_POLL_SECONDS` (0.2 s) and starts a fade when the theme changed
 (revision-guarded, so idle systems cost one cheap socket read per
-second). A missing daemon keeps the current theme, never an error.
+interval). A missing daemon keeps the current theme, never an error.
 `palette` blends from the previous to the current palette with
 `CubicOut` over `THEME_FADE_SECONDS` (0.25 s) and returns the exact
 target once finished.
