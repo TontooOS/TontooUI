@@ -251,9 +251,12 @@ this pass blurs only what the app itself draws.
 
 ```rust
 pub const BACKDROP_SIGMA: f32;
+pub const LENS_OVERSHOOT_RATIO: f64;
 pub struct BackdropBlur { .. }
 pub fn fill_backdrop(scene: &mut Scene, images: &ImageLoader<'_>, shape: &impl Shape)
 pub fn fill_backdrop_lens(scene: &mut Scene, images: &ImageLoader<'_>, shape: &impl Shape, center: Point, zoom: f64)
+pub fn fill_backdrop_lens_xy(scene: &mut Scene, images: &ImageLoader<'_>, shape: &impl Shape, center: Point, zoom_x: f64, zoom_y: f64)
+pub fn lens_zoom_for_size(half_w: f64, half_h: f64, zoom: f64) -> (f64, f64)
 pub fn stroke_backdrop_edge(scene: &mut Scene, images: &ImageLoader<'_>, ring: &RoundedRect, width: f64)
 pub fn fill_lens_glass(scene: &mut Scene, images: &ImageLoader<'_>, rect: &Rect, radius: f64, zoom: f64, edge_width: f64)
 ```
@@ -268,6 +271,16 @@ pub fn fill_lens_glass(scene: &mut Scene, images: &ImageLoader<'_>, rect: &Rect,
   `zoom` around `center` (both physical px) via the brush transform
   (below 1.0 minifies, above 1.0 magnifies); no-op
   when `backdrop_sharp()` is `None`.
+- `fill_backdrop_lens_xy` is the anisotropic variant with separate
+  horizontal and vertical zoom; `fill_backdrop_lens` wraps it with a
+  uniform zoom.
+- `lens_zoom_for_size` eases a uniform `zoom` toward 1.0 on the long axis
+  of stretched bodies (allowed rim overshoot is `LENS_OVERSHOOT_RATIO`
+  times the smaller half side), so wide pills sample locally at their
+  ends. Bodies up to a 2:1 aspect keep the full zoom.
+- `fill_lens_glass` clamps `radius` to half the smaller side and applies
+  the per-axis zoom above, then strokes the blurred rim band inside the
+  outline.
 - `stroke_backdrop_edge` strokes `ring` with the blurred capture; callers
   inset the ring by half the band and stroke at full band width so the frost
   sits inside the body outline.

@@ -82,6 +82,7 @@ balanced stage (it still follows dark/light mode).
 | `GLASS_CHROMA_RED` / `GLASS_CHROMA_CYAN` | reserved (former rim split, unused) |
 | `GLASS_EDGE_WIDTH` / `GLASS_EDGE_WIDTH_LARGE` | 2 px rim band, 3 px once the smaller side reaches `GLASS_LARGE_MIN_SIDE` (200 px) |
 | `GLASS_ZOOM` | 0.80x lens zoom of the clear center (minify) |
+| `LENS_OVERSHOOT_RATIO` | 0.5: rim sample may reach half the smaller half side outside the outline; longer axes ease toward 1.0 |
 
 ## Lens
 
@@ -93,6 +94,14 @@ body center (`fill_backdrop_lens`, `GLASS_ZOOM`), so the minifier covers
 the whole middle. Tiny bodies (smaller than twice the band) fall back to a
 full `fill_backdrop` blur. The held toggle knob and the dragged slider knob
 use the same lens via `fill_lens_glass` with a narrower 4 px rim.
+
+Stretched bodies (wider than a 2:1 aspect, e.g. the sidebar search pill)
+ease the zoom toward 1.0 on the long axis via `lens_zoom_for_size`, so the
+ends sample locally while the short axis keeps the full lens. This keeps the
+rim from pulling in the divider or the content page when the sidebar grows
+wider. `fill_backdrop_lens_xy` exposes the per-axis zoom directly;
+`fill_backdrop_lens` stays as the uniform wrapper. The body radius clamps to
+half the smaller side, so flat pills never fold into pointed corners.
 
 ## Frosted
 

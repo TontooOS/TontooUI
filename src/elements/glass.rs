@@ -317,7 +317,11 @@ impl GlassContainer {
         }
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
-        let radius = self.radius as f64 * scale;
+        // Clamp the radius to half the smaller side: flat pills (long
+        // search fields) would otherwise fold the arcs into pointed
+        // corners at the ends.
+        let radius = (self.radius as f64 * scale)
+            .min(((self.width.min(self.height)) as f64 * scale / 2.0).max(0.0));
         let rect = vello::kurbo::Rect::new(
             px(self.x),
             px(self.y),

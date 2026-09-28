@@ -786,15 +786,31 @@ pub fn fill_backdrop_lens(
     center: Point,
     zoom: f64,
 ) {
+    fill_backdrop_lens_xy(scene, images, shape, center, zoom, zoom);
+}
+
+/// Anisotropic lens center: separate horizontal (`zoom_x`) and vertical
+/// (`zoom_y`) zoom around `center`. Long pills use a `zoom_x` close to
+/// 1.0 (see `lens_zoom_for_size`) so the rim never pulls in pixels far
+/// outside the body, while the short axis keeps the full lens effect.
+pub fn fill_backdrop_lens_xy(
+    scene: &mut vello::Scene,
+    images: &crate::renderer::images::ImageLoader<'_>,
+    shape: &impl vello::kurbo::Shape,
+    center: Point,
+    zoom_x: f64,
+    zoom_y: f64,
+) {
     let Some(sharp) = images.backdrop_sharp() else {
         return;
     };
-    let z = if zoom <= 0.0 { 1.0 } else { zoom };
+    let zx = if zoom_x <= 0.0 { 1.0 } else { zoom_x };
+    let zy = if zoom_y <= 0.0 { 1.0 } else { zoom_y };
     // Brush -> surface: scale around the glass center so each surface
     // point samples away from (z < 1, minify) or toward (z > 1, magnify)
     // the center.
     let brush_transform = Affine::translate((center.x, center.y))
-        * Affine::scale(z)
+        * Affine::scale_non_uniform(zx, zy)
         * Affine::translate((-center.x, -center.y));
     scene.fill(
         Fill::NonZero,
@@ -809,11 +825,45 @@ pub fn fill_backdrop_lens(
     );
 }
 
+/// Allowed lens overshoot beyond the body as a fraction of the smaller
+/// half side: the minified sample at the rim may reach this far outside
+/// the outline. Caps the distortion on long pills (sidebar search) so
+/// the rim never pulls in the divider or the content page, while bodies
+/// up to a 2:1 aspect keep the full `GLASS_ZOOM` effect.
+pub const LENS_OVERSHOOT_RATIO: f64 = 0.5;
+
+/// Per-axis lens zoom for a body of the given half sizes (physical px):
+/// uniform `zoom` while the aspect stays at or below 2:1, eased toward
+/// 1.0 (no distortion) on the long axis beyond that. Never stronger
+/// than `zoom`, never above 1.0.
+pub fn lens_zoom_for_size(half_w: f64, half_h: f64, zoom: f64) -> (f64, f64) {
+    let z = zoom.clamp(0.0, 1.0);
+    if z <= 0.0 || z >= 1.0 || half_w <= 0.0 || half_h <= 0.0 {
+        let unit = if z <= 0.0 { 1.0 } else { z };
+        return (unit, unit);
+    }
+    let min_half = half_w.min(half_h);
+    let allowed = (min_half * LENS_OVERSHOOT_RATIO).max(0.0);
+    let axis = |half: f64| {
+        if allowed <= 0.0 {
+            z
+        } else {
+            (half / (half + allowed)).clamp(z, 1.0)
+        }
+    };
+    (axis(half_w), axis(half_h))
+}
+
 /// Shared liquid glass body: clear zoomed center with only a thin
 /// blurred rim band inside the outline. `rect`/`radius` are in physical px,
 /// `zoom` is the lens zoom (below 1.0 minifies, above 1.0 magnifies) and
 /// `edge_width` the rim band width in physical px. Bodies smaller than twice
 /// the band fall back to a full blur fill.
+///
+/// The zoom eases toward 1.0 on the long axis of stretched bodies (see
+/// `lens_zoom_for_size`), so a wide search pill keeps the vertical lens
+/// while its ends sample locally. The radius clamps to half the smaller
+/// side so flat pills never fold into pointed corners.
 pub fn fill_lens_glass(
     scene: &mut vello::Scene,
     images: &crate::renderer::images::ImageLoader<'_>,
@@ -822,14 +872,18 @@ pub fn fill_lens_glass(
     zoom: f64,
     edge_width: f64,
 ) {
+    let w = rect.x1 - rect.x0;
+    let h = rect.y1 - rect.y0;
+    let radius = radius.min((w.min(h) / 2.0).max(0.0));
     let body = RoundedRect::from_rect(*rect, radius);
-    let min_side = (rect.x1 - rect.x0).min(rect.y1 - rect.y0);
+    let min_side = w.min(h);
     if edge_width <= 0.0 || min_side <= edge_width * 2.0 {
         fill_backdrop(scene, images, &body);
         return;
     }
     let center = Point::new((rect.x0 + rect.x1) * 0.5, (rect.y0 + rect.y1) * 0.5);
-    fill_backdrop_lens(scene, images, &body, center, zoom);
+    let (zoom_x, zoom_y) = lens_zoom_for_size(w / 2.0, h / 2.0, zoom);
+    fill_backdrop_lens_xy(scene, images, &body, center, zoom_x, zoom_y);
     let inset = edge_width * 0.5;
     let ring = RoundedRect::new(
         rect.x0 + inset,
@@ -1035,5 +1089,39 @@ mod tests {
         // 900x620 at tile 16: ceil math for partial edge tiles.
         assert_eq!(900u32.div_ceil(BUSY_TILE), 57);
         assert_eq!(620u32.div_ceil(BUSY_TILE), 39);
+    }
+
+    #[test]
+    fn lens_zoom_square_keeps_full_effect() {
+        // Square and 2:1 bodies keep the full uniform zoom.
+        for (hw, hh) in [(100.0, 100.0), (200.0, 100.0), (100.0, 200.0)] {
+            let (zx, zy) = lens_zoom_for_size(hw, hh, 0.8);
+            assert!((zx - 0.8).abs() < 1e-12, "zx was {zx} for {hw}x{hh}");
+            assert!((zy - 0.8).abs() < 1e-12, "zy was {zy} for {hw}x{hh}");
+        }
+    }
+
+    #[test]
+    fn lens_zoom_long_pill_tames_long_axis() {
+        // Sidebar search pill (~208x36 logical): the long axis eases
+        // toward 1.0 so the rim samples locally, the short axis keeps
+        // the full lens. Overshoot stays within half the smaller side.
+        let (zx, zy) = lens_zoom_for_size(104.0, 18.0, 0.8);
+        assert!(zx > 0.8 && zx < 1.0, "zx was {zx}");
+        assert!((zy - 0.8).abs() < 1e-12, "zy was {zy}");
+        let overshoot_x = 104.0 / zx - 104.0;
+        assert!(
+            overshoot_x <= 18.0 * LENS_OVERSHOOT_RATIO + 1e-6,
+            "overshoot was {overshoot_x}"
+        );
+        // Wider sidebar (448x36): stronger tame, same overshoot cap.
+        let (zx2, zy2) = lens_zoom_for_size(224.0, 18.0, 0.8);
+        assert!(zx2 > zx && zx2 < 1.0, "zx2 was {zx2}");
+        assert!((zy2 - 0.8).abs() < 1e-12, "zy2 was {zy2}");
+        let overshoot2 = 224.0 / zx2 - 224.0;
+        assert!(
+            (overshoot2 - overshoot_x).abs() < 1e-6,
+            "overshoot2 was {overshoot2}"
+        );
     }
 }
