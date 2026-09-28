@@ -88,6 +88,11 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-28: Clipboard uses Foundation `NSPasteboard` (native
+  Wayland/X11); the `arboard` dependency is removed, unifying the
+  `image` crate to a single version (fixes duplicate-symbol cdylib
+  link). Layer-shell backend (`run_layer`, one `App` per output) and
+  transparency-only `BarMenu` for shell bars.
 - 2026-09-26: Text stack moved to CoreText (`CTFrame` layouts,
   `hit_byte` links, `decorations()` underlines; `parley` dependency
   removed). `FontSystem` keeps its name and gains

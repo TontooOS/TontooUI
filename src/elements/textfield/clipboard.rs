@@ -2,12 +2,21 @@ use std::sync::{Mutex, OnceLock};
 
 /// System clipboard for copy/cut/paste, with an in-process fallback.
 ///
-/// `arboard` talks to the display server; where that fails (headless
-/// tests, missing server) edits fall back to a process-local buffer
-/// so shortcuts keep working inside the app.
-fn system() -> &'static Mutex<Option<arboard::Clipboard>> {
-    static SYSTEM: OnceLock<Mutex<Option<arboard::Clipboard>>> = OnceLock::new();
-    SYSTEM.get_or_init(|| Mutex::new(arboard::Clipboard::new().ok()))
+/// Foundation `NSPasteboard` talks to the display server natively;
+/// where that fails (headless tests, missing server) edits fall back
+/// to a process-local buffer so shortcuts keep working inside the app.
+fn system_text() -> Option<String> {
+    foundation::pasteboard::Pasteboard::general()
+        .get_text()
+        .ok()
+        .flatten()
+        .filter(|s| !s.is_empty())
+}
+
+fn system_set_text(text: &str) -> bool {
+    foundation::pasteboard::Pasteboard::general()
+        .set_text(text)
+        .is_ok()
 }
 
 fn fallback() -> &'static Mutex<String> {
@@ -17,14 +26,8 @@ fn fallback() -> &'static Mutex<String> {
 
 /// Read text: system clipboard first, fallback buffer otherwise.
 pub(crate) fn get() -> Option<String> {
-    if let Ok(mut guard) = system().lock() {
-        if let Some(clipboard) = guard.as_mut() {
-            if let Ok(text) = clipboard.get_text() {
-                if !text.is_empty() {
-                    return Some(text);
-                }
-            }
-        }
+    if let Some(text) = system_text() {
+        return Some(text);
     }
     fallback().lock().ok().and_then(|guard| {
         if guard.is_empty() {
@@ -52,12 +55,7 @@ pub(crate) fn set(text: &str) -> bool {
     if let Ok(mut guard) = fallback().lock() {
         *guard = text.to_string();
     }
-    if let Ok(mut guard) = system().lock() {
-        if let Some(clipboard) = guard.as_mut() {
-            return clipboard.set_text(text.to_string()).is_ok();
-        }
-    }
-    false
+    system_set_text(text)
 }
 
 #[cfg(test)]

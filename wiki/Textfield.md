@@ -73,9 +73,9 @@ and work in every variant through the shared `handle_key`:
 | Ctrl+V | Paste clipboard text at the caret (replaces the highlight) |
 | Ctrl+Z / Ctrl+Y | Undo / redo (100 steps, text plus caret) |
 
-Copy and paste use the system clipboard (`arboard`) with an
-in-process fallback where no display server answers, so shortcuts
-keep working headless. Typing or pasting over a highlight replaces
+Copy and paste use the system clipboard (Foundation `NSPasteboard`,
+native Wayland/X11, no third-party crates) with an in-process fallback
+where no display server answers, so shortcuts keep working headless. Typing or pasting over a highlight replaces
 it in a single undo step. Programmatic `set_text` clears the undo
 stacks. Direct stack access per variant:
 
