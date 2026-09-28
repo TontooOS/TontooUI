@@ -93,6 +93,10 @@ for the `View` tree.
   `HStack` and `ZStack` cut overflowing content off via a clip layer
   (same pattern as `ScrollView`) instead of spilling past their bounds;
   unplaced stacks draw unclipped as before. See [Layout.md](Layout.md).
+- 2026-09-28: Fixed `accent_gallery` row helper skipping every second
+  element type in mixed rows (Gauge, Stepper, SecureField, MenuButton
+  never received the theme). It now iterates by `len` and skips type
+  mismatches, the documented `child_mut` pattern.
 - 2026-09-28: `accent_gallery` example. One page with every
   accent-following element plus an accent switcher (daemon "Auto" or
   local preview of all thirteen accents). See [Theme.md](Theme.md).

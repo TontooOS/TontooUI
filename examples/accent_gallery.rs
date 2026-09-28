@@ -149,15 +149,23 @@ impl AccentGallery {
         }
     }
 
+    /// Apply `f` to every child of type `T` in a mixed row. Skips
+    /// other types by index (the documented `len` pattern): stopping
+    /// at the first mismatch would never reach elements past it
+    /// (this left Gauge, Stepper, SecureField and MenuButton
+    /// unthemed).
     fn each_in_row<T: View + 'static>(&mut self, row: usize, mut f: impl FnMut(&mut T)) {
-        if let Some(hstack) = self.stack.child_mut::<HStack>(row) {
-            let mut index = 0;
-            loop {
-                match hstack.child_mut::<T>(index) {
-                    Some(element) => f(element),
-                    None => break,
-                }
-                index += 1;
+        let len = self
+            .stack
+            .child_mut::<HStack>(row)
+            .map_or(0, |hstack| hstack.len());
+        for index in 0..len {
+            if let Some(element) = self
+                .stack
+                .child_mut::<HStack>(row)
+                .and_then(|hstack| hstack.child_mut::<T>(index))
+            {
+                f(element);
             }
         }
     }
