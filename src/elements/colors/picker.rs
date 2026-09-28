@@ -129,9 +129,6 @@ pub fn hsva_to_color(hsv: Hsv, alpha: f32) -> Color {
 fn wheel_png() -> &'static [u8] {
     static WHEEL: OnceLock<Vec<u8>> = OnceLock::new();
     WHEEL.get_or_init(|| {
-        use image::codecs::png::PngEncoder;
-        use image::ImageEncoder;
-
         const N: u32 = 256;
         let mut raw = Vec::with_capacity((N * N * 4) as usize);
         for py in 0..N {
@@ -156,11 +153,7 @@ fn wheel_png() -> &'static [u8] {
                 ]);
             }
         }
-        let mut png = Vec::new();
-        PngEncoder::new(&mut png)
-            .write_image(&raw, N, N, image::ExtendedColorType::Rgba8)
-            .expect("wheel PNG encodes");
-        png
+        coreimage::codecs::png::encode(N, N, &raw).expect("wheel PNG encodes")
     })
 }
 

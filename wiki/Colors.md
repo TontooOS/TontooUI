@@ -158,7 +158,8 @@ pub fn key(&mut self, key: Key) -> bool
 | `PICKER_HEX_SIZE` | 14 px hex text |
 
 - Menu-like frosted popup (`GlassType::Frosted`): hue/saturation
-  wheel with a crosshair (baked 256 px texture, white center glow),
+  wheel with a crosshair (baked 256 px texture, white center glow,
+  PNG-encoded with `coreimage::codecs::png::encode`),
   brightness slider (full color into black, ring knob), opacity
   label plus checker transparency slider (transparent left, opaque
   right) with a percent pill. Triggered with `show` by a button or

@@ -89,6 +89,12 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-28: Image backend moved from the third-party `image`/`png`
+  crates to CoreImage (`coreimage::TiImage::load`, `from_bytes` and
+  `thumbnail` in `src/renderer/images.rs`; `coreimage::codecs::png::encode`
+  for the hue wheel in `src/elements/colors/picker.rs`). The `image` and
+  `png` dependencies were removed. See [Renderer.md](Renderer.md) and
+  [Colors.md](Colors.md).
 - 2026-09-28: `FontPreview::from_file` and `from_data` preview
   font files/bytes without a system install
   (`FontSystem::register_font_file`, `register_font_data`).

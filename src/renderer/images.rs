@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fs::File;
 use std::path::Path;
 
 use vello::Renderer;
@@ -240,49 +239,22 @@ impl<'a> ImageLoader<'a> {
         tint: Color,
         target_px: u32,
     ) -> Option<(ImageData, u32, u32)> {
-        use std::io::BufReader;
-
         let path = coreicon::resolve_icon_path(name);
-        let file = File::open(path).ok()?;
-        let decoder = png::Decoder::new(BufReader::new(file));
-        let mut reader = decoder.read_info().ok()?;
-        // RGBA8 upper bound; interlaced assets are not supported.
-        let capacity = {
-            let info = reader.info();
-            info.width as usize * info.height as usize * 4
-        };
-        let mut raw = vec![0; capacity];
-        let info = reader.next_frame(&mut raw).ok()?;
-        let (width, height) = (info.width, info.height);
+        let img = coreimage::TiImage::load(&path.to_string_lossy()).ok()?;
+        let (width, height) = img.dimensions();
         if width == 0 || height == 0 {
             return None;
         }
-        let gray: Vec<u8> = match info.color_type {
-            png::ColorType::Rgba => raw
-                .chunks_exact(4)
-                .flat_map(|px| [px[0], px[1], px[2], px[3]])
-                .collect(),
-            png::ColorType::Rgb => raw
-                .chunks_exact(3)
-                .flat_map(|px| [px[0], px[1], px[2], 255])
-                .collect(),
-            _ => return None,
-        };
         // Downscale once with Lanczos3: 1024 px assets minified 50x by the
         // GPU sampler turn to mush without mipmaps, so the CPU bakes a
-        // crisp ~2x texture instead.
-        let long_side = width.max(height);
-        let (pixels, width, height) = if long_side > target_px {
-            let scale = target_px as f32 / long_side as f32;
-            let nw = ((width as f32 * scale).round() as u32).max(1);
-            let nh = ((height as f32 * scale).round() as u32).max(1);
-            let src = image::RgbaImage::from_raw(width, height, gray)?;
-            let small =
-                image::imageops::resize(&src, nw, nh, image::imageops::FilterType::Lanczos3);
-            (small.into_raw(), nw, nh)
+        // crisp ~2x texture instead. CoreImage thumbnails with Lanczos3.
+        let small = if width.max(height) > target_px {
+            img.thumbnail(target_px).ok()?
         } else {
-            (gray, width, height)
+            img
         };
+        let (width, height) = small.dimensions();
+        let pixels = small.into_rgba().into_raw();
         // Glyphs are black with alpha: paint the tint, keep the alpha.
         let rgba = tint.to_rgba8();
         let pixels: Vec<u8> = pixels
@@ -390,20 +362,16 @@ impl<'a> ImageLoader<'a> {
 /// physical px) so minified photos stay crisp. Returns the pixels plus
 /// natural size, or `None` when the bytes are undecodable.
 fn decode_raster(bytes: &[u8], target_px: u32) -> Option<(Vec<u8>, u32, u32)> {
-    let decoded = image::load_from_memory(bytes).ok()?.to_rgba8();
+    let decoded = coreimage::TiImage::from_bytes(bytes).ok()?;
     let (width, height) = decoded.dimensions();
     if width == 0 || height == 0 {
         return None;
     }
-    let long_side = width.max(height);
-    if long_side > target_px {
-        let scale = target_px as f32 / long_side as f32;
-        let nw = ((width as f32 * scale).round() as u32).max(1);
-        let nh = ((height as f32 * scale).round() as u32).max(1);
-        let small =
-            image::imageops::resize(&decoded, nw, nh, image::imageops::FilterType::Lanczos3);
-        Some((small.into_raw(), nw, nh))
+    let small = if width.max(height) > target_px {
+        decoded.thumbnail(target_px).ok()?
     } else {
-        Some((decoded.into_raw(), width, height))
-    }
+        decoded
+    };
+    let (width, height) = small.dimensions();
+    Some((small.into_rgba().into_raw(), width, height))
 }

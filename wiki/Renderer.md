@@ -358,11 +358,16 @@ pub fn is_capture_pass(&self) -> bool
 Per-frame SF Symbol access for views. Resolves CoreIcon artwork by name
 (`COREICON_ASSETS_DIR` override or system resources on TontooOS),
 recolors the black glyph to `tint` and uploads once; later frames hit the
-shell-owned cache. Assets are 1024 px: they downscale on the CPU with
-Lanczos3 to `target_px` (pass ~2x the display size) because GPU
-minification without mipmaps turns them to mush. Returns the upload plus
-natural size; callers scale with the draw transform preserving aspect.
-Missing or undecodable assets return `None` so callers skip the icon.
+shell-owned cache. Decoding goes through CoreImage
+(`coreimage::TiImage::load` for symbol files,
+`coreimage::TiImage::from_bytes` for raster bytes, downscaled with
+`TiImage::thumbnail` which uses Lanczos3). Assets are 1024 px: they
+downscale on the CPU to `target_px` (pass ~2x the display size) because
+GPU minification without mipmaps turns them to mush. Returns the upload
+plus natural size; callers scale with the draw transform preserving
+aspect. Missing or undecodable assets return `None` so callers skip the
+icon. The direct `image` and `png` crate dependencies were removed; all
+raster decode, downscale and PNG encode paths use `coreimage`.
 
 Backdrop access during the two-pass frame:
 

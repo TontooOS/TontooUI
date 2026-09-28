@@ -10,7 +10,8 @@ gradient, a caption and an optional badge. All four are display-only
 (no mouse handling). Shared fit math and resource lookup live in
 `mod.rs`; untinted raster upload (`raster`, `raster_file`) lives on
 `ImageLoader` in `src/renderer/images.rs` next to the tinted
-SF Symbol path (`get`).
+SF Symbol path (`get`). All decode and downscale paths use CoreImage
+(`coreimage::TiImage::from_bytes` / `load` plus `thumbnail`).
 
 ## ImageFit
 

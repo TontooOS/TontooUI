@@ -13,8 +13,7 @@ winit = "0.30"
 wgpu = "29"
 vello = "0.10"
 futures = "0.3"
-png = "0.18"
-image = "0.25"
+coreimage = { package = "coreimage", path = "../CoreImage" }
 # Layer-shell backend (shell bars like the menubar): Wayland only.
 smithay-client-toolkit = "0.19"
 wayland-client = { version = "0.31", features = ["system"] }
