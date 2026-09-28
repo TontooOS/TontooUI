@@ -16,6 +16,10 @@ vello = "0.10"
 futures = "0.3"
 png = "0.18"
 image = "0.25"
+# Layer-shell backend (shell bars like the menubar): Wayland only.
+smithay-client-toolkit = "0.19"
+wayland-client = { version = "0.31", features = ["system"] }
+raw-window-handle = "0.6"
 networkkit = { path = "../NetworkKit" }
 coreicon = { path = "../CoreIcon" }
 coretext = { path = "../CoreText" }

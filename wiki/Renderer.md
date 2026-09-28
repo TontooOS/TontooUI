@@ -9,6 +9,7 @@ result to the winit surface. There is no UIKit layer and no GTK dependency.
 | Module | Path | Description |
 |---|---|---|
 | `window` | `src/renderer/window.rs` | winit event loop, surface management, `App` trait, `run` |
+| `layershell` | `src/renderer/layershell.rs` | Wayland layer-shell backend, one `App` per output, `run_layer` |
 | `text` | `src/renderer/text.rs` | CoreText font system and crisp scene text drawing |
 | `frame` | `src/renderer/frame.rs` | Window frame: shadows, rounded body, edge, outline |
 | `backdrop` | `src/renderer/backdrop.rs` | Offscreen capture + separable gaussian blur for glass |
@@ -398,6 +399,30 @@ pub fn content_rect(width: f32, height: f32) -> (f32, f32, f32, f32)
 
 Logical `(x, y, width, height)` inside the frame for the given logical
 window size. The shell converts it to the `Viewport` passed to views.
+
+## LayerShell
+
+Wayland layer-shell backend for shell bars (`src/renderer/layershell.rs`,
+smithay-client-toolkit): one layer surface per output (top edge,
+exclusive zone, no keyboard focus), each driving its own `App` instance,
+so a single process serves all monitors. Rendering reuses the
+texture/blit/present pipeline; there is no backdrop blur on this path.
+
+```rust
+pub struct LayerBarOptions;
+pub struct LayerOutput;
+pub fn run_layer(make: impl FnMut(LayerOutput) -> Option<(Box<dyn App>, LayerBarOptions>)) -> Result<(), Box<dyn Error>>
+```
+
+- `LayerOutput` carries the output `name`, logical `width` and `scale`;
+  the factory returns the bar `App` plus `LayerBarOptions` (`namespace`,
+  `height` in logical px, also the exclusive zone), or `None` to skip
+  the output. Hotplugged outputs call the factory again.
+- Pointer events (left button only) map to `mouse_move`/`mouse_down`/
+  `mouse_up` in logical px; only `WindowCommand::Close` is honored
+  (drops the surface, exits when none is left).
+- Without a Wayland compositor `run_layer` returns an error. Transparent
+  bars use `App::transparent_body` and paint their own background.
 
 ## Usage / Example
 

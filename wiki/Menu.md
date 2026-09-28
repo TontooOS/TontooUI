@@ -292,6 +292,45 @@ let mut share = NestedMenu::new(
 share.set_theme(accent, true);
 ```
 
+## BarMenu
+
+Transparency-only dropdown panel for shell bars (`src/elements/menu/bar.rs`).
+Unlike `NestedMenu` it never uses glass: the panel is a plain translucent
+fill (`BARMENU_BG_DARK` / `BARMENU_BG_LIGHT`), so it renders in a single
+pass with no backdrop blur (which crashes on layer surfaces).
+
+```rust
+pub enum BarItem { Action(BarAction), Divider }
+pub fn action(label: impl Into<String>) -> BarActionBuilder
+pub fn icon(self, symbol: impl Into<String>) -> Self
+pub fn shortcut(self, text: impl Into<String>) -> Self
+pub fn disabled(self) -> Self
+pub fn submenu(self, items: Vec<BarItem>) -> Self
+pub fn build(self) -> BarItem
+pub fn open_at(&mut self, x: f32, y: f32)
+pub fn close(&mut self)
+pub fn is_open(&self) -> bool
+pub fn on_action(self, callback: impl FnMut(Vec<usize>) + 'static) -> Self
+pub fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32)
+```
+
+- Rows hold an SF Symbol icon, a label, an optional shortcut (or an
+  automatic `›` chevron for submenus) and an enabled flag; hovering a
+  submenu row opens its child panel beside the parent (right preferred).
+- `open_at` anchors the panel (clamped into the viewport from
+  `set_viewport`, call it every frame). A press outside closes the menu;
+  an action press fires `on_action` with the row path (e.g. `[0, 2]`)
+  and closes.
+
+```rust
+let menu = BarMenu::new(vec![
+    BarItem::action("About").icon("info.circle").build(),
+    BarItem::divider(),
+    BarItem::action("Quit").shortcut("⌘Q").build(),
+])
+.on_action(|path| println!("picked {path:?}"));
+```
+
 ## Cross References
 
 - [Picker.md](Picker.md) – `MenuPicker` selection on top of this base

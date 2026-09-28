@@ -1,9 +1,16 @@
 pub mod action;
+pub mod bar;
 pub mod context;
 pub mod menu;
 pub mod nested;
 
 pub use action::{MenuButton, MENUBTN_CHEV_ZONE, MENUBTN_DIV_INSET};
+pub use bar::{
+    BarAction, BarActionBuilder, BarItem, BarMenu, BARMENU_BG_DARK, BARMENU_BG_LIGHT,
+    BARMENU_DIV_H, BARMENU_FONT_SIZE, BARMENU_ICON_SIZE, BARMENU_MIN_W, BARMENU_PAD_X,
+    BARMENU_PAD_Y, BARMENU_RADIUS, BARMENU_ROW_H, BARMENU_SHORTCUT_SIZE, BARMENU_SUB_GAP,
+    BARMENU_TEXT_GAP,
+};
 
 pub use context::{
     ContextKind, ContextMenu, CONTEXT_LONG_PRESS_MOVE, CONTEXT_LONG_PRESS_SECONDS,
