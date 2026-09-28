@@ -89,6 +89,10 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-28: Push-based theme updates. `ThemeWatcher` holds one
+  persistent `subscribe` connection and applies pushed
+  `customize_changed` events immediately (no polling traffic while idle),
+  with throttled revision polling as fallback. See [Theme.md](Theme.md).
 - 2026-09-28: Faster theme switch detection. `THEME_POLL_SECONDS` is 0.2 s
   instead of 1.0 s, so dark/light changes picked up from the daemon start
   the crossfade almost immediately (revision-guarded, still one cheap

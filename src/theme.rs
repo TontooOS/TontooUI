@@ -233,17 +233,26 @@ pub const THEME_POLL_SECONDS: f64 = 0.2;
 
 /// Watches the settings daemon for theme changes and crossfades the
 /// palette. Unix only (daemon socket); elsewhere it serves defaults.
+///
+/// Change delivery is push-based: the watcher holds one persistent
+/// `subscribe` connection and applies `customize_changed` events as they
+/// arrive, so no polling traffic happens while nothing changes. When the
+/// daemon is unreachable the watcher falls back to throttled revision
+/// polling (`THEME_POLL_SECONDS`).
 pub struct ThemeWatcher {
     theme: Theme,
     from: Palette,
     fade_start: f64,
     fading: bool,
     focused: bool,
+    #[cfg(unix)]
     last_poll: f64,
     #[cfg(unix)]
     provider: coresettings::SettingsProvider,
     #[cfg(unix)]
     revision: u64,
+    #[cfg(unix)]
+    subscription: Option<coresettings::Subscription>,
 }
 
 impl ThemeWatcher {
@@ -255,11 +264,14 @@ impl ThemeWatcher {
             fade_start: 0.0,
             fading: false,
             focused: true,
+            #[cfg(unix)]
             last_poll: f64::NEG_INFINITY,
             #[cfg(unix)]
             provider: coresettings::SettingsProvider::from_env(),
             #[cfg(unix)]
             revision: 0,
+            #[cfg(unix)]
+            subscription: None,
         }
     }
 
@@ -283,37 +295,97 @@ impl ThemeWatcher {
         self.focused
     }
 
-    /// Poll the daemon (throttled). Returns true when the theme changed and
-    /// a fade started. Never errors: a missing daemon keeps the theme.
+    /// Poll the daemon. Returns true when the theme changed and a fade
+    /// started. Never errors: a missing daemon keeps the theme.
+    ///
+    /// Prefers pushed `customize_changed` events over the persistent
+    /// subscription (no traffic while idle); falls back to throttled
+    /// revision polling when the daemon is unreachable.
     pub fn poll(&mut self, now_secs: f64) -> bool {
+        #[cfg(unix)]
+        {
+            if self.subscription.is_none() {
+                match self.provider.subscribe(&["customize_changed"]) {
+                    Ok(subscription) => self.subscription = Some(subscription),
+                    Err(_) => return self.poll_fallback(now_secs),
+                }
+            }
+            let mut changed = false;
+            // Drain queued pushes, bounded so one frame never stalls.
+            for _ in 0..8 {
+                let next = self
+                    .subscription
+                    .as_mut()
+                    .map(|stream| stream.try_next())
+                    .unwrap_or(Ok(None));
+                match next {
+                    Ok(Some(event)) => {
+                        if event.name != "customize_changed" {
+                            continue;
+                        }
+                        let customize = coresettings::Customize::from_json(&event.payload);
+                        self.revision = customize.revision;
+                        let theme = Self::theme_from(&customize);
+                        if theme != self.theme {
+                            self.from = self.palette(now_secs);
+                            self.theme = theme;
+                            self.fade_start = now_secs;
+                            self.fading = true;
+                            changed = true;
+                        }
+                    }
+                    Ok(None) => break,
+                    Err(_) => {
+                        // Connection lost: resubscribe on the next poll.
+                        self.subscription = None;
+                        break;
+                    }
+                }
+            }
+            changed
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = now_secs;
+            false
+        }
+    }
+
+    /// Map daemon customization facts onto a theme.
+    #[cfg(unix)]
+    fn theme_from(customize: &coresettings::Customize) -> Theme {
+        Theme {
+            mode: ThemeMode::from_str(match customize.theme {
+                coresettings::ThemeMode::Light => "light",
+                coresettings::ThemeMode::Dark => "dark",
+            }),
+            accent: Accent::from_str(customize.accent.as_str()),
+            glass: GlassAmount::from_str(customize.glass.as_str()),
+        }
+    }
+
+    /// Throttled revision poll for daemons without push support or while
+    /// unreachable. Never errors: a missing daemon keeps the theme.
+    #[cfg(unix)]
+    fn poll_fallback(&mut self, now_secs: f64) -> bool {
         if now_secs - self.last_poll < THEME_POLL_SECONDS {
             return false;
         }
         self.last_poll = now_secs;
-        #[cfg(unix)]
-        {
-            let Ok(customize) = self.provider.customize() else {
-                return false;
-            };
-            if customize.revision == self.revision {
-                return false;
-            }
-            self.revision = customize.revision;
-            let theme = Theme {
-                mode: ThemeMode::from_str(match customize.theme {
-                    coresettings::ThemeMode::Light => "light",
-                    coresettings::ThemeMode::Dark => "dark",
-                }),
-                accent: Accent::from_str(customize.accent.as_str()),
-                glass: GlassAmount::from_str(customize.glass.as_str()),
-            };
-            if theme != self.theme {
-                self.from = self.palette(now_secs);
-                self.theme = theme;
-                self.fade_start = now_secs;
-                self.fading = true;
-                return true;
-            }
+        let Ok(customize) = self.provider.customize() else {
+            return false;
+        };
+        if customize.revision == self.revision {
+            return false;
+        }
+        self.revision = customize.revision;
+        let theme = Self::theme_from(&customize);
+        if theme != self.theme {
+            self.from = self.palette(now_secs);
+            self.theme = theme;
+            self.fade_start = now_secs;
+            self.fading = true;
+            return true;
         }
         false
     }
@@ -414,6 +486,65 @@ mod tests {
         watcher.set_focused(true, 10.0);
         let back = watcher.palette(20.0);
         assert_eq!(back, Theme::default().palette());
+    }
+
+    #[test]
+    fn push_event_applies_theme_without_polling() {
+        use std::io::{BufRead, BufReader, Write};
+        use std::os::unix::net::UnixListener;
+
+        // Mock daemon: ack the subscribe, then push one theme change.
+        let path = std::env::temp_dir().join(format!(
+            "tontoo-theme-push-{}.sock",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&path);
+        let listener = UnixListener::bind(&path).unwrap();
+        std::thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut line = String::new();
+                let _ = reader.read_line(&mut line);
+                let _ = stream.write_all(
+                    b"{\"id\":1,\"ok\":true,\"result\":{\"subscribed\":true,\"events\":[\"customize_changed\"]}}\n",
+                );
+                let _ = stream.write_all(
+                    b"{\"event\":\"customize_changed\",\"result\":{\"wallpaper\":\"THAOELAKE\",\"accent\":\"blue\",\"theme\":\"light\",\"glass\":\"glass\",\"revision\":7}}\n",
+                );
+                let _ = stream.flush();
+                std::thread::sleep(std::time::Duration::from_secs(2));
+            }
+        });
+
+        let previous = std::env::var("SETTINGS_SOCKET").ok();
+        std::env::set_var("SETTINGS_SOCKET", &path);
+        let mut watcher = ThemeWatcher::new();
+        assert!(watcher.poll(0.0));
+        assert_eq!(watcher.theme().mode, ThemeMode::Light);
+        assert_eq!(watcher.theme().accent, Accent::Blue);
+        // Event consumed: no further change, and no polling traffic.
+        assert!(!watcher.poll(0.0));
+        match previous {
+            Some(value) => std::env::set_var("SETTINGS_SOCKET", value),
+            None => std::env::remove_var("SETTINGS_SOCKET"),
+        }
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn missing_daemon_keeps_theme_without_error() {
+        let previous = std::env::var("SETTINGS_SOCKET").ok();
+        std::env::set_var(
+            "SETTINGS_SOCKET",
+            "/nonexistent-tontoo-theme-test/settings.sock",
+        );
+        let mut watcher = ThemeWatcher::new();
+        assert!(!watcher.poll(0.0));
+        assert_eq!(watcher.theme(), Theme::default());
+        match previous {
+            Some(value) => std::env::set_var("SETTINGS_SOCKET", value),
+            None => std::env::remove_var("SETTINGS_SOCKET"),
+        }
     }
 
     #[test]

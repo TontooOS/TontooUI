@@ -1,9 +1,12 @@
 # Theme
 
 System theme from the settings daemon: dark/light mode plus accent color.
-`ThemeWatcher` polls the daemon (0.2 s interval, revision-guarded) and
-crossfades the whole palette over 0.25 s, so mode switches animate live
-instead of snapping.
+`ThemeWatcher` holds one persistent `subscribe` connection and applies
+pushed `customize_changed` events as they arrive, then crossfades the
+whole palette over 0.25 s, so mode switches animate live instead of
+snapping. No polling traffic happens while nothing changes; when the
+daemon is unreachable the watcher falls back to throttled revision
+polling (`THEME_POLL_SECONDS`).
 
 ## Mode and Accent
 
@@ -87,10 +90,13 @@ pub fn poll(&mut self, now_secs: f64) -> bool
 pub fn palette(&mut self, now_secs: f64) -> Palette
 ```
 
-`poll` reads `customize_get` through CoreSettings at most once per
-`THEME_POLL_SECONDS` (0.2 s) and starts a fade when the theme changed
-(revision-guarded, so idle systems cost one cheap socket read per
-interval). A missing daemon keeps the current theme, never an error.
+`poll` drains queued `customize_changed` events from the persistent
+subscription and starts a fade when the theme changed. The first `poll`
+opens the subscription; when it fails (missing daemon, old daemon
+without `subscribe`) `poll` falls back to a revision-guarded
+`customize_get` at most once per `THEME_POLL_SECONDS` (0.2 s). A lost
+connection resubscribes on the next `poll`. A missing daemon keeps the
+current theme, never an error.
 `palette` blends from the previous to the current palette with
 `CubicOut` over `THEME_FADE_SECONDS` (0.25 s) and returns the exact
 target once finished.
