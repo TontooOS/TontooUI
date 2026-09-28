@@ -89,6 +89,10 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-28: `all_elements` example. One scrollable page with every
+  TontooUI element in a single `View` (`ScrollView` plus a flat `VStack`
+  with captions); modal elements (alerts, sheet, color picker popup,
+  context menu) open through demo buttons.
 - 2026-09-28: Stacks clip children to the placed rect. `VStack`,
   `HStack` and `ZStack` cut overflowing content off via a clip layer
   (same pattern as `ScrollView`) instead of spilling past their bounds;
