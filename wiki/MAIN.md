@@ -42,6 +42,7 @@ theme, animation and a Vello/WGPU renderer.
 | Slider | [Slider.md](Slider.md) | Slider with steps, labels, ticks, glass |
 | Stepper | [Stepper.md](Stepper.md) | Basic stepper with step size, range and limit dimming |
 | Form | [Form.md](Form.md) | Settings form with sections, text, toggle, picker and button rows |
+| FontPreview | [FontPreview.md](FontPreview.md) | Font family name plus sample line in its own family |
 | Table | [Table.md](Table.md) | Basic table with sort, scroll, select and inline edit |
 | Theme | [Theme.md](Theme.md) | Live dark/light, accent, glass stage |
 | Text | [Text.md](Text.md) | Basic text with styles and foregrounds |
@@ -87,6 +88,10 @@ See [Renderer.md](Renderer.md) for the shell and [Layout.md](Layout.md)
 for the `View` tree.
 
 ## Changelog
+
+- 2026-09-28: New `FontPreview` element (family name plus sample
+  line in its own family, `FontSystem::layout_text_in_family` with
+  `system-ui` fallback). See [FontPreview.md](FontPreview.md).
 
 - 2026-09-28: Clipboard uses Foundation `NSPasteboard` (native
   Wayland/X11); the `arboard` dependency is removed, unifying the

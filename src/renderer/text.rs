@@ -51,6 +51,19 @@ impl FontSystem {
         &mut self.setter
     }
 
+    /// Active font family of the framesetter (defaults to SF Pro).
+    pub fn family(&self) -> &str {
+        &self.setter.family
+    }
+
+    /// Set the active font family for subsequent layouts. Callers
+    /// that preview foreign families should prefer
+    /// `layout_text_in_family`, which restores the previous family.
+    pub fn set_family(&mut self, family: impl Into<String>) {
+        self.sync();
+        self.setter.set_family(family);
+    }
+
     /// Lay out `content` at `size` logical px with regular weight.
     /// `max_width` is in logical px; `None` disables wrapping.
     pub fn layout_text(
@@ -160,6 +173,31 @@ impl FontSystem {
         }
         self.setter
             .create_frame(&string, &paragraph, size, color, 400.0, max_width)
+    }
+
+    /// Lay out `content` in an explicit font `family` at `size`
+    /// logical px with `weight`. The previous family is restored
+    /// afterwards so shared `FontSystem` state never leaks between
+    /// elements. Unknown families fall back to the system font
+    /// (CoreText pushes `"family", system-ui`).
+    pub fn layout_text_in_family(
+        &mut self,
+        content: &str,
+        family: &str,
+        size: f32,
+        color: Color,
+        weight: f32,
+        max_width: Option<f32>,
+    ) -> CTFrame {
+        self.sync();
+        let previous = self.setter.family.clone();
+        self.setter.set_family(family);
+        let paragraph = CTParagraphStyle::default();
+        let frame =
+            self.setter
+                .create_plain_frame(content, &paragraph, size, color, weight, max_width);
+        self.setter.set_family(previous);
+        frame
     }
 }
 

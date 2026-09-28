@@ -213,8 +213,10 @@ pub use images::{
     IMAGE_RADIUS, IMAGE_SYMBOL_SIZE, IMAGE_TEXT_SIZE,
 };
 pub use text::{
-    BasicText, FormattedText, LabeledText, ResolvedForeground, Span, TextAlignment,
-    TextForeground, TextStyle, LABELED_GAP, TEXT_TERTIARY_DARK, TEXT_TERTIARY_LIGHT,
+    BasicText, FontPreview, FormattedText, LabeledText, ResolvedForeground, Span, TextAlignment,
+    TextForeground, TextStyle, FONT_PREVIEW_DEFAULT_SAMPLE, FONT_PREVIEW_GAP,
+    FONT_PREVIEW_SAMPLE_SIZE, FONT_PREVIEW_SAMPLE_WEIGHT, FONT_PREVIEW_TITLE_SIZE,
+    FONT_PREVIEW_TITLE_WEIGHT, LABELED_GAP, TEXT_TERTIARY_DARK, TEXT_TERTIARY_LIGHT,
     parse_markdown,
 };
 pub use toolbar::{
