@@ -2,7 +2,8 @@ use std::error::Error;
 use std::sync::Arc;
 use std::time::Instant;
 
-use vello::peniko::Color;
+use vello::kurbo::Affine;
+use vello::peniko::{Color, Fill};
 use vello::util::{RenderContext, RenderSurface};
 use vello::{AaConfig, AaSupport, RenderParams, Renderer, RendererOptions, Scene};
 use wgpu::PresentMode;
@@ -276,6 +277,16 @@ impl<V: App> Shell<V> {
                 scale,
                 background,
             );
+            // Clip content to the rounded body so square views never
+            // spill over the corners. Transparent bodies skip the clip
+            // (nothing to round against).
+            let clip_body = background.is_some();
+            if clip_body {
+                let clip = super::frame::body_shape(size.width, size.height, scale);
+                active
+                    .scene
+                    .push_clip_layer(Fill::NonZero, Affine::IDENTITY, &clip);
+            }
             {
                 let mut loader = ImageLoader::new(
                     &mut active.renderer,
@@ -286,6 +297,9 @@ impl<V: App> Shell<V> {
                 loader.set_capture_pass(true);
                 loader.set_busy(active.backdrop.busy_handle());
                 self.app.draw(&mut active.scene, &mut active.fonts, &mut loader, viewport, elapsed);
+            }
+            if clip_body {
+                active.scene.pop_layer();
             }
             if let Err(err) = active.renderer.render_to_texture(
                 &device_handle.device,
@@ -312,6 +326,12 @@ impl<V: App> Shell<V> {
                 scale,
                 background,
             );
+            if clip_body {
+                let clip = super::frame::body_shape(size.width, size.height, scale);
+                active
+                    .scene
+                    .push_clip_layer(Fill::NonZero, Affine::IDENTITY, &clip);
+            }
             {
                 let mut loader = ImageLoader::new(
                     &mut active.renderer,
@@ -324,6 +344,9 @@ impl<V: App> Shell<V> {
                 loader.set_backdrop_sharp(backdrop_sharp);
                 loader.set_busy(active.backdrop.busy_handle());
                 self.app.draw(&mut active.scene, &mut active.fonts, &mut loader, viewport, elapsed);
+            }
+            if clip_body {
+                active.scene.pop_layer();
             }
             super::frame::draw_frame(&mut active.scene, size.width, size.height, scale);
             if let Err(err) = active.renderer.render_to_texture(
@@ -345,6 +368,13 @@ impl<V: App> Shell<V> {
                 scale,
                 background,
             );
+            let clip_body = background.is_some();
+            if clip_body {
+                let clip = super::frame::body_shape(size.width, size.height, scale);
+                active
+                    .scene
+                    .push_clip_layer(Fill::NonZero, Affine::IDENTITY, &clip);
+            }
             {
                 let mut loader = ImageLoader::new(
                     &mut active.renderer,
@@ -353,6 +383,9 @@ impl<V: App> Shell<V> {
                     &mut active.images,
                 );
                 self.app.draw(&mut active.scene, &mut active.fonts, &mut loader, viewport, elapsed);
+            }
+            if clip_body {
+                active.scene.pop_layer();
             }
             super::frame::draw_frame(&mut active.scene, size.width, size.height, scale);
             if let Err(err) = active.renderer.render_to_texture(

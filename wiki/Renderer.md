@@ -222,8 +222,8 @@ Each `RedrawRequested` event runs these steps:
 1. `scene.reset()` clears the previous frame.
 2. `frame::draw_behind()` records shadows and the rounded body. The window
    is transparent and the surface is cleared transparent, so the corners
-   stay see-through. Content drawn by views can still paint over the
-   cutout; per-window clipping is not implemented yet.
+   stay see-through. Opaque content is clipped to `frame::body_shape()` so
+   square views never spill over the rounded corners.
 3. `view.draw()` records GPU commands into the scene.
 4. `frame::draw_frame()` records inner highlight, edge and outline above
    the content so bars and fields never cover the frame.
@@ -411,17 +411,20 @@ Recreates the old UIKit window style, drawn by the shell before every
 |---|---|
 | Margin | `24.0` logical px to the screen edge (`MARGIN`) |
 | Body | `RoundedRect` with `BACKGROUND` and `WINDOW_CORNER_RADIUS` |
-| Shadows | `0 2px 4px` black 15%, `0 4px 12px` black 12%, `0 7px 16px` black 8% (gaussian blur via `draw_blurred_rounded_rect`; shrunk from the UIKit spec so the reach fits the 24 px margin without clipping) |
+| Shadows | `0 2px 4px` black 15%, `0 4px 12px` black 12%, `0 6px 12px` black 8% (gaussian blur via `draw_blurred_rounded_rect`; shrunk from the UIKit spec so the reach fits the 24 px margin without clipping) |
 | Inner | 1 px inner ring with a top-to-transparent white gradient (`INNER_TOP`) |
 | Edge | 1 px stroke in `EDGE` (white 14%) |
 | Outline | Outer 1 px ring in `OUTER` (black 55%) |
 
 ```rust
 pub fn content_rect(width: f32, height: f32) -> (f32, f32, f32, f32)
+pub fn body_shape(width: u32, height: u32, scale: f32) -> RoundedRect
 ```
 
 Logical `(x, y, width, height)` inside the frame for the given logical
 window size. The shell converts it to the `Viewport` passed to views.
+`body_shape` returns the same body in physical px; the shell clips opaque
+content to it, transparent bodies skip the clip.
 
 ## LayerShell
 

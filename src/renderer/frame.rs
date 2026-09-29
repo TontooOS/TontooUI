@@ -14,10 +14,11 @@ pub const INNER_TOP: Color = Color::from_rgba8(255, 255, 255, 71);
 /// Outer 1px outline ring.
 pub const OUTER: Color = Color::from_rgba8(0, 0, 0, 140);
 
-/// Drop shadow layers: (y offset, blur, alpha). Shrunk proportionally from
-/// the UIKit spec so the largest reach (offset + blur) fits the 24 px margin
-/// instead of clipping at the window edge.
-const SHADOWS: [(f32, f32, u8); 3] = [(2.0, 4.0, 38), (4.0, 12.0, 31), (7.0, 16.0, 20)];
+/// Drop shadow layers: (y offset, blur, alpha). The largest reach
+/// (offset + 1.25 x blur, since vello blurs with std_dev = blur / 2
+/// and fades out at ~2.5 x std_dev) must stay inside the 24 px margin
+/// or the shadow clips with a hard edge at the window border.
+const SHADOWS: [(f32, f32, u8); 3] = [(2.0, 4.0, 38), (4.0, 12.0, 31), (6.0, 12.0, 20)];
 
 /// Logical content rect inside the frame: (x, y, width, height).
 pub fn content_rect(width: f32, height: f32) -> (f32, f32, f32, f32) {
@@ -34,6 +35,14 @@ fn body_rect(width: u32, height: u32, scale: f32) -> (Rect, f64) {
         height as f64 - MARGIN as f64 * s,
     );
     (rect, radius)
+}
+
+/// Rounded body shape in physical px. Content must be clipped to this
+/// (see `window.rs`) or square views spill over the rounded corners and
+/// the frame strokes no longer line up with the visible edge.
+pub fn body_shape(width: u32, height: u32, scale: f32) -> RoundedRect {
+    let (rect, radius) = body_rect(width, height, scale);
+    RoundedRect::from_rect(rect, radius)
 }
 
 /// Draw behind content: layered drop shadows plus the rounded body.
