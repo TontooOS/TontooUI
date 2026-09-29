@@ -11,8 +11,12 @@ variant with only a centered title and a vertical stack of
 full-width option buttons plus a trailing cancel, and `IconAlert` in
 `icon.rs` is the icon variant with an SF Symbol on the left, a
 leading-aligned title plus message on its right, and any number of
-full-width action buttons stacked below. None can be
-dismissed by clicking outside — only the buttons close them.
+full-width action buttons stacked below, and `TextInputAlert` in
+`input.rs` is the text input variant with a centered title, a
+message, a clear (`Lens`) glass pill holding a single-line text
+input (no icon, full width for typing) and Cancel + OK buttons. None can
+be dismissed by clicking outside — only the buttons close them
+(`TextInputAlert` additionally confirms with Enter).
 Entrance and exit fade through an engine tween; the app triggers
 them with `show` (e.g. from its own buttons). The action variants
 report their button as an `AlertEvent`; the plain `BasicAlert`
@@ -29,6 +33,7 @@ unclickable. Alert buttons react to clicks only: hover does nothing
 | `ALERT_PAD` | 18 px inner padding |
 | `ALERT_TITLE_SIZE` / `ALERT_MESSAGE_SIZE` | 12.75 px semibold title / 11.25 px message, wrapping |
 | `ALERT_TITLE_GAP` / `ALERT_MESSAGE_GAP` | 6 px title gap / 15 px button gap |
+| `ALERT_FIELD_GAP` / `ALERT_FIELD_H` | 12 px message-to-field gap / 36 px input pill height (text input alert) |
 | `ALERT_BUTTON_H` / `ALERT_BUTTON_GAP` | 33 px button height / 9 px button gap |
 | `ALERT_ICON_SIZE` / `ALERT_ICON_GAP` | 44 px SF icon box / 12 px icon-text gap |
 | `ALERT_FADE_SECONDS` | 0.25 s engine fade in/out (shared by all variants) |
@@ -195,6 +200,80 @@ pub fn mouse_up(&mut self, x: f64, y: f64) -> Option<AlertEvent>
   (stack index, action, label) once per click; clicks outside or
   mid-fade are swallowed.
 
+## TextInputAlert
+
+```rust
+pub fn new(title: impl Into<String>, message: impl Into<String>, placeholder: impl Into<String>) -> Self
+pub fn buttons(title: impl Into<String>, message: impl Into<String>, placeholder: impl Into<String>, buttons: Vec<AlertButton>) -> Self
+pub fn set_placeholder(&mut self, placeholder: impl Into<String>)
+pub fn set_text(&mut self, text: impl Into<String>)
+pub fn text_value(&self) -> &str
+pub fn is_selected(&self) -> bool
+pub fn set_theme(&mut self, mode: ThemeMode, accent: Color, glass: GlassAmount)
+pub fn set_focused(&mut self, focused: bool)
+pub fn set_title(&mut self, title: impl Into<String>)
+pub fn set_message(&mut self, message: impl Into<String>)
+pub fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32)
+pub fn viewport(&self) -> (f32, f32, f32, f32)
+pub fn show(&mut self)
+pub fn dismiss(&mut self)
+pub fn is_open(&self) -> bool
+pub fn is_visible(&self) -> bool
+pub fn opacity_at(&self, elapsed: f32) -> f32
+pub fn opacity_value(&self) -> f32
+pub fn mouse_down(&mut self, x: f64, y: f64)
+pub fn mouse_up(&mut self, x: f64, y: f64) -> Option<AlertAction>
+pub fn take_action(&mut self) -> Option<AlertAction>
+pub fn mouse_move(&mut self, x: f64, y: f64)
+pub fn type_text(&mut self, content: &str)
+pub fn key(&mut self, key: Key) -> bool
+pub fn wants_text_cursor(&self) -> bool
+```
+
+- Same modal core as the other variants (frosted card, dim, engine
+  fade, `show`/`dismiss`, viewport centering), but with a clear
+  (`Lens`) glass pill between the message and the buttons holding a
+  single-line text input with no icon (same metrics as
+  `SearchField`: 14 px text, 14 px side padding, capsule radius).
+- `new` defaults to Cancel + OK; `buttons` follows the `BasicAlert`
+  rules (one fills the row, two share it, empty falls back to OK,
+  longer lists clamp to the first two).
+- `show` autofocuses the field with the caret at the end of prefilled
+  text. A press inside the pill selects the field (caret to the
+  click, double-click highlights the word, dragging extends);
+  anywhere else on the card deselects. Typing, Backspace, caret
+  motion, clipboard and undo/redo arrive through `type_text` and
+  `key` (shared `FieldCore` editing); ESC deselects the field.
+- Enter confirms with the first OK def (no-op without one) and
+  reports through `take_action`, so keyboard flows never need a
+  click: the app calls `key`, then `take_action`, and reads the typed
+  text from `text_value`. `mouse_up` reports button presses as
+  `AlertAction` like `BasicAlert`.
+- `mouse_move` tracks pill hover for `wants_text_cursor` (I-beam
+  cursor); the pill needs the shell blur pass like the other
+  frosted elements (`wants_backdrop` while visible).
+
+```rust
+use tontooui::elements::{AlertAction, TextInputAlert};
+
+let mut alert = TextInputAlert::new("Rename File", "Enter a new name.", "Untitled");
+alert.show();
+
+// Per frame while visible:
+alert.set_viewport(viewport.x, top, viewport.width, content_h);
+alert.draw(scene, fonts, images);
+
+// Typing and Enter:
+fn text(&mut self, text: &str) { alert.type_text(text); }
+fn key(&mut self, key: Key) {
+    alert.key(key);
+    if let Some(AlertAction::Ok) = alert.take_action() {
+        println!("renamed to {}", alert.text_value());
+        alert.dismiss();
+    }
+}
+```
+
 ## Titlebar modal block
 
 ```rust
@@ -273,7 +352,9 @@ if let Some(event) = alert.mouse_up(x, y) {
 
 See `examples/alert.rs` for the full demo (OK, OK/Cancel, action,
 confirmation and icon alerts over buttons plus a toolbar, gray
-blocked red light).
+blocked red light) and `examples/all_elements.rs` for the text input
+alert (own section with a demo button, typed text lands in the
+titlebar).
 
 ## Cross References
 
@@ -282,3 +363,4 @@ blocked red light).
 - [Titlebar.md](Titlebar.md) – red light block while modal
 - [Animation.md](Animation.md) – engine tween behind the fade
 - [Layout.md](Layout.md) – `View` measure/place/draw contract
+- [Textfield.md](Textfield.md) – shared `FieldCore` editing behind the input pill

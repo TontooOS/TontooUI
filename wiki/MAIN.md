@@ -89,6 +89,10 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-28: `TextInputAlert` element. Modal alert with a clear
+  (`Lens`) glass input pill (no icon), autofocus, Enter confirms
+  with OK, typed text via `text_value`; wired into the
+  `all_elements` demo (own section). See [Alerts.md](Alerts.md).
 - 2026-09-28: `all_elements` example. One scrollable page with every
   TontooUI element in a single `View` (`ScrollView` plus a flat `VStack`
   with captions); modal elements (alerts, sheet, color picker popup,

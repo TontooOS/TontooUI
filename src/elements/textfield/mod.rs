@@ -187,6 +187,53 @@ impl FieldCore {
         }
     }
 
+    /// Current text (read-only). Variants outside `textfield`
+    /// (e.g. the text input alert) read the value through this.
+    pub(crate) fn text_value(&self) -> &str {
+        &self.text
+    }
+
+    /// True while the field holds the caret.
+    pub(crate) fn is_selected(&self) -> bool {
+        self.selected
+    }
+
+    /// Caret accent plus dark mode in one go (marks dirty).
+    /// Used by variants outside `textfield`.
+    pub(crate) fn set_style(&mut self, accent: Color, dark: bool) {
+        self.accent = accent;
+        self.dark = dark;
+        self.dirty = true;
+    }
+
+    /// Window focus flag (marks dirty). Used by variants outside
+    /// `textfield`.
+    pub(crate) fn set_focused_flag(&mut self, focused: bool) {
+        self.focused = focused;
+        self.dirty = true;
+    }
+
+    /// Placeholder text (marks dirty when changed). Used by
+    /// variants outside `textfield`.
+    pub(crate) fn set_placeholder_text(&mut self, placeholder: String) {
+        if placeholder != self.placeholder {
+            self.placeholder = placeholder;
+            self.dirty = true;
+        }
+    }
+
+    /// Hover flag for the I-beam cursor. Used by variants outside
+    /// `textfield`.
+    pub(crate) fn set_hovered(&mut self, hovered: bool) {
+        self.hovered = hovered;
+    }
+
+    /// Horizontal text scroll in logical px. Used by variants
+    /// outside `textfield` that paint the line themselves.
+    pub(crate) fn scroll(&self) -> f32 {
+        self.scroll
+    }
+
     fn snapshot(&self) -> UndoState {
         UndoState {
             text: self.text.clone(),

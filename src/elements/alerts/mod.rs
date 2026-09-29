@@ -2,11 +2,13 @@ pub mod action;
 pub mod basic;
 pub mod confirm;
 pub mod icon;
+pub mod input;
 
 pub use action::{ActionAlert, AlertEvent};
 pub use basic::{AlertAction, AlertButton, BasicAlert};
 pub use confirm::ConfirmationDialog;
 pub use icon::IconAlert;
+pub use input::TextInputAlert;
 
 use vello::peniko::Color;
 
@@ -26,6 +28,12 @@ pub const ALERT_MESSAGE_SIZE: f32 = 11.25;
 pub const ALERT_TITLE_GAP: f32 = 6.0;
 /// Gap between message and buttons in logical px.
 pub const ALERT_MESSAGE_GAP: f32 = 15.0;
+/// Gap between the message and the input pill in logical px (text
+/// input alert).
+pub const ALERT_FIELD_GAP: f32 = 12.0;
+/// Input pill height in logical px (text input alert, same metrics
+/// as the glass search field).
+pub const ALERT_FIELD_H: f32 = 36.0;
 /// Action button height in logical px.
 pub const ALERT_BUTTON_H: f32 = 33.0;
 /// Gap between two action buttons in logical px.

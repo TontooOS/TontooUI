@@ -25,7 +25,7 @@ use tontooui::elements::{
     ScrollView, Scrollbar, SearchEmpty, SearchField, SecureField, SegmentedPicker,
     SFSymbolImage, SheetSize, Sidebar, SidebarItem, Slider, Span, Spinner, Stepper,
     StyledGroupBox, StyledLabel, StyledLink, TableColumn, TableHit, TextEditor,
-    TextStyle, Titlebar, Toggle, ToggleStyle, ToolbarItem, ToolbarPlacement,
+    TextInputAlert, TextStyle, Titlebar, Toggle, ToggleStyle, ToolbarItem, ToolbarPlacement,
     TrafficAction, UrlImage, VerticalDivider, View, VStack, ZStack, ALL_SYSTEM_COLORS,
     Spacer, SystemColor,
 };
@@ -56,6 +56,7 @@ struct AllElements {
     alert_action: ActionAlert,
     alert_dialog: ConfirmationDialog,
     alert_icon: IconAlert,
+    alert_input: TextInputAlert,
     sheet: BasicSheet<VStack>,
     context: ContextMenu,
     picker: ColorPicker,
@@ -64,6 +65,7 @@ struct AllElements {
     show_action: Rc<RefCell<bool>>,
     show_dialog: Rc<RefCell<bool>>,
     show_icon: Rc<RefCell<bool>>,
+    show_input: Rc<RefCell<bool>>,
     open_sheet: Rc<RefCell<Option<SheetSize>>>,
     dismiss_sheet: Rc<RefCell<bool>>,
     show_picker: Rc<RefCell<bool>>,
@@ -71,6 +73,7 @@ struct AllElements {
     table_edit: Rc<Cell<bool>>,
     sidebar_selected: Rc<Cell<usize>>,
     form_status: Rc<RefCell<String>>,
+    last_input: Rc<RefCell<String>>,
     text_cursor: Cell<bool>,
     watcher: ThemeWatcher,
     focused: bool,
@@ -85,6 +88,7 @@ impl AllElements {
         let show_action: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
         let show_dialog: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
         let show_icon: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
+        let show_input: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
         let open_sheet: Rc<RefCell<Option<SheetSize>>> = Rc::new(RefCell::new(None));
         let dismiss_sheet: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
         let show_picker: Rc<RefCell<bool>> = Rc::new(RefCell::new(false));
@@ -92,6 +96,7 @@ impl AllElements {
         let table_edit: Rc<Cell<bool>> = Rc::new(Cell::new(false));
         let sidebar_selected: Rc<Cell<usize>> = Rc::new(Cell::new(0));
         let form_status: Rc<RefCell<String>> = Rc::new(RefCell::new(String::new()));
+        let last_input: Rc<RefCell<String>> = Rc::new(RefCell::new(String::new()));
 
         let mut page = VStack::new().spacing(10.0).align(Align::Leading);
 
@@ -410,7 +415,9 @@ impl AllElements {
         page = page
             .child(BasicText::new("40 - BasicSheet and SheetSize"))
             .child(sheet_button("Small Sheet", SheetSize::Small, open_sheet.clone()))
-            .child(sheet_button("Half Sheet", SheetSize::Half, open_sheet.clone()));
+            .child(sheet_button("Half Sheet", SheetSize::Half, open_sheet.clone()))
+            .child(BasicText::new("60 - TextInputAlert"))
+            .child(alert_button("Show Text Input Alert", show_input.clone()));
 
         // Colors: inline picker, system colors and gradient paints.
         let linear = GradientPaint::preset_linear();
@@ -630,6 +637,11 @@ impl AllElements {
                 "Enter an administrator name and password to continue.",
                 vec![AlertButton::ok("Use Password...")],
             ),
+            alert_input: TextInputAlert::new(
+                "Rename File",
+                "Enter a new name for the document.",
+                "Untitled",
+            ),
             sheet: BasicSheet::new(sheet_content),
             context: ContextMenu::basic(
                 (0.0, 0.0, 0.0, 0.0),
@@ -649,6 +661,7 @@ impl AllElements {
             show_action,
             show_dialog,
             show_icon,
+            show_input,
             open_sheet,
             dismiss_sheet,
             show_picker,
@@ -656,6 +669,7 @@ impl AllElements {
             table_edit,
             sidebar_selected,
             form_status,
+            last_input,
             text_cursor: Cell::new(false),
             watcher: ThemeWatcher::new(),
             focused: true,
@@ -674,6 +688,7 @@ impl AllElements {
             || self.alert_action.is_visible()
             || self.alert_dialog.is_visible()
             || self.alert_icon.is_visible()
+            || self.alert_input.is_visible()
             || self.sheet.is_visible()
             || self.picker.is_visible()
             || self.context.is_open()
@@ -978,6 +993,9 @@ impl AllElements {
     }
 
     fn wants_text_cursor(&mut self) -> bool {
+        if self.alert_input.is_visible() && self.alert_input.wants_text_cursor() {
+            return true;
+        }
         let Some(stack) = self.stack_mut() else {
             return false;
         };
@@ -1020,6 +1038,7 @@ impl App for AllElements {
             self.alert_action.dismiss();
             self.alert_dialog.dismiss();
             self.alert_icon.dismiss();
+            self.alert_input.dismiss();
             self.alert_ok.show();
         }
         if std::mem::replace(&mut *self.show_both.borrow_mut(), false) {
@@ -1027,6 +1046,7 @@ impl App for AllElements {
             self.alert_action.dismiss();
             self.alert_dialog.dismiss();
             self.alert_icon.dismiss();
+            self.alert_input.dismiss();
             self.alert_both.show();
         }
         if std::mem::replace(&mut *self.show_action.borrow_mut(), false) {
@@ -1034,6 +1054,7 @@ impl App for AllElements {
             self.alert_both.dismiss();
             self.alert_dialog.dismiss();
             self.alert_icon.dismiss();
+            self.alert_input.dismiss();
             self.alert_action.show();
         }
         if std::mem::replace(&mut *self.show_dialog.borrow_mut(), false) {
@@ -1041,6 +1062,7 @@ impl App for AllElements {
             self.alert_both.dismiss();
             self.alert_action.dismiss();
             self.alert_icon.dismiss();
+            self.alert_input.dismiss();
             self.alert_dialog.show();
         }
         if std::mem::replace(&mut *self.show_icon.borrow_mut(), false) {
@@ -1048,7 +1070,16 @@ impl App for AllElements {
             self.alert_both.dismiss();
             self.alert_action.dismiss();
             self.alert_dialog.dismiss();
+            self.alert_input.dismiss();
             self.alert_icon.show();
+        }
+        if std::mem::replace(&mut *self.show_input.borrow_mut(), false) {
+            self.alert_ok.dismiss();
+            self.alert_both.dismiss();
+            self.alert_action.dismiss();
+            self.alert_dialog.dismiss();
+            self.alert_icon.dismiss();
+            self.alert_input.show();
         }
         if let Some(size) = self.open_sheet.borrow_mut().take() {
             self.sheet.set_size(size);
@@ -1094,6 +1125,9 @@ impl App for AllElements {
         self.alert_icon
             .set_theme(theme.mode, palette.text, theme.glass);
         self.alert_icon.set_focused(focused);
+        self.alert_input
+            .set_theme(theme.mode, palette.accent, theme.glass);
+        self.alert_input.set_focused(focused);
         self.sheet.set_theme(dark);
         self.sheet.set_focused(focused);
         if let Some(text) = self.sheet.child_mut().child_mut::<BasicText>(0) {
@@ -1113,6 +1147,7 @@ impl App for AllElements {
         self.context.set_focused(focused);
 
         let status = self.form_status.borrow().clone();
+        let typed = self.last_input.borrow().clone();
         let selected = self.sidebar_selected.get();
         self.bar.set_palette(
             palette.titlebar_bg,
@@ -1120,10 +1155,12 @@ impl App for AllElements {
             palette.divider,
         );
         self.bar.set_modal_blocked(self.any_overlay());
-        self.bar.set_title(if status.is_empty() {
-            format!("All Elements - sidebar page {selected}")
-        } else {
+        self.bar.set_title(if !status.is_empty() {
             format!("All Elements - {status}")
+        } else if !typed.is_empty() {
+            format!("All Elements - input \"{typed}\"")
+        } else {
+            format!("All Elements - sidebar page {selected}")
         });
         self.bar.set_rect(viewport.x, viewport.y, viewport.width);
         self.bar.draw(scene, fonts);
@@ -1162,6 +1199,10 @@ impl App for AllElements {
             self.alert_icon
                 .set_viewport(viewport.x, top, viewport.width, content_h);
             self.alert_icon.draw(scene, fonts, images);
+        } else if self.alert_input.is_visible() {
+            self.alert_input
+                .set_viewport(viewport.x, top, viewport.width, content_h);
+            self.alert_input.draw(scene, fonts, images);
         }
         if self.sheet.is_visible() {
             self.sheet
@@ -1233,6 +1274,10 @@ impl App for AllElements {
             self.alert_icon.mouse_down(x, y);
             return;
         }
+        if self.alert_input.is_visible() {
+            self.alert_input.mouse_down(x, y);
+            return;
+        }
         if self.sheet.is_visible() {
             self.sheet.mouse_down(x, y);
             return;
@@ -1292,6 +1337,20 @@ impl App for AllElements {
             }
             return;
         }
+        if self.alert_input.is_visible() {
+            match self.alert_input.mouse_up(x, y) {
+                Some(AlertAction::Ok) => {
+                    *self.last_input.borrow_mut() =
+                        self.alert_input.text_value().to_string();
+                    self.alert_input.dismiss();
+                }
+                Some(AlertAction::Cancel) => {
+                    self.alert_input.dismiss();
+                }
+                None => {}
+            }
+            return;
+        }
         if self.sheet.is_visible() {
             self.sheet.mouse_up(x, y);
             return;
@@ -1318,6 +1377,9 @@ impl App for AllElements {
             }
             if self.context.is_open() {
                 self.context.mouse_move(x, y);
+            }
+            if self.alert_input.is_visible() {
+                self.alert_input.mouse_move(x, y);
             }
             return;
         }
@@ -1356,6 +1418,10 @@ impl App for AllElements {
             self.picker.type_text(text);
             return;
         }
+        if self.alert_input.is_visible() {
+            self.alert_input.type_text(text);
+            return;
+        }
         self.forward_text(text);
     }
 
@@ -1364,6 +1430,23 @@ impl App for AllElements {
             self.sheet.key(key);
         }
         if self.picker.is_visible() && self.picker.key(key) {
+            return;
+        }
+        if self.alert_input.is_visible() {
+            // Keys go to the field; Enter confirms with OK and the
+            // pending action is consumed here like a button press.
+            self.alert_input.key(key);
+            match self.alert_input.take_action() {
+                Some(AlertAction::Ok) => {
+                    *self.last_input.borrow_mut() =
+                        self.alert_input.text_value().to_string();
+                    self.alert_input.dismiss();
+                }
+                Some(AlertAction::Cancel) => {
+                    self.alert_input.dismiss();
+                }
+                None => {}
+            }
             return;
         }
         self.forward_key(key);
