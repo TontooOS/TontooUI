@@ -1,6 +1,7 @@
 pub mod basic;
 pub(crate) mod clipboard;
 pub mod editor;
+pub mod glass;
 pub mod large;
 pub mod large_editor;
 pub mod search;
@@ -26,6 +27,7 @@ pub use large_editor::{
 pub use search::{
     SearchField, SEARCH_FONT_SIZE, SEARCH_GAP, SEARCH_ICON_SIZE, SEARCH_PAD_X,
 };
+pub use glass::{GlassTextField, GLASS_FIELD_FONT_SIZE, GLASS_FIELD_PAD_X};
 pub use secure::SecureField;
 
 use std::time::{Instant, SystemTime, UNIX_EPOCH};

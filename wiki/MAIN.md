@@ -89,6 +89,12 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-29: `GlassTextField` element. Single-line input with the
+  `SearchField` clear (`Lens`) glass capsule but no magnifier icon
+  (full-width text, `GLASS_FIELD_FONT_SIZE` 14 px,
+  `GLASS_FIELD_PAD_X` 14 px). Same editing contract as the basic
+  field, needs `wants_backdrop` while visible.
+  See [Textfield.md](Textfield.md).
 - 2026-09-29: Re-exported Vello scene types from the crate root
   (`Scene`, `Color`, `kurbo`, `peniko`). Apps now write
   `use tontooui::Scene` instead of `use vello::Scene`; no direct
