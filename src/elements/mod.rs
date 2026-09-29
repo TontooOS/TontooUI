@@ -32,6 +32,7 @@ pub mod text;
 pub mod titlebar;
 pub mod toggles;
 pub mod toolbar;
+pub mod video;
 
 pub use buttons::{
     Button, ButtonShape, ButtonStyle, BUTTON_ACCENT, BUTTON_BG_DARK, BUTTON_BG_LIGHT,
@@ -224,5 +225,6 @@ pub use toolbar::{
     TOOLBAR_GAP, TOOLBAR_HEIGHT, TOOLBAR_HIT, TOOLBAR_ICON_SIZE, TOOLBAR_PAD_X,
     TOOLBAR_RADIUS,
 };
+pub use video::{VideoPlayer, VideoSource, VideoState};
 pub use layout::{Align, Background, Frame, HStack, Padding, Spacer, View, VStack, ZStack};
 pub use titlebar::{Titlebar, TitlebarHeight, TrafficAction};

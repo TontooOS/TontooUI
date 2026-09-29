@@ -50,6 +50,7 @@ theme, animation and a Vello/WGPU renderer.
 | Titlebar | [Titlebar.md](Titlebar.md) | Custom decoration bar with drag region |
 | Toggle | [Toggle.md](Toggle.md) | Switch, button and checkbox styles |
 | Toolbar | [Toolbar.md](Toolbar.md) | Small clear-glass icon toolbar |
+| Video | [Video.md](Video.md) | File/URL playback via MediaKit, no next/previous |
 
 ## Quick Start
 
@@ -89,6 +90,10 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-29: `VideoPlayer` element (`elements/video/`). File/URL
+  playback through MediaKit `frame_at` with transport controls
+  (play/pause, stop, scrubber, time, mute, fullscreen) and
+  deliberately no next/previous. See [Video.md](Video.md).
 - 2026-09-29: `GlassTextField` element. Single-line input with the
   `SearchField` clear (`Lens`) glass capsule but no magnifier icon
   (full-width text, `GLASS_FIELD_FONT_SIZE` 14 px,
