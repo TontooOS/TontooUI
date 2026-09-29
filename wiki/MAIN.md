@@ -57,7 +57,7 @@ theme, animation and a Vello/WGPU renderer.
 use tontooui::elements::Titlebar;
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::window::{App, Viewport, run};
-use vello::Scene;
+use tontooui::Scene;
 
 struct Hello {
     bar: Titlebar,
@@ -88,6 +88,11 @@ See [Renderer.md](Renderer.md) for the shell and [Layout.md](Layout.md)
 for the `View` tree.
 
 ## Changelog
+
+- 2026-09-29: Re-exported Vello scene types from the crate root
+  (`Scene`, `Color`, `kurbo`, `peniko`). Apps now write
+  `use tontooui::Scene` instead of `use vello::Scene`; no direct
+  `use vello` import is needed in app code. See [Renderer.md](Renderer.md).
 
 - 2026-09-28: Empty-state text follows the theme. `ContentUnavailable`
   and `CustomContentUnavailable` forward the mode to their inner

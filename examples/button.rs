@@ -8,8 +8,7 @@ use tontooui::elements::{
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
 use tontooui::theme::{ThemeMode, ThemeWatcher};
-use vello::Scene;
-use vello::peniko::Color;
+use tontooui::{Color, Scene};
 
 struct ButtonDemo {
     bar: Titlebar,

@@ -66,6 +66,24 @@ Opens a window with `title` and logical size `width` x `height` and runs
 
 ## App
 
+Apps do not need a direct `use vello` import. The scene types used
+by the public API are re-exported from the crate root:
+
+```rust
+use tontooui::{Color, Scene, kurbo, peniko};
+```
+
+- `Scene` is the Vello scene passed to `App::draw` and `View::draw`.
+- `Color` is `vello::peniko::Color`, used for `background`, palettes
+  and constants such as `BACKGROUND`.
+- `kurbo` and `peniko` are the Vello geometry and brush modules,
+  for custom drawing (`Rect`, `Fill`, `Brush`, `Gradient`).
+- The `vello` crate must still match the version TontooUI builds
+  against (see `Cargo.toml`); only the import in app code is gone.
+- Through the SDK the same names work as `sdk::TontooUI::Scene`,
+  `sdk::TontooUI::Color`, `sdk::TontooUI::kurbo` and
+  `sdk::TontooUI::peniko`.
+
 ```rust
 pub trait App {
     fn draw(
@@ -435,7 +453,7 @@ pub fn run_layer(make: impl FnMut(LayerOutput) -> Option<(Box<dyn App>, LayerBar
 use tontooui::elements::Titlebar;
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::window::{App, Viewport, run};
-use vello::Scene;
+use tontooui::Scene;
 
 struct Hello {
     bar: Titlebar,
