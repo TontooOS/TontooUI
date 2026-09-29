@@ -57,6 +57,9 @@ pub fn rect(&self) -> (f32, f32, f32, f32)
   refresh in flight) and calls `finish_refresh` when the reload
   lands. `set_text`-style live updates go through `set_title` and
   `set_message`.
+- `set_theme` forwards the mode to the inner title and message
+  texts (plus the accent to the refresh button), so all three
+  variants follow dark/light correctly.
 
 ## Usage / Example
 

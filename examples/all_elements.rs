@@ -902,6 +902,21 @@ impl AllElements {
                 outline.set_focused(focused);
                 continue;
             }
+            if let Some(empty) = stack.child_mut::<ContentUnavailable>(index) {
+                empty.set_theme(mode, accent);
+                empty.set_focused(focused);
+                continue;
+            }
+            if let Some(empty) = stack.child_mut::<CustomContentUnavailable<Button>>(index) {
+                empty.set_theme(mode);
+                empty.set_focused(focused);
+                continue;
+            }
+            if let Some(empty) = stack.child_mut::<SearchEmpty>(index) {
+                empty.set_theme(mode);
+                empty.set_focused(focused);
+                continue;
+            }
             if let Some(row) = stack.child_mut::<HStack>(index) {
                 row.set_focused(focused);
                 continue;

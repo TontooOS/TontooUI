@@ -89,6 +89,11 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-28: Empty-state text follows the theme. `ContentUnavailable`
+  and `CustomContentUnavailable` forward the mode to their inner
+  title/message texts (they kept the dark default, rendering gray in
+  light mode); the `all_elements` demo themes all three variants.
+  See [ContentUnavailable.md](ContentUnavailable.md).
 - 2026-09-28: `TextInputAlert` element. Modal alert with a clear
   (`Lens`) glass input pill (no icon), autofocus, Enter confirms
   with OK, typed text via `text_value`; wired into the

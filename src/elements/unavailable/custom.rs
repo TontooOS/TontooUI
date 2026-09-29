@@ -206,10 +206,16 @@ impl<V: View + 'static> CustomContentUnavailable<V> {
     }
 
     fn apply_state(&mut self) {
+        let mode = if self.dark {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
+        };
         for index in 0..self.stack.len() {
             if let Some(symbol) = self.stack.child_mut::<SFSymbolImage>(index) {
                 symbol.set_focused(self.focused);
             } else if let Some(text) = self.stack.child_mut::<BasicText>(index) {
+                text.set_theme(mode);
                 text.set_focused(self.focused);
             } else if let Some(button) = self.stack.child_mut::<Button>(index) {
                 button.set_focused(self.focused);
@@ -369,5 +375,21 @@ mod tests {
         view.mouse_up((bx + bw / 2.0) as f64, (by + bh / 2.0) as f64);
         assert!(*fired.borrow());
         assert_eq!(view.icon_value(), "star.fill");
+    }
+
+    #[test]
+    fn light_theme_reaches_inner_texts() {
+        // Regression test: same as the refresh variant — title and
+        // message kept their dark default in light mode.
+        let mut view = view();
+        view.set_theme(ThemeMode::Light);
+        let mut seen = 0;
+        for index in 0..view.stack.len() {
+            if let Some(text) = view.stack.child_mut::<BasicText>(index) {
+                assert_eq!(text.mode_value(), ThemeMode::Light);
+                seen += 1;
+            }
+        }
+        assert_eq!(seen, 2);
     }
 }

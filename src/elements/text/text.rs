@@ -174,6 +174,13 @@ impl BasicText {
         }
     }
 
+    /// Current theme mode (test hook: verifies containers forward
+    /// the mode to their inner texts).
+    #[cfg(test)]
+    pub fn mode_value(&self) -> ThemeMode {
+        self.mode()
+    }
+
     /// Resolved base foreground (shared with `LabeledText` icon tint).
     pub(crate) fn resolve_foreground(
         &self,

@@ -258,10 +258,16 @@ impl ContentUnavailable {
     fn apply_state(&mut self) {
         // Theme/focus reach the parts through typed access; the
         // stack order is fixed by `rebuild`.
+        let mode = if self.dark {
+            ThemeMode::Dark
+        } else {
+            ThemeMode::Light
+        };
         for index in 0..self.stack.len() {
             if let Some(symbol) = self.stack.child_mut::<SFSymbolImage>(index) {
                 symbol.set_focused(self.focused);
             } else if let Some(text) = self.stack.child_mut::<BasicText>(index) {
+                text.set_theme(mode);
                 text.set_focused(self.focused);
             } else if let Some(button) = self.stack.child_mut::<Button>(index) {
                 button.set_theme(self.accent, self.dark);
@@ -430,8 +436,38 @@ mod tests {
     }
 
     #[test]
-    fn refresh_off_has_no_button() {
-        let mut view = view().refresh(false);
+    fn light_theme_reaches_inner_texts() {
+        use crate::theme::ThemeMode;
+
+        // Regression test: the title and message texts kept their
+        // dark default in light mode (gray on white) because
+        // `apply_state` only forwarded focus, never the theme.
+        let mut view = view();
+        view.set_theme(
+            ThemeMode::Light,
+            Color::from_rgb8(0x00, 0x7a, 0xff),
+        );
+        let mut seen = 0;
+        for index in 0..view.stack.len() {
+            if let Some(text) = view.stack.child_mut::<BasicText>(index) {
+                assert_eq!(text.mode_value(), ThemeMode::Light);
+                seen += 1;
+            }
+        }
+        assert_eq!(seen, 2);
+        view.set_theme(
+            ThemeMode::Dark,
+            Color::from_rgb8(0x00, 0x7a, 0xff),
+        );
+        for index in 0..view.stack.len() {
+            if let Some(text) = view.stack.child_mut::<BasicText>(index) {
+                assert_eq!(text.mode_value(), ThemeMode::Dark);
+            }
+        }
+    }
+
+    #[test]
+    fn refresh_off_has_no_button() {        let mut view = view().refresh(false);
         let mut fonts = FontSystem::new();
         let (w, h) = view.measure(&mut fonts);
         view.place(&mut fonts, 0.0, 0.0, w.max(400.0), h);
