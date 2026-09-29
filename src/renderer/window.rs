@@ -482,7 +482,7 @@ impl<V: App> ApplicationHandler for Shell<V> {
         let size = window.inner_size();
 
         let mut context = self.context.take().unwrap_or_else(RenderContext::new);
-        let surface = match futures::executor::block_on(context.create_surface(
+        let mut surface = match futures::executor::block_on(context.create_surface(
             window.clone(),
             size.width.max(1),
             size.height.max(1),
@@ -495,6 +495,9 @@ impl<V: App> ApplicationHandler for Shell<V> {
                 return;
             }
         };
+        // Transparent margin: vello configures `Auto` (resolves to `Opaque`),
+        // which renders the margin solid black with square outer corners.
+        super::frame::ensure_transparent_alpha(&context, &mut surface);
         let renderer = Renderer::new(
             &context.devices[surface.dev_id].device,
             RendererOptions {

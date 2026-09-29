@@ -419,12 +419,17 @@ Recreates the old UIKit window style, drawn by the shell before every
 ```rust
 pub fn content_rect(width: f32, height: f32) -> (f32, f32, f32, f32)
 pub fn body_shape(width: u32, height: u32, scale: f32) -> RoundedRect
+pub fn ensure_transparent_alpha(context: &RenderContext, surface: &mut RenderSurface)
 ```
 
 Logical `(x, y, width, height)` inside the frame for the given logical
 window size. The shell converts it to the `Viewport` passed to views.
 `body_shape` returns the same body in physical px; the shell clips opaque
-content to it, transparent bodies skip the clip.
+content to it, transparent bodies skip the clip. `ensure_transparent_alpha`
+switches the surface from vello's `Auto` alpha mode (which wgpu resolves
+to `Opaque`, rendering the margin solid black with square outer corners)
+to `PreMultiplied` / `PostMultiplied` so the margin stays see-through;
+call it after every `create_surface` (resizes reuse the stored config).
 
 ## LayerShell
 

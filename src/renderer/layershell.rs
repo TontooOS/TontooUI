@@ -334,12 +334,15 @@ impl LayerState {
         let scale = 1.0f32;
         let phys_w = physical_size(width, scale).max(1);
         let phys_h = physical_size(options.height, scale).max(1);
-        let surface = futures::executor::block_on(self.context.create_surface(
+        let mut surface = futures::executor::block_on(self.context.create_surface(
             target,
             phys_w,
             phys_h,
             PresentMode::AutoVsync,
         ))?;
+        // Same transparency story as the winit shell: keep alpha so
+        // rounded elements blend instead of sitting on black.
+        super::frame::ensure_transparent_alpha(&self.context, &mut surface);
         let renderer = Renderer::new(
             &self.context.devices[surface.dev_id].device,
             RendererOptions {

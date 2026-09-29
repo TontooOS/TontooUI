@@ -45,6 +45,32 @@ pub fn body_shape(width: u32, height: u32, scale: f32) -> RoundedRect {
     RoundedRect::from_rect(rect, radius)
 }
 
+/// Request a transparency-capable composite alpha mode for `surface` and
+/// reconfigure it. vello configures `Auto`, which wgpu resolves to `Opaque`
+/// first: on Wayland the 24 px margin then renders solid black with square
+/// outer corners instead of a soft round shadow over the desktop. Prefers
+/// `PreMultiplied`, falls back to `PostMultiplied`; when neither is
+/// advertised the surface keeps its current mode. Persists across resizes
+/// because vello reconfigures from the stored `config`.
+pub fn ensure_transparent_alpha(
+    context: &vello::util::RenderContext,
+    surface: &mut vello::util::RenderSurface,
+) {
+    let adapter = context.devices[surface.dev_id].adapter();
+    let caps = surface.surface.get_capabilities(adapter);
+    let mode = [
+        wgpu::CompositeAlphaMode::PreMultiplied,
+        wgpu::CompositeAlphaMode::PostMultiplied,
+    ]
+    .into_iter()
+    .find(|mode| caps.alpha_modes.contains(mode));
+    if let Some(mode) = mode {
+        surface.config.alpha_mode = mode;
+        let device = &context.devices[surface.dev_id].device;
+        surface.surface.configure(device, &surface.config);
+    }
+}
+
 /// Draw behind content: layered drop shadows plus the rounded body.
 /// `width`/`height` are physical pixels. `None` skips shadows and body for
 /// fully transparent windows (glass demos); the frame lines still draw.
@@ -163,4 +189,31 @@ pub fn draw_frame(scene: &mut Scene, width: u32, height: u32, scale: f32) {
         None,
         &outer,
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shadows_fit_margin() {
+        // vello blurs with std_dev = blur / 2 and fades out at ~2.5 x
+        // std_dev: a larger reach clips with a hard edge at the window
+        // border and reads as a square black bar.
+        for (dy, blur, _) in SHADOWS {
+            let reach = dy + 2.5 * (blur / 2.0);
+            assert!(
+                reach <= MARGIN,
+                "shadow reach {reach} exceeds margin {MARGIN}"
+            );
+        }
+    }
+
+    #[test]
+    fn body_shape_matches_margin() {
+        use vello::kurbo::Shape;
+        let bb = body_shape(800, 600, 1.0).bounding_box();
+        assert_eq!((bb.x0, bb.y0), (MARGIN as f64, MARGIN as f64));
+        assert_eq!((bb.x1, bb.y1), (800.0 - MARGIN as f64, 600.0 - MARGIN as f64));
+    }
 }
