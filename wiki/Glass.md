@@ -2,8 +2,9 @@
 
 `GlassContainer`: liquid glass lens container with a clear minified center,
 a frosted edge band, liquid bevel rim (Lens finish: specular top light
-melting into bottom depth shade; Frosted finish: uniform 1 px dark-gray
-rim on every side), edge sheen (both finishes: subtle top light brightest
+melting into bottom depth shade; Frosted finish: uniform 1 px rim on
+every side, dark gray in dark mode and soft translucent black in light
+mode), edge sheen (both finishes: subtle top light brightest
 in the middle and fading toward the corners, much fainter at the bottom)
 and a soft drop
 shadow. Optional content draws on top. When the shell runs `App::wants_backdrop`, the center samples the sharp in-app
@@ -76,7 +77,8 @@ balanced stage (it still follows dark/light mode).
 | `GLASS_TINT_LIGHT` | black 8% |
 | `GLASS_SPECULAR` | white 45% top light (Lens finish) |
 | `GLASS_DEPTH` | black 18% bottom shade (Lens finish) |
-| `GLASS_FROSTED_RIM` | dark gray (`#3A3A3C`) 1 px rim on every side (Frosted finish) |
+| `GLASS_FROSTED_RIM` | dark gray (`#3A3A3C`) 1 px rim on every side, dark mode (Frosted finish) |
+| `GLASS_FROSTED_RIM_LIGHT` | black 24% 1 px rim on every side, light mode (Frosted finish) |
 | `GLASS_SHEEN_TOP` / `GLASS_SHEEN_TOP_GLOW` | top edge sheen core and halo, center-weighted (both finishes) |
 | `GLASS_SHEEN_BOTTOM` / `GLASS_SHEEN_BOTTOM_GLOW` | much fainter bottom counterpart (both finishes) |
 | `GLASS_CHROMA_RED` / `GLASS_CHROMA_CYAN` | reserved (former rim split, unused) |
@@ -105,9 +107,10 @@ half the smaller side, so flat pills never fold into pointed corners.
 
 ## Frosted
 
-No bevel: a single 1 px `GLASS_FROSTED_RIM`
-stroke sits exactly on the body edge, the same dark gray on every
-side (desaturated with the palette when the window is inactive).
+No bevel: a single 1 px rim stroke sits exactly on the body edge, dark
+gray (`GLASS_FROSTED_RIM`) on every side in dark mode and soft
+translucent black (`GLASS_FROSTED_RIM_LIGHT`, black 24%) in light mode
+(desaturated with the palette when the window is inactive).
 
 ## Edge sheen
 

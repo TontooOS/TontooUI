@@ -20,9 +20,13 @@ pub const GLASS_TINT_LIGHT: Color = Color::from_rgba8(0, 0, 0, 20);
 pub const GLASS_SPECULAR: Color = Color::from_rgba8(255, 255, 255, 115);
 /// Depth shade pooling at the bottom of the bevel (Lens finish only).
 pub const GLASS_DEPTH: Color = Color::from_rgba8(0, 0, 0, 46);
-/// Uniform dark-gray 1 px rim for the Frosted finish: no specular top
-/// light, no depth shade, the same border on every side.
+/// Uniform dark-gray 1 px rim for the Frosted finish in dark mode: no
+/// specular top light, no depth shade, the same border on every side.
 pub const GLASS_FROSTED_RIM: Color = Color::from_rgba8(0x3a, 0x3a, 0x3c, 255);
+/// Soft translucent rim for the Frosted finish in light mode: much less
+/// black than the dark-mode rim, matching other light-mode hairlines
+/// (textfield border strength).
+pub const GLASS_FROSTED_RIM_LIGHT: Color = Color::from_rgba8(0, 0, 0, 60);
 /// Top edge sheen core (both finishes): subtle white, strongest in the
 /// middle of the edge, fading out toward the corners.
 pub const GLASS_SHEEN_TOP: Color = Color::from_rgba8(255, 255, 255, 64);
@@ -90,6 +94,7 @@ pub struct GlassContainer {
     specular: Color,
     grain: bool,
     focused: bool,
+    dark: bool,
     glass_type: GlassType,
     /// Frost busy backdrops (video, photos) automatically: the clear
     /// center gains a blur veil with the local variance. Off while
@@ -112,6 +117,7 @@ impl GlassContainer {
             specular: GLASS_SPECULAR,
             grain: false,
             focused: true,
+            dark: true,
             glass_type: GlassType::Lens,
             auto_frost: true,
             frost: 0.0,
@@ -198,6 +204,7 @@ impl GlassContainer {
     /// follows dark/light mode, just never the glass amount).
     pub fn set_theme(&mut self, mode: ThemeMode, amount: GlassAmount) {
         let dark = mode == ThemeMode::Dark;
+        self.dark = dark;
         let amount = match self.glass_type {
             GlassType::Lens => amount,
             GlassType::Frosted => GlassAmount::Glass,
@@ -412,9 +419,15 @@ impl GlassContainer {
                 (radius - 0.5 * scale).max(0.0),
             );
             let rim_color = if self.focused {
-                GLASS_FROSTED_RIM
-            } else {
+                if self.dark {
+                    GLASS_FROSTED_RIM
+                } else {
+                    GLASS_FROSTED_RIM_LIGHT
+                }
+            } else if self.dark {
                 desaturate(GLASS_FROSTED_RIM)
+            } else {
+                desaturate(GLASS_FROSTED_RIM_LIGHT)
             };
             scene.stroke(
                 &Stroke::new(1.0 * scale),
