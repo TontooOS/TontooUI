@@ -256,10 +256,26 @@ pub struct ThemeWatcher {
 }
 
 impl ThemeWatcher {
+    /// Best-effort initial read: the watcher starts with the daemon
+    /// state (mode, accent, glass, revision), not the dark/blue
+    /// defaults. A missing daemon keeps the defaults; the first
+    /// frame already paints the real theme, no fade.
     pub fn new() -> Self {
+        #[cfg(unix)]
+        let provider = coresettings::SettingsProvider::from_env();
+        #[cfg(unix)]
+        let (theme, revision) = match provider.customize() {
+            Ok(customize) => {
+                let revision = customize.revision;
+                (Self::theme_from(&customize), revision)
+            }
+            Err(_) => (Theme::default(), 0),
+        };
+        #[cfg(not(unix))]
         let theme = Theme::default();
+        let from = theme.palette();
         Self {
-            from: theme.palette(),
+            from,
             theme,
             fade_start: 0.0,
             fading: false,
@@ -267,9 +283,9 @@ impl ThemeWatcher {
             #[cfg(unix)]
             last_poll: f64::NEG_INFINITY,
             #[cfg(unix)]
-            provider: coresettings::SettingsProvider::from_env(),
+            provider,
             #[cfg(unix)]
-            revision: 0,
+            revision,
             #[cfg(unix)]
             subscription: None,
         }
@@ -304,13 +320,28 @@ impl ThemeWatcher {
     pub fn poll(&mut self, now_secs: f64) -> bool {
         #[cfg(unix)]
         {
+            let mut changed = false;
             if self.subscription.is_none() {
                 match self.provider.subscribe(&["customize_changed"]) {
-                    Ok(subscription) => self.subscription = Some(subscription),
+                    Ok(subscription) => {
+                        self.subscription = Some(subscription);
+                        // Catch-up: the state may have changed between
+                        // `new()` and this subscribe, so sync once.
+                        if let Ok(customize) = self.provider.customize() {
+                            let theme = Self::theme_from(&customize);
+                            self.revision = customize.revision;
+                            if theme != self.theme {
+                                self.from = self.palette(now_secs);
+                                self.theme = theme;
+                                self.fade_start = now_secs;
+                                self.fading = true;
+                                changed = true;
+                            }
+                        }
+                    }
                     Err(_) => return self.poll_fallback(now_secs),
                 }
             }
-            let mut changed = false;
             // Drain queued pushes, bounded so one frame never stalls.
             for _ in 0..8 {
                 let next = self
@@ -375,11 +406,11 @@ impl ThemeWatcher {
         let Ok(customize) = self.provider.customize() else {
             return false;
         };
-        if customize.revision == self.revision {
+        let theme = Self::theme_from(&customize);
+        if customize.revision == self.revision && theme == self.theme {
             return false;
         }
         self.revision = customize.revision;
-        let theme = Self::theme_from(&customize);
         if theme != self.theme {
             self.from = self.palette(now_secs);
             self.theme = theme;
@@ -429,6 +460,15 @@ impl Default for ThemeWatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Unit tests share one process, so `SETTINGS_SOCKET` is global.
+    /// Every test that reads or writes it holds this lock, otherwise
+    /// parallel tests observe each other's mock daemon.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn lock_env() -> std::sync::MutexGuard<'static, ()> {
+        ENV_LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
 
     #[test]
     fn dark_palette_matches_conventions() {
@@ -480,20 +520,85 @@ mod tests {
 
     #[test]
     fn refocus_restores_color() {
+        let _guard = lock_env();
+        // Deterministic defaults: ignore any real or mock daemon.
+        let previous = std::env::var("SETTINGS_SOCKET").ok();
+        std::env::set_var(
+            "SETTINGS_SOCKET",
+            "/nonexistent-tontoo-theme-test/settings.sock",
+        );
         let mut watcher = ThemeWatcher::new();
         watcher.set_focused(false, 0.0);
         let _ = watcher.palette(10.0);
         watcher.set_focused(true, 10.0);
         let back = watcher.palette(20.0);
         assert_eq!(back, Theme::default().palette());
+        match previous {
+            Some(value) => std::env::set_var("SETTINGS_SOCKET", value),
+            None => std::env::remove_var("SETTINGS_SOCKET"),
+        }
+    }
+
+    #[test]
+    fn new_starts_with_daemon_state() {
+        let _guard = lock_env();
+        use std::io::{BufRead, BufReader, Write};
+        use std::os::unix::net::UnixListener;
+
+        // Mock daemon: serve the initial customize_get from new().
+        let path = std::env::temp_dir().join(format!(
+            "tontoo-theme-init-{}.sock",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&path);
+        let listener = UnixListener::bind(&path).unwrap();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else {
+                    break;
+                };
+                std::thread::spawn(move || {
+                    let mut reader = BufReader::new(stream.try_clone().unwrap());
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).is_err() {
+                        return;
+                    }
+                    let _ = stream.write_all(
+                        b"{\"id\":1,\"ok\":true,\"result\":{\"wallpaper\":\"SONOMA\",\"accent\":\"pink\",\"theme\":\"light\",\"glass\":\"much\",\"revision\":9}}\n",
+                    );
+                    let _ = stream.flush();
+                });
+            }
+        });
+
+        let previous = std::env::var("SETTINGS_SOCKET").ok();
+        std::env::set_var("SETTINGS_SOCKET", &path);
+        let mut watcher = ThemeWatcher::new();
+        assert_eq!(watcher.theme().mode, ThemeMode::Light);
+        assert_eq!(watcher.theme().accent, Accent::Pink);
+        assert_eq!(watcher.theme().glass, GlassAmount::Much);
+        // First frame already paints the daemon theme, no fade.
+        assert!(!watcher.fading);
+        let palette = watcher.palette(0.0);
+        assert_eq!(palette.bg, Color::from_rgb8(0xff, 0xff, 0xff));
+        assert_eq!(palette.text, Color::from_rgb8(0x27, 0x27, 0x27));
+        assert_eq!(palette.accent, Accent::Pink.color());
+        match previous {
+            Some(value) => std::env::set_var("SETTINGS_SOCKET", value),
+            None => std::env::remove_var("SETTINGS_SOCKET"),
+        }
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]
     fn push_event_applies_theme_without_polling() {
+        let _guard = lock_env();
         use std::io::{BufRead, BufReader, Write};
         use std::os::unix::net::UnixListener;
 
-        // Mock daemon: ack the subscribe, then push one theme change.
+        // Mock daemon: serve the initial customize_get from new()
+        // (dark/gray), then ack the subscribe and push one theme
+        // change (light/blue).
         let path = std::env::temp_dir().join(format!(
             "tontoo-theme-push-{}.sock",
             std::process::id()
@@ -501,24 +606,41 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         let listener = UnixListener::bind(&path).unwrap();
         std::thread::spawn(move || {
-            if let Ok((mut stream, _)) = listener.accept() {
-                let mut reader = BufReader::new(stream.try_clone().unwrap());
-                let mut line = String::new();
-                let _ = reader.read_line(&mut line);
-                let _ = stream.write_all(
-                    b"{\"id\":1,\"ok\":true,\"result\":{\"subscribed\":true,\"events\":[\"customize_changed\"]}}\n",
-                );
-                let _ = stream.write_all(
-                    b"{\"event\":\"customize_changed\",\"result\":{\"wallpaper\":\"THAOELAKE\",\"accent\":\"blue\",\"theme\":\"light\",\"glass\":\"glass\",\"revision\":7}}\n",
-                );
-                let _ = stream.flush();
-                std::thread::sleep(std::time::Duration::from_secs(2));
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else {
+                    break;
+                };
+                std::thread::spawn(move || {
+                    let mut reader = BufReader::new(stream.try_clone().unwrap());
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).is_err() {
+                        return;
+                    }
+                    if line.contains("customize_get") {
+                        let _ = stream.write_all(
+                            b"{\"id\":1,\"ok\":true,\"result\":{\"wallpaper\":\"SONOMA\",\"accent\":\"gray\",\"theme\":\"dark\",\"glass\":\"glass\",\"revision\":3}}\n",
+                        );
+                        let _ = stream.flush();
+                    } else {
+                        let _ = stream.write_all(
+                            b"{\"id\":1,\"ok\":true,\"result\":{\"subscribed\":true,\"events\":[\"customize_changed\"]}}\n",
+                        );
+                        let _ = stream.write_all(
+                            b"{\"event\":\"customize_changed\",\"result\":{\"wallpaper\":\"THAOELAKE\",\"accent\":\"blue\",\"theme\":\"light\",\"glass\":\"glass\",\"revision\":7}}\n",
+                        );
+                        let _ = stream.flush();
+                        std::thread::sleep(std::time::Duration::from_secs(2));
+                    }
+                });
             }
         });
 
         let previous = std::env::var("SETTINGS_SOCKET").ok();
         std::env::set_var("SETTINGS_SOCKET", &path);
         let mut watcher = ThemeWatcher::new();
+        // Initial state comes from the daemon, not the defaults.
+        assert_eq!(watcher.theme().mode, ThemeMode::Dark);
+        assert_eq!(watcher.theme().accent, Accent::Gray);
         assert!(watcher.poll(0.0));
         assert_eq!(watcher.theme().mode, ThemeMode::Light);
         assert_eq!(watcher.theme().accent, Accent::Blue);
@@ -533,6 +655,7 @@ mod tests {
 
     #[test]
     fn missing_daemon_keeps_theme_without_error() {
+        let _guard = lock_env();
         let previous = std::env::var("SETTINGS_SOCKET").ok();
         std::env::set_var(
             "SETTINGS_SOCKET",
