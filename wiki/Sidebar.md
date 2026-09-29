@@ -34,8 +34,10 @@ Traffic geometry (`TRAFFIC_LEFT`, `TRAFFIC_SIZE`, `TRAFFIC_GAP`)
 and colors come from [Titlebar.md](Titlebar.md); the sidebar body
 defaults to `SIDEBAR_BG_DARK` (`#1F282D`) in dark mode and the
 `GroupBox` fill in light mode. Hover matches the titlebar: hovering
-any light on a focused window reveals all three glyphs (x, minus,
-expand logo) via `draw_traffic_glyph`, with no ring highlight.
+any light or the gaps between lights on a focused window reveals all
+three glyphs (x, minus, expand logo) via `draw_traffic_glyph`, with no
+ring highlight. Clicks stay precise per light (`traffic_index`); gaps
+never trigger an action (`traffic_cluster_hover` only affects hover).
 Unfocused windows stay plain gray.
 
 ## SidebarItem

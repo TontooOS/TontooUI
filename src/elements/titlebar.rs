@@ -181,15 +181,32 @@ impl Titlebar {
         None
     }
 
+    /// Group hover area: whole traffic cluster including the small gaps
+    /// between the lights, plus 3 px tolerance. Clicks still use
+    /// `button_at` so gaps never trigger an action, but hovering a gap
+    /// still reveals all glyphs.
+    fn cluster_hover(&self, x: f32, y: f32) -> bool {
+        let (c0x, cy) = self.button_center(0);
+        let (c2x, _) = self.button_center(2);
+        let pad = 3.0;
+        let x0 = c0x - TRAFFIC_SIZE / 2.0 - pad;
+        let x1 = c2x + TRAFFIC_SIZE / 2.0 + pad;
+        x >= x0 && x <= x1 && (y - cy).abs() <= TRAFFIC_SIZE / 2.0 + pad
+    }
+
     /// Update group hover from logical cursor position. While modal
     /// blocked the close light never highlights; a disabled maximize
     /// light never highlights either.
     pub fn set_hover(&mut self, x: f32, y: f32) {
+        if !self.cluster_hover(x, y) {
+            self.hover = false;
+            return;
+        }
         self.hover = match self.button_at(x, y) {
             Some(TrafficAction::Close) if self.modal_blocked => false,
             Some(TrafficAction::Maximize) if !self.maximize_enabled => false,
-            Some(_) => true,
-            None => false,
+            // Direct hit or gap between lights: show all enabled glyphs.
+            _ => true,
         };
     }
 

@@ -122,7 +122,10 @@ viewBox), uniformly scaled into the 68% box so it never stretches.
 
 17 px circles, no border, no shadow. Hovering the group on a focused
 window shows glyphs at 68% size: filled rounded bars for x (dark red)
-and minus (dark amber), the expand logo (near-black) for maximize. An
+and minus (dark amber), the expand logo (near-black) for maximize. The
+hover area covers the whole cluster including the gaps between lights
+(`cluster_hover`, 3 px tolerance); clicks stay precise per light
+(`button_at`) so gaps never trigger an action. An
 unfocused window shows all gray with no glyphs, even on hover. A modal
 blocked close light is gray with no glyph and ignores clicks.
 

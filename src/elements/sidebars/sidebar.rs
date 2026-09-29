@@ -767,6 +767,7 @@ impl Sidebar {
     fn traffic_index(&self, x: f32, y: f32) -> Option<usize> {
         // Traffic lives in the sidebar when expanded, top-left of
         // the content when collapsed: same geometry either way.
+        // Precise per-light hit for clicks; gaps never click.
         for index in 0..3 {
             let (cx, cy) = self.traffic_center(index);
             let dx = x - cx;
@@ -774,6 +775,41 @@ impl Sidebar {
             if dx * dx + dy * dy <= (TRAFFIC_SIZE / 2.0 + 3.0).powi(2) {
                 return Some(index);
             }
+        }
+        None
+    }
+
+    /// Group hover area: whole traffic cluster including the small gaps
+    /// between the lights, plus 3 px tolerance. Hovering a gap still
+    /// reveals all three glyphs.
+    fn traffic_cluster_hover(&self, x: f32, y: f32) -> bool {
+        let (c0x, cy) = self.traffic_center(0);
+        let (c2x, _) = self.traffic_center(2);
+        let pad = 3.0;
+        let x0 = c0x - TRAFFIC_SIZE / 2.0 - pad;
+        let x1 = c2x + TRAFFIC_SIZE / 2.0 + pad;
+        x >= x0 && x <= x1 && (y - cy).abs() <= TRAFFIC_SIZE / 2.0 + pad
+    }
+
+    /// Hover index including gaps: direct hit wins, otherwise a gap
+    /// maps to the nearest light so `traffic_hover.is_some()` still
+    /// reveals all glyphs.
+    fn traffic_hover_index(&self, x: f32, y: f32) -> Option<usize> {
+        if let Some(index) = self.traffic_index(x, y) {
+            return Some(index);
+        }
+        if self.traffic_cluster_hover(x, y) {
+            let mut best = 0;
+            let mut best_dist = f32::MAX;
+            for index in 0..3 {
+                let (cx, _) = self.traffic_center(index);
+                let dist = (x - cx).abs();
+                if dist < best_dist {
+                    best_dist = dist;
+                    best = index;
+                }
+            }
+            return Some(best);
         }
         None
     }
@@ -847,7 +883,7 @@ impl Sidebar {
             return;
         }
         self.resize_hover = self.resize_hit(x, y);
-        self.traffic_hover = self.traffic_index(x, y);
+        self.traffic_hover = self.traffic_hover_index(x, y);
         self.left_bar.set_hover(x, y);
         self.right_bar.set_hover(x, y);
         if self.show_search && !self.collapsed {
