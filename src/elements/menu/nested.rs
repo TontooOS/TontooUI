@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::path::Path;
 
 use vello::Scene;
 use vello::kurbo::{Affine, BezPath, Cap, Join, Line, RoundedRect, Stroke};
@@ -26,12 +27,19 @@ pub const NESTED_DIV_H: f32 = 9.0;
 pub const NESTED_SUB_GAP: f32 = 4.0;
 /// Default hover fill (theme accent blue).
 pub const NESTED_ACCENT: Color = Color::from_rgb8(0x00, 0x7a, 0xff);
+/// Action row icon box in logical px.
+pub const NESTED_ICON_SIZE: f32 = 20.0;
+/// Gap between row icon and label in logical px.
+pub const NESTED_ICON_GAP: f32 = 8.0;
 
 /// One row of a nested menu.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MenuItem {
-    /// Clickable action row, fires `on_action` with its path.
-    Action(String),
+    /// Clickable action row, fires `on_action` with its path. The
+    /// optional raster icon (absolute app PNG file) is decoded through
+    /// the CoreImage pipeline and drawn ahead of the label; missing or
+    /// undecodable files draw the label without an icon.
+    Action { label: String, icon: Option<String> },
     /// Row opening a child panel on hover, with a `>` chevron.
     Submenu(String, Vec<MenuItem>),
     /// Dimmed non-interactive section title.
@@ -42,7 +50,19 @@ pub enum MenuItem {
 
 impl MenuItem {
     pub fn action(label: impl Into<String>) -> Self {
-        MenuItem::Action(label.into())
+        MenuItem::Action {
+            label: label.into(),
+            icon: None,
+        }
+    }
+
+    /// Raster icon for the row (absolute PNG file path). A no-op on
+    /// non-action rows.
+    pub fn icon(mut self, path: impl Into<String>) -> Self {
+        if let MenuItem::Action { icon, .. } = &mut self {
+            *icon = Some(path.into());
+        }
+        self
     }
 
     pub fn submenu(label: impl Into<String>, items: Vec<MenuItem>) -> Self {
@@ -59,7 +79,7 @@ impl MenuItem {
 
     fn label(&self) -> Option<&str> {
         match self {
-            MenuItem::Action(label) | MenuItem::Submenu(label, _) | MenuItem::Section(label) => {
+            MenuItem::Action { label, .. } | MenuItem::Submenu(label, _) | MenuItem::Section(label) => {
                 Some(label)
             }
             MenuItem::Divider => None,
@@ -67,7 +87,7 @@ impl MenuItem {
     }
 
     fn is_action(&self) -> bool {
-        matches!(self, MenuItem::Action(_))
+        matches!(self, MenuItem::Action { .. })
     }
 
     fn children(&self) -> Option<&[MenuItem]> {
@@ -105,6 +125,8 @@ pub struct NestedMenu {
     hover: Color,
     hover_manual: bool,
     dark: bool,
+    /// Button text size in logical px (default `MENU_FONT_SIZE`).
+    button_font: f32,
     text_color: Color,
     text_dim: Color,
     divider: Color,
@@ -127,6 +149,10 @@ pub struct NestedMenu {
     armed: Option<(usize, usize)>,
     armed_outside: bool,
     disabled: bool,
+    /// Transparent button body: skips the solid fill so apps can draw
+    /// their own backdrop (e.g. a glass toolbar pill) underneath.
+    /// Text, chevron and press tint keep drawing. Default `false`.
+    transparent_button: bool,
     focused: bool,
     on_action: Option<Box<dyn FnMut(Vec<usize>)>>,
 }
@@ -147,6 +173,7 @@ impl NestedMenu {
             hover: NESTED_ACCENT,
             hover_manual: false,
             dark: true,
+            button_font: MENU_FONT_SIZE,
             text_color: Color::WHITE,
             text_dim: Color::from_rgb8(0x9a, 0x9a, 0x9e),
             divider: Color::from_rgba8(255, 255, 255, 40),
@@ -169,6 +196,7 @@ impl NestedMenu {
             armed: None,
             armed_outside: false,
             disabled: false,
+            transparent_button: false,
             focused: true,
             on_action: None,
         }
@@ -188,9 +216,32 @@ impl NestedMenu {
         self
     }
 
+    /// Button text size in logical px (default `MENU_FONT_SIZE`,
+    /// panel rows always keep `MENU_FONT_SIZE`).
+    pub fn button_font(mut self, px: f32) -> Self {
+        self.button_font = px.max(1.0);
+        self
+    }
+
+    pub fn set_button_font(&mut self, px: f32) {
+        self.button_font = px.max(1.0);
+    }
+
     pub fn disabled(mut self, disabled: bool) -> Self {
         self.disabled = disabled;
         self
+    }
+
+    /// Transparent button body (default `false`). With transparency
+    /// the solid fill is skipped so apps can draw their own backdrop
+    /// underneath; text, chevron and press tint keep drawing.
+    pub fn transparent_button(mut self, transparent: bool) -> Self {
+        self.transparent_button = transparent;
+        self
+    }
+
+    pub fn set_transparent_button(&mut self, transparent: bool) {
+        self.transparent_button = transparent;
     }
 
     /// Fires on every action click with the row path from the root
@@ -343,12 +394,16 @@ impl NestedMenu {
     }
 
     fn text_w(&self, fonts: &mut FontSystem, text: &str) -> f32 {
-        let layout = fonts.layout_text(text, MENU_FONT_SIZE, Color::WHITE, None);
+        self.text_w_sized(fonts, text, MENU_FONT_SIZE)
+    }
+
+    fn text_w_sized(&self, fonts: &mut FontSystem, text: &str, size: f32) -> f32 {
+        let layout = fonts.layout_text(text, size, Color::WHITE, None);
         FontSystem::layout_size(&layout).0 / fonts.scale
     }
 
     fn button_w(&self, fonts: &mut FontSystem) -> f32 {
-        let mut widest = self.text_w(fonts, &self.button);
+        let mut widest = self.text_w_sized(fonts, &self.button, self.button_font);
         for item in &self.items {
             if let Some(label) = item.label() {
                 widest = widest.max(self.text_w(fonts, label));
@@ -373,6 +428,7 @@ impl NestedMenu {
     fn panel_content_w(&self, fonts: &mut FontSystem, items: &[MenuItem]) -> f32 {
         let mut widest: f32 = 0.0;
         let mut submenu = false;
+        let mut icons = false;
         for item in items {
             if let Some(label) = item.label() {
                 widest = widest.max(self.text_w(fonts, label));
@@ -380,12 +436,21 @@ impl NestedMenu {
             if item.children().is_some() {
                 submenu = true;
             }
+            if matches!(item, MenuItem::Action { icon: Some(_), .. }) {
+                icons = true;
+            }
         }
-        widest + MENU_PAD * 2.0 + if submenu {
-            NESTED_CHEV_GAP + NESTED_CHEV_COL
-        } else {
-            0.0
-        }
+        widest + MENU_PAD * 2.0
+            + if icons {
+                NESTED_ICON_SIZE + NESTED_ICON_GAP
+            } else {
+                0.0
+            }
+            + if submenu {
+                NESTED_CHEV_GAP + NESTED_CHEV_COL
+            } else {
+                0.0
+            }
     }
 
     fn panel_content_h(items: &[MenuItem]) -> f32 {
@@ -497,7 +562,7 @@ impl NestedMenu {
             let h = Self::item_h(item);
             if y >= top && y <= top + h {
                 return match item {
-                    MenuItem::Action(_) | MenuItem::Submenu(_, _) => Some(i),
+                    MenuItem::Action { .. } | MenuItem::Submenu(_, _) => Some(i),
                     _ => None,
                 };
             }
@@ -641,7 +706,7 @@ impl NestedMenu {
             // close, submenu rows just stay open.
             if self.level_at(x, y) == Some(level) && self.level_row_at(level, x, y) == Some(row) {
                 let path = self.action_path(level, row);
-                if matches!(self.item_at_path(&path), Some(MenuItem::Action(_))) {
+                if matches!(self.item_at_path(&path), Some(MenuItem::Action { .. })) {
                     self.notify(path);
                     self.close();
                     return;
@@ -767,13 +832,15 @@ impl View for NestedMenu {
                 px(self.btn_y + MENU_BUTTON_H),
                 px(MENU_BUTTON_RADIUS),
             );
-            scene.fill(
-                Fill::NonZero,
-                Affine::IDENTITY,
-                &Brush::Solid(self.eff(self.button_bg())),
-                None,
-                &button,
-            );
+            if !self.transparent_button {
+                scene.fill(
+                    Fill::NonZero,
+                    Affine::IDENTITY,
+                    &Brush::Solid(self.eff(self.button_bg())),
+                    None,
+                    &button,
+                );
+            }
             if self.armed_button && !self.disabled {
                 let press = if self.dark {
                     Color::from_rgba8(255, 255, 255, 24)
@@ -790,7 +857,7 @@ impl View for NestedMenu {
             }
             let layout = fonts.layout_text_weighted(
                 &self.button,
-                MENU_FONT_SIZE,
+                self.button_font,
                 self.eff(self.text_color),
                 400.0,
                 None,
@@ -877,7 +944,7 @@ impl View for NestedMenu {
                         );
                         top += MENU_ROW_H + MENU_ROW_SPACING;
                     }
-                    MenuItem::Action(label) | MenuItem::Submenu(label, _) => {
+                    MenuItem::Action { label, .. } | MenuItem::Submenu(label, _) => {
                         let is_sub = matches!(item, MenuItem::Submenu(_, _));
                         let is_hovered =
                             self.hovered.get(level).copied().flatten() == Some(i)
@@ -911,10 +978,36 @@ impl View for NestedMenu {
                             None,
                         );
                         let (_, th) = FontSystem::layout_size(&layout);
+                        // Optional raster icon ahead of the label,
+                        // decoded through the CoreImage pipeline. A
+                        // missing file keeps the plain label offset.
+                        let mut text_x = px0 + MENU_PAD;
+                        let icon_path: Option<&str> = match item {
+                            MenuItem::Action {
+                                icon: Some(path), ..
+                            } => Some(path),
+                            _ => None,
+                        };
+                        if let Some(path) = icon_path {
+                            let target =
+                                (NESTED_ICON_SIZE * fonts.scale).ceil().max(1.0) as u32;
+                            if let Some((image, iw, ih)) =
+                                images.raster_file(Path::new(path), target)
+                            {
+                                let s = (NESTED_ICON_SIZE / iw as f32)
+                                    .min(NESTED_ICON_SIZE / ih as f32);
+                                let transform = Affine::translate((
+                                    px(px0 + MENU_PAD),
+                                    px(top + (MENU_ROW_H - ih as f32 * s) / 2.0),
+                                )) * Affine::scale(s as f64 * scale);
+                                scene.draw_image(&image, transform);
+                                text_x += NESTED_ICON_SIZE + NESTED_ICON_GAP;
+                            }
+                        }
                         draw_layout(
                             scene,
                             &layout,
-                            px0 + MENU_PAD,
+                            text_x,
                             top + (MENU_ROW_H - th / fonts.scale) / 2.0,
                             fonts.scale,
                         );
@@ -1129,5 +1222,80 @@ mod tests {
         m.mouse_down(2.0, 2.0);
         m.mouse_up(2.0, 2.0);
         assert!(!m.is_open());
+    }
+
+    #[test]
+    fn button_font_defaults_and_widens() {
+        let plain = NestedMenu::new("P", vec![MenuItem::action("A")]);
+        assert_eq!(plain.button_font, MENU_FONT_SIZE);
+        let mut big = NestedMenu::new("P", vec![MenuItem::action("A")]).button_font(20.0);
+        assert_eq!(big.button_font, 20.0);
+        // Bigger button text widens the button, rows keep measuring.
+        let mut fonts = FontSystem::new();
+        let small_w = plain.button_w(&mut fonts);
+        let big_w = big.button_w(&mut fonts);
+        assert!(big_w >= small_w);
+        big.set_button_font(0.5);
+        assert_eq!(big.button_font, 1.0);
+    }
+
+    #[test]
+    fn transparent_button_roundtrips() {        let plain = NestedMenu::new("P", vec![MenuItem::action("A")]);
+        assert!(!plain.transparent_button);
+        let glass = NestedMenu::new("P", vec![MenuItem::action("A")])
+            .transparent_button(true);
+        assert!(glass.transparent_button);
+        let mut toggled = glass;
+        toggled.set_transparent_button(false);
+        assert!(!toggled.transparent_button);
+    }
+
+    #[test]
+    fn action_icon_roundtrips_and_widens_panel() {
+        // Builder keeps the label and stores the icon path.
+        let item = MenuItem::action("Save").icon("/tmp/save.png");
+        assert_eq!(
+            item,
+            MenuItem::Action {
+                label: "Save".to_string(),
+                icon: Some("/tmp/save.png".to_string()),
+            }
+        );
+        assert_eq!(item.label(), Some("Save"));
+        // No-op on non-action rows.
+        let section = MenuItem::section("S").icon("/tmp/s.png");
+        assert_eq!(section, MenuItem::section("S"));
+        // A panel with icons reserves the icon column.
+        let plain = NestedMenu::new("P", vec![MenuItem::action("Save")]);
+        let mut fonts = FontSystem::new();
+        let plain_w = plain.panel_content_w(&mut fonts, &plain.items.clone());
+        let icons = NestedMenu::new(
+            "P",
+            vec![MenuItem::action("Save").icon("/tmp/save.png")],
+        );
+        let icons_w = icons.panel_content_w(&mut fonts, &icons.items.clone());
+        assert_eq!(icons_w - plain_w, NESTED_ICON_SIZE + NESTED_ICON_GAP);
+    }
+
+    #[test]
+    fn icon_action_still_fires() {
+        let fires = Rc::new(Cell::new(Vec::new()));
+        let count = fires.clone();
+        let (mut m, _) = placed(
+            NestedMenu::new(
+                "File",
+                vec![MenuItem::action("Save").icon("/tmp/save.png")],
+            )
+            .on_action(move |path| count.set(path)),
+        );
+        let (bx, by) = button_center(&m);
+        m.mouse_down(bx, by);
+        m.mouse_up(bx, by);
+        assert!(m.is_open());
+        // Missing icon file draws the plain label: row 0 still hits.
+        let (rx, ry) = row_point(&m, 0, 0);
+        m.mouse_down(rx, ry);
+        m.mouse_up(rx, ry);
+        assert_eq!(fires.take(), vec![0]);
     }
 }
