@@ -706,7 +706,7 @@ impl AllElements {
 
     /// Theme every direct page child that follows the system theme.
     /// Elements without a theme API keep their defaults.
-    fn theme_page(&mut self, accent: Color, dark: bool, mode: ThemeMode, glass: tontooui::theme::GlassAmount, viewport: Viewport, focused: bool) {
+    fn theme_page(&mut self, accent: Color, dark: bool, mode: ThemeMode, glass: tontooui::theme::GlassAmount, viewport: Viewport, focused: bool, text: Color) {
         let Some(stack) = self.stack_mut() else {
             return;
         };
@@ -878,6 +878,23 @@ impl AllElements {
             if let Some(group) = stack.child_mut::<BasicGroupBox>(index) {
                 group.set_theme(mode);
                 group.set_focused(focused);
+                continue;
+            }
+            if let Some(group) = stack.child_mut::<StyledGroupBox>(index) {
+                group.set_theme(mode);
+                group.set_focused(focused);
+                // Leading elements keep their own theme: wire them
+                // here like the groupbox demo does.
+                for row in 0..group.row_len() {
+                    if let Some(toggle) = group.row_leading_mut::<Toggle>(row) {
+                        toggle.set_theme(accent, dark);
+                        toggle.set_focused(focused);
+                    }
+                    if let Some(symbol) = group.row_leading_mut::<SFSymbolImage>(row) {
+                        symbol.set_theme(text, dark);
+                        symbol.set_focused(focused);
+                    }
+                }
                 continue;
             }
             if let Some(outline) = stack.child_mut::<BasicOutlineGroup>(index) {
@@ -1108,6 +1125,7 @@ impl App for AllElements {
             theme.glass,
             viewport,
             focused,
+            palette.text,
         );
         self.scroll.set_theme(palette.accent, dark);
         self.scroll.set_focused(focused);
