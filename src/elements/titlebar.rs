@@ -349,54 +349,61 @@ impl Titlebar {
     /// logo. Glyphs fit 68% of the button diameter without stretching. The
     /// x and minus are filled rounded bars in a darker tone of the button.
     fn draw_glyph(&self, scene: &mut Scene, index: usize, cx: f64, cy: f64, scale: f64) {
-        match index {
-            0 => {
-                for angle in [45.0_f64.to_radians(), -45.0_f64.to_radians()] {
-                    let transform = Affine::translate((cx, cy))
-                        * Affine::rotate(angle)
-                        * Affine::scale(scale);
-                    scene.fill(
-                        Fill::NonZero,
-                        transform,
-                        &Brush::Solid(TRAFFIC_GLYPH_CLOSE),
-                        None,
-                        &glyph_bar(),
-                    );
-                }
-            }
-            1 => {
-                let transform =
-                    Affine::translate((cx, cy)) * Affine::scale(scale);
+        draw_traffic_glyph(scene, index, cx, cy, scale);
+    }
+}
+
+/// Shared traffic light glyph painter (macOS style): close = x,
+/// minimize = minus, maximize = expand logo. Used by both the
+/// titlebar and the sidebar so hover looks identical everywhere.
+pub(crate) fn draw_traffic_glyph(scene: &mut Scene, index: usize, cx: f64, cy: f64, scale: f64) {
+    match index {
+        0 => {
+            for angle in [45.0_f64.to_radians(), -45.0_f64.to_radians()] {
+                let transform = Affine::translate((cx, cy))
+                    * Affine::rotate(angle)
+                    * Affine::scale(scale);
                 scene.fill(
                     Fill::NonZero,
                     transform,
-                    &Brush::Solid(TRAFFIC_GLYPH_MINIMIZE),
+                    &Brush::Solid(TRAFFIC_GLYPH_CLOSE),
                     None,
                     &glyph_bar(),
                 );
             }
-            _ => {
-                // Expand logo (500x500 viewBox), uniformly scaled to fit the
-                // 68% box so the aspect ratio never stretches.
-                let box_px = TRAFFIC_SIZE as f64 * 0.68 * scale;
-                let k = box_px / 500.0;
-                let transform =
-                    Affine::translate((cx - box_px / 2.0, cy - box_px / 2.0)) * Affine::scale(k);
-                scene.fill(
-                    Fill::NonZero,
-                    transform,
-                    &Brush::Solid(TRAFFIC_GLYPH),
-                    None,
-                    &expand_logo(),
-                );
-            }
+        }
+        1 => {
+            let transform =
+                Affine::translate((cx, cy)) * Affine::scale(scale);
+            scene.fill(
+                Fill::NonZero,
+                transform,
+                &Brush::Solid(TRAFFIC_GLYPH_MINIMIZE),
+                None,
+                &glyph_bar(),
+            );
+        }
+        _ => {
+            // Expand logo (500x500 viewBox), uniformly scaled to fit the
+            // 68% box so the aspect ratio never stretches.
+            let box_px = TRAFFIC_SIZE as f64 * 0.68 * scale;
+            let k = box_px / 500.0;
+            let transform =
+                Affine::translate((cx - box_px / 2.0, cy - box_px / 2.0)) * Affine::scale(k);
+            scene.fill(
+                Fill::NonZero,
+                transform,
+                &Brush::Solid(TRAFFIC_GLYPH),
+                None,
+                &expand_logo(),
+            );
         }
     }
 }
 
 /// Rounded bar centered at the origin in logical px: 68% of the button
 /// diameter long, 2.2 px thick. Rotated copies form the x glyph.
-fn glyph_bar() -> RoundedRect {
+pub(crate) fn glyph_bar() -> RoundedRect {
     let len = TRAFFIC_SIZE as f64 * 0.68;
     let thick = 2.2;
     RoundedRect::new(-len / 2.0, -thick / 2.0, len / 2.0, thick / 2.0, thick / 2.0)
@@ -432,7 +439,7 @@ impl View for Titlebar {
 
 /// Expand logo from the TontooOS artwork (500x500 viewBox, square, so a
 /// uniform scale never stretches it).
-fn expand_logo() -> BezPath {
+pub(crate) fn expand_logo() -> BezPath {
     let mut top = BezPath::new();
     top.move_to((120.0, 270.0));
     top.line_to((120.0, 170.0));

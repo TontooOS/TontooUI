@@ -13,7 +13,7 @@ use super::super::layout::View;
 use super::super::titlebar::{
     TRAFFIC_CLOSE, TRAFFIC_GAP, TRAFFIC_INACTIVE, TRAFFIC_LEFT, TRAFFIC_MAXIMIZE,
     TRAFFIC_MINIMIZE, TRAFFIC_SIZE, TITLEBAR_DIVIDER_DARK, TITLEBAR_DIVIDER_LIGHT,
-    TrafficAction,
+    TrafficAction, draw_traffic_glyph,
 };
 use super::super::textfield::SearchField;
 use super::super::toolbar::{
@@ -1165,21 +1165,15 @@ impl Sidebar {
         } else {
             [TRAFFIC_INACTIVE; 3]
         };
+        // macOS behavior: hovering any light reveals all three glyphs.
+        // No ring highlight, same look as the titlebar.
+        let show_glyphs = self.focused && self.traffic_hover.is_some();
         for (index, color) in colors.iter().enumerate() {
             let (cx, cy) = self.traffic_center(index);
             let circle = Circle::new((px(cx), px(cy)), (TRAFFIC_SIZE / 2.0 * fonts.scale) as f64);
             scene.fill(Fill::NonZero, Affine::IDENTITY, &Brush::Solid(*color), None, &circle);
-            // Hovered light gets a subtle white ring (glyphs stay a
-            // titlebar-only detail for now).
-            if self.traffic_hover == Some(index) && self.focused {
-                let ring = Circle::new((px(cx), px(cy)), (TRAFFIC_SIZE / 2.0 + 2.0) as f64 * scale);
-                scene.stroke(
-                    &Stroke::new(1.5 * scale),
-                    Affine::IDENTITY,
-                    &Brush::Solid(Color::from_rgba8(255, 255, 255, 120)),
-                    None,
-                    &ring,
-                );
+            if show_glyphs {
+                draw_traffic_glyph(scene, index, px(cx), px(cy), scale);
             }
         }
     }
