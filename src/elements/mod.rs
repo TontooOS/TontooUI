@@ -1,5 +1,5 @@
 pub mod buttons;
-pub mod dividers;
+pub mod barswitcher;pub mod dividers;
 pub mod animation;
 pub mod alerts;
 pub mod gestures;
@@ -38,6 +38,11 @@ pub use buttons::{
     Button, ButtonShape, ButtonStyle, BUTTON_ACCENT, BUTTON_BG_DARK, BUTTON_BG_LIGHT,
     BUTTON_FONT_SIZE, BUTTON_GAP, BUTTON_ICON_SIZE, BUTTON_PAD_X, BUTTON_PAD_Y,
     BUTTON_RADIUS,
+};
+pub use barswitcher::{
+    BarSwitcher, BarSwitcherItem, BARSWITCHER_FONT_SIZE, BARSWITCHER_ICON_TEXT_GAP,
+    BARSWITCHER_MIN_W, BARSWITCHER_TEXT_PAD_X, BARSWITCHER_WEIGHT,
+    BARSWITCHER_SELECTED_WEIGHT, BARSWITCHER_COLOR_DARK, BARSWITCHER_COLOR_LIGHT,
 };
 pub use animation::{
     Animated, Anchor, AnimSpec, Keyframe, Phase, Spin, Timeline, Transform,

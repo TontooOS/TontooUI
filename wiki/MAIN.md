@@ -15,6 +15,7 @@ theme, animation and a Vello/WGPU renderer.
 | Rules | [RULE.md](RULE.md) | Development and usage rules |
 | Animation | [Animation.md](Animation.md) | Frame clock, tweens, springs, decay |
 | Alerts | [Alerts.md](Alerts.md) | Modal frosted alert with OK/Cancel actions |
+| BarSwitcher | [BarSwitcher.md](BarSwitcher.md) | Single-select toolbar with icon/text/both cells |
 | Button | [Button.md](Button.md) | Standard button with CoreIcon SF Symbols |
 | Colors | [Colors.md](Colors.md) | System colors and linear/radial/angular gradients |
 | ContentUnavailable | [ContentUnavailable.md](ContentUnavailable.md) | Empty-state placeholder with refresh |
@@ -89,6 +90,13 @@ See [Renderer.md](Renderer.md) for the shell and [Layout.md](Layout.md)
 for the `View` tree.
 
 ## Changelog
+
+- 2026-09-30: `BarSwitcher` element (`src/elements/barswitcher.rs`).
+  Single-select toolbar in the `BasicToolbar` capsule look: each cell
+  holds an icon, a text label or both, the selected cell keeps the
+  gray hover-style highlight, clicks move the selection and fire
+  `on_select` (change only) for view swapping. Demo in
+  `examples/barswitcher.rs`. See [BarSwitcher.md](BarSwitcher.md).
 
 - 2026-09-30: Window resize zone is asymmetric (3 px into content,
   10 px into the shadow rim) so the overlay scrollbar stays usable.
