@@ -91,6 +91,15 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-30: List icons plus outline upgrades. `ListRow::icon`
+  plus `icon_tint` draw an 18px SF Symbol ahead of item labels
+  (row height stays put); `OutlineNode::icon_tint` tints one node
+  icon over the group tint; `DisclosureGroup::header_icon` plus
+  `header_icon_tint` prefix the header title;
+  `DisclosureGroup::trailing_chevron` moves the chevron to the row
+  end with the same morph and hit box. See [List.md](List.md) and
+  [Outline.md](Outline.md).
+
 - 2026-09-30: `BarSwitcher` element (`src/elements/barswitcher.rs`).
   Single-select toolbar in the `BasicToolbar` capsule look: each cell
   holds an icon, a text label or both, the selected cell keeps the

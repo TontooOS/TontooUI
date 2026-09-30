@@ -31,6 +31,7 @@ second child of the first root).
 pub fn folder(label: impl Into<String>) -> Self
 pub fn file(label: impl Into<String>) -> Self
 pub fn icon(self, name: impl Into<String>) -> Self
+pub fn icon_tint(self, color: Color) -> Self
 pub fn expanded(self, expanded: bool) -> Self
 pub fn child(self, node: OutlineNode) -> Self
 pub fn children(self, nodes: Vec<OutlineNode>) -> Self
@@ -46,6 +47,8 @@ pub fn child_nodes(&self) -> &[OutlineNode]
 - Folders expand while they have children (files never do);
   childless folders show no chevron and ignore toggles. Custom
   symbols (e.g. `"tag"`) still expand with children.
+- `icon_tint` tints one node icon (e.g. a file type color) and wins
+  over the group tint; `None` follows the group.
 - `expanded` snaps without animation and applies in any builder
   order (children added later still open the node).
 - `progress` is 0.0 closed, 1.0 open, between mid-tween; children
@@ -58,6 +61,7 @@ pub fn new(roots: Vec<OutlineNode>) -> Self
 pub fn selectable(self, selectable: bool) -> Self
 pub fn disabled(self, disabled: bool) -> Self
 pub fn icon_color(self, color: Color) -> Self
+pub fn trailing_chevron(self, trailing: bool) -> Self
 pub fn on_toggle(self, callback: impl FnMut(Vec<usize>, bool) + 'static) -> Self
 pub fn on_select(self, callback: impl FnMut(Vec<usize>) + 'static) -> Self
 pub fn selected_path(&self) -> Option<Vec<usize>>
@@ -82,8 +86,12 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
   not; `select` and `clear_selection` fire `on_select` on change
   (empty on clear). `expand_all` and `collapse_all` snap instantly
   without callbacks.
-- Icons tint with the theme accent unless `icon_color` wins;
-  unfocused windows desaturate like the palette.
+- Icons tint with the theme accent unless `icon_color` wins; a
+  node `icon_tint` wins over both; unfocused windows desaturate
+  like the palette.
+- `trailing_chevron` moves the chevron to the row end (same `>` to
+  `v` morph, same row-click toggle); the icon then starts at the
+  row start and long labels wrap before the chevron.
 - `measure` reports the content width with the animated height, so
   the group pages inside a `ScrollView` and rows below glide.
 

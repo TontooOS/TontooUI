@@ -63,6 +63,8 @@ impl OutlineIcon {
 pub struct OutlineNode {
     label: String,
     icon: OutlineIcon,
+    /// Per-node icon tint (`None` follows the group tint).
+    icon_tint: Option<Color>,
     children: Vec<OutlineNode>,
     expanded: bool,
     start_open: bool,
@@ -77,6 +79,7 @@ impl OutlineNode {
         Self {
             label: label.into(),
             icon: OutlineIcon::Folder,
+            icon_tint: None,
             children: Vec::new(),
             expanded: false,
             start_open: false,
@@ -91,6 +94,7 @@ impl OutlineNode {
         Self {
             label: label.into(),
             icon: OutlineIcon::File,
+            icon_tint: None,
             children: Vec::new(),
             expanded: false,
             start_open: false,
@@ -104,6 +108,13 @@ impl OutlineNode {
     /// still expand when the node has children.
     pub fn icon(mut self, name: impl Into<String>) -> Self {
         self.icon = OutlineIcon::Symbol(name.into());
+        self
+    }
+
+    /// Per-node icon tint (e.g. a file type color). `None` follows
+    /// the group tint.
+    pub fn icon_tint(mut self, color: Color) -> Self {
+        self.icon_tint = Some(color);
         self
     }
 
@@ -248,6 +259,9 @@ pub struct BasicOutlineGroup {
     accent: Color,
     icon_color: Color,
     icon_manual: bool,
+    /// Chevron on the trailing row edge instead of the leading slot
+    /// (same `>` to `v` morph; row clicks still toggle).
+    trailing_chevron: bool,
     dark: bool,
     focused: bool,
     disabled: bool,
@@ -270,6 +284,7 @@ impl BasicOutlineGroup {
             accent: OUTLINE_ACCENT,
             icon_color: OUTLINE_ACCENT,
             icon_manual: false,
+            trailing_chevron: false,
             dark: true,
             focused: true,
             disabled: false,
@@ -301,6 +316,13 @@ impl BasicOutlineGroup {
     pub fn icon_color(mut self, color: Color) -> Self {
         self.icon_color = color;
         self.icon_manual = true;
+        self
+    }
+
+    /// Chevron on the trailing row edge instead of the leading slot
+    /// (same `>` to `v` morph, same row-click toggle).
+    pub fn trailing_chevron(mut self, trailing: bool) -> Self {
+        self.trailing_chevron = trailing;
         self
     }
 
@@ -578,6 +600,7 @@ impl BasicOutlineGroup {
         Some(RowInfo {
             label: node.label.clone(),
             icon: node.icon.clone(),
+            icon_tint: node.icon_tint,
             progress: node.progress,
             has_children: node.has_children(),
             child_count: node.children.len(),
@@ -642,20 +665,29 @@ impl BasicOutlineGroup {
             scene.fill(Fill::NonZero, Affine::IDENTITY, &Brush::Solid(fill), None, &wash);
         }
         let indent_x = self.x + depth as f32 * OUTLINE_INDENT;
+        let chev_cx = if self.trailing_chevron {
+            self.x + self.width - OUTLINE_CHEV_SLOT / 2.0
+        } else {
+            indent_x + OUTLINE_CHEV_SLOT / 2.0
+        };
         if info.has_children {
             self.draw_chevron(
                 scene,
-                indent_x + OUTLINE_CHEV_SLOT / 2.0,
+                chev_cx,
                 y + OUTLINE_ROW_H / 2.0,
                 info.progress,
                 fonts.scale,
                 chevron,
             );
         }
-        let icon_x = indent_x + OUTLINE_CHEV_SLOT + 2.0;
+        let icon_x = if self.trailing_chevron {
+            indent_x + 2.0
+        } else {
+            indent_x + OUTLINE_CHEV_SLOT + 2.0
+        };
         let mut icon = SFSymbolImage::new(info.icon.symbol())
             .size(OUTLINE_ICON_SIZE)
-            .color(tint);
+            .color(info.icon_tint.unwrap_or(tint));
         icon.place(
             fonts,
             icon_x,
@@ -664,7 +696,12 @@ impl BasicOutlineGroup {
             OUTLINE_ICON_SIZE,
         );
         icon.draw(scene, fonts, images);
-        let layout = fonts.layout_text(&info.label, OUTLINE_LABEL_SIZE, text, None);
+        let label_wrap = if self.trailing_chevron {
+            Some((self.width - (icon_x - self.x) - OUTLINE_CHEV_SLOT).max(0.0))
+        } else {
+            None
+        };
+        let layout = fonts.layout_text(&info.label, OUTLINE_LABEL_SIZE, text, label_wrap);
         let (_, th) = FontSystem::layout_size(&layout);
         draw_layout(
             scene,
@@ -705,6 +742,7 @@ impl BasicOutlineGroup {
 struct RowInfo {
     label: String,
     icon: OutlineIcon,
+    icon_tint: Option<Color>,
     progress: f32,
     has_children: bool,
     child_count: usize,
@@ -932,5 +970,29 @@ mod tests {
         assert_eq!(group.selected_path(), Some(vec![0, 0]));
         group.mouse_down(100.0, 590.0);
         assert_eq!(group.selected_path(), Some(vec![0, 0]));
+    }
+
+    #[test]
+    fn node_icon_tint_roundtrips() {
+        let node = OutlineNode::file("a.rs")
+            .icon("rust")
+            .icon_tint(Color::WHITE);
+        assert!(node.icon_tint.is_some());
+        let plain = OutlineNode::file("b.rs");
+        assert_eq!(plain.icon_tint, None);
+    }
+
+    #[test]
+    fn trailing_chevron_defaults_off_and_toggles() {
+        let mut group = BasicOutlineGroup::new(vec![
+            OutlineNode::folder("D").child(OutlineNode::file("f")),
+        ])
+        .trailing_chevron(true);
+        group.place(&mut FontSystem::new(), 0.0, 0.0, 400.0, 600.0);
+        assert!(group.trailing_chevron);
+        // Row click still toggles (chevron side is visual only).
+        group.mouse_down(100.0, 10.0);
+        assert!(group.is_expanded(&[0]));
+        assert!(!BasicOutlineGroup::new(Vec::new()).trailing_chevron);
     }
 }
