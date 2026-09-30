@@ -264,7 +264,8 @@ corner shows the matching resize arrow; pressing and holding the left
 button there starts an OS resize drag instead of a content click.
 
 ```rust
-pub const RESIZE_HIT: f32;
+pub const RESIZE_INNER_HIT: f32;
+pub const RESIZE_OUTER_HIT: f32;
 pub const RESIZE_CORNER_HIT: f32;
 pub fn resize_direction_at(x: f32, y: f32, width: f32, height: f32) -> Option<ResizeDirection>
 ```
@@ -272,7 +273,13 @@ pub fn resize_direction_at(x: f32, y: f32, width: f32, height: f32) -> Option<Re
 - The hit zones sit on the visible body border (which is `MARGIN`
   inside the transparent window): corners are checked first with the
   wider `RESIZE_CORNER_HIT` band (currently `22.0` logical px), then
-  straight edges with `RESIZE_HIT` (currently `10.0` logical px).
+  straight edges.
+- The edge band is asymmetric: `RESIZE_INNER_HIT` (currently `3.0`
+  logical px) reaches into the content while `RESIZE_OUTER_HIT`
+  (currently `10.0` logical px) reaches into the shadow rim. The
+  narrow inner band keeps edge content usable: the overlay scrollbar
+  thumb (up to 10 px wide at the content edge) hovers and drags
+  without the resize zone stealing it.
 - `resize_direction_at` takes a logical pointer position plus the
   logical window size and returns the winit `ResizeDirection`, or
   `None` inside content, far outside the body, or when the window is

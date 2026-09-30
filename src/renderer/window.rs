@@ -29,11 +29,15 @@ pub const SCREEN_MARGIN: f32 = 48.0;
 /// screen, so tiny displays still yield a usable window.
 pub const MIN_WINDOW: u32 = 320;
 
-/// Grab width around the window body border in logical px. The window is
-/// transparent with a `MARGIN` shadow rim (see `frame.rs`); the visible body
-/// edge sits `MARGIN` inside the window, so the hit band extends to both
-/// sides of that edge for easy grabbing.
-pub const RESIZE_HIT: f32 = 10.0;
+/// Grab width reaching into the window body in logical px. Deliberately
+/// narrow so edge content stays usable: the overlay scrollbar thumb (up
+/// to 10 px wide at the content edge) must keep its hover and drag
+/// without the resize zone stealing it.
+pub const RESIZE_INNER_HIT: f32 = 3.0;
+/// Grab width reaching out of the window body into the transparent shadow
+/// rim (see `frame.rs`) in logical px. The wider outer band keeps the
+/// edge easy to grab even though the inner band is narrow.
+pub const RESIZE_OUTER_HIT: f32 = 10.0;
 /// Corner square half-size in logical px around each body corner. Corners
 /// are checked first with this wider band so diagonal resizing wins over
 /// the straight edges near the corners.
@@ -122,9 +126,11 @@ impl CursorKind {
 /// Resize zone at the given logical pointer position for a logical window
 /// size of `width` x `height`. Hits the visible body border (which sits
 /// `MARGIN` inside the transparent window, see `frame.rs`): corners first
-/// with the wider `RESIZE_CORNER_HIT` band, then straight edges with
-/// `RESIZE_HIT`. Returns `None` inside content, far outside the body, or
-/// when the window is too small to hold a body.
+/// with the wider `RESIZE_CORNER_HIT` band, then straight edges. The band
+/// is asymmetric (`RESIZE_INNER_HIT` into content, `RESIZE_OUTER_HIT`
+/// into the shadow rim) so edge content like the overlay scrollbar keeps
+/// working. Returns `None` inside content, far outside the body, or when
+/// the window is too small to hold a body.
 pub fn resize_direction_at(x: f32, y: f32, width: f32, height: f32) -> Option<ResizeDirection> {
     let margin = super::frame::MARGIN;
     let body_l = margin;
@@ -136,23 +142,33 @@ pub fn resize_direction_at(x: f32, y: f32, width: f32, height: f32) -> Option<Re
     }
     // Ignore presses far away from the body (deep content or far outside
     // the shadow rim).
-    if x < body_l - RESIZE_HIT
-        || x > body_r + RESIZE_HIT
-        || y < body_t - RESIZE_HIT
-        || y > body_b + RESIZE_HIT
+    if x < body_l - RESIZE_OUTER_HIT
+        || x > body_r + RESIZE_OUTER_HIT
+        || y < body_t - RESIZE_OUTER_HIT
+        || y > body_b + RESIZE_OUTER_HIT
     {
         return None;
     }
-    let near_left = (x - body_l).abs() <= RESIZE_CORNER_HIT;
-    let near_right = (x - body_r).abs() <= RESIZE_CORNER_HIT;
-    let near_top = (y - body_t).abs() <= RESIZE_CORNER_HIT;
-    let near_bottom = (y - body_b).abs() <= RESIZE_CORNER_HIT;
+    // Signed distance from each body edge (negative = inside content).
+    let dist_left = x - body_l;
+    let dist_right = body_r - x;
+    let dist_top = y - body_t;
+    let dist_bottom = body_b - y;
+    /// True when a signed edge distance sits inside the grab band
+    /// (negative = outside in the shadow rim, positive = inside content).
+    fn on_edge(dist: f32) -> bool {
+        dist >= -RESIZE_OUTER_HIT && dist <= RESIZE_INNER_HIT
+    }
+    let near_left = dist_left.abs() <= RESIZE_CORNER_HIT;
+    let near_right = dist_right.abs() <= RESIZE_CORNER_HIT;
+    let near_top = dist_top.abs() <= RESIZE_CORNER_HIT;
+    let near_bottom = dist_bottom.abs() <= RESIZE_CORNER_HIT;
     // Corners win: diagonal resize. Require the tight edge band on both
     // axes so the corner squares do not swallow long edge stretches.
-    let on_left = (x - body_l).abs() <= RESIZE_HIT;
-    let on_right = (x - body_r).abs() <= RESIZE_HIT;
-    let on_top = (y - body_t).abs() <= RESIZE_HIT;
-    let on_bottom = (y - body_b).abs() <= RESIZE_HIT;
+    let on_left = on_edge(dist_left);
+    let on_right = on_edge(dist_right);
+    let on_top = on_edge(dist_top);
+    let on_bottom = on_edge(dist_bottom);
     if near_left && near_top && (on_left || on_top) {
         return Some(ResizeDirection::NorthWest);
     }
@@ -899,6 +915,26 @@ mod tests {
     fn content_has_no_resize_zone() {
         assert_eq!(resize_direction_at(W / 2.0, H / 2.0, W, H), None);
         assert_eq!(resize_direction_at(200.0, 200.0, W, H), None);
+    }
+
+    #[test]
+    fn scrollbar_stays_usable() {
+        use ResizeDirection::*;
+        let margin = super::super::frame::MARGIN;
+        // Overlay scrollbar thumb (up to 10 px wide at the content edge):
+        // hovering it must not show a resize cursor or steal the press.
+        assert_eq!(resize_direction_at(W - margin - 8.0, H / 2.0, W, H), None);
+        assert_eq!(resize_direction_at(W - margin - 5.0, H / 2.0, W, H), None);
+        // The outermost content pixels still grab the edge.
+        assert_eq!(
+            resize_direction_at(W - margin - 2.0, H / 2.0, W, H),
+            Some(East)
+        );
+        // Outer shadow rim grabs too.
+        assert_eq!(
+            resize_direction_at(W - margin + 8.0, H / 2.0, W, H),
+            Some(East)
+        );
     }
 
     #[test]
