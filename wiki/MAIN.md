@@ -90,6 +90,10 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-29: Window corner radius is `17.0` logical px
+  (`WINDOW_CORNER_RADIUS`, was `20.0`), matching the GTK theme.
+  See [Renderer.md](Renderer.md).
+
 - 2026-09-29: `VideoPlayer` element (`elements/video/`). File/URL
   playback through MediaKit `frame_at` with transport controls
   (play/pause, stop, scrubber, time, mute, fullscreen) and

@@ -27,7 +27,7 @@ Window background color. Currently `#1B2022` (dark mode base).
 pub const WINDOW_CORNER_RADIUS: f32;
 ```
 
-Standard window corner radius in logical px. Currently `20.0`, following
+Standard window corner radius in logical px. Currently `17.0`, following
 the macOS 27 Golden Gate direction (one fixed radius, tighter than Tahoe).
 Windows are undecorated (`with_decorations(false)`); apps draw their own
 chrome, including rounded corners, traffic lights and title bars.

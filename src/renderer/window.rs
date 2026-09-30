@@ -31,8 +31,8 @@ pub const MIN_WINDOW: u32 = 320;
 
 /// Standard window corner radius in logical px. Follows the macOS 27 Golden
 /// Gate direction: one fixed radius for all windows, tighter than Tahoe.
-/// Physical pixels = value x window scale factor (20 pt is ~40 px at 2x).
-pub const WINDOW_CORNER_RADIUS: f32 = 20.0;
+/// Physical pixels = value x window scale factor (17 pt is ~34 px at 2x).
+pub const WINDOW_CORNER_RADIUS: f32 = 17.0;
 
 /// Non-printable keys forwarded to the app. The `Select*`, `Copy`,
 /// `Cut`, `Paste`, `Undo` and `Redo` variants arrive for Ctrl
