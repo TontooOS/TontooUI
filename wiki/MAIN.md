@@ -90,9 +90,10 @@ for the `View` tree.
 
 ## Changelog
 
-- 2026-09-29: `slider` example with a `UrlImage` photo background
-  (`ImageFit::Cover`, shell-clipped to the rounded window) and
-  three `BasicToolbar` rows (leading, center, trailing).
+- 2026-09-29: `slider` example with a vendored `FileImage` photo
+  background (`examples/assets/slider-bg.jpg`, `ImageFit::Cover`,
+  shell-clipped to the rounded window) and three `BasicToolbar`
+  rows (leading, center, trailing).
   See [Slider.md](Slider.md).
 
 - 2026-09-29: Window corner radius is `17.0` logical px

@@ -77,8 +77,9 @@ the knob keeps the solid frost tint only.
 Run `cargo run --example slider`: basic, stepped with ticks, labeled
 temperature, 1-5 rating with ticks, red/green/purple colors side by side,
 a glass slider and three `BasicToolbar` rows (leading, center,
-trailing) in a `VStack`, all over a `UrlImage` photo background
-(`ImageFit::Cover`, shell-clipped to the rounded window).
+trailing) in a `VStack`, all over a vendored `FileImage` photo
+background (`examples/assets/slider-bg.jpg`, `ImageFit::Cover`,
+shell-clipped to the rounded window).
 
 ```rust
 let mut temperature = Slider::new(50.0, 0.0, 100.0)

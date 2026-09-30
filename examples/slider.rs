@@ -1,6 +1,6 @@
 use tontooui::elements::{
-    BasicToolbar, HStack, ImageFit, Slider, Titlebar, ToolbarItem, ToolbarPlacement,
-    TrafficAction, UrlImage, View, VStack,
+    BasicToolbar, FileImage, HStack, ImageFit, Slider, Titlebar, ToolbarItem,
+    ToolbarPlacement, TrafficAction, View, VStack,
 };
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
@@ -9,9 +9,11 @@ use tontooui::theme::{ThemeMode, ThemeWatcher};
 use vello::Scene;
 use vello::peniko::Color;
 
-/// Window background photo, cover fit behind the sliders (the opaque
-/// body keeps the shell clip to the rounded window corners).
-const BG_PHOTO_URL: &str = "https://unsplash.com/photos/TdVKTu8pudE/download?force=true";
+/// Window background photo, vendored under `examples/assets` (the
+/// Unsplash source needs network; the file keeps the demo offline).
+/// Cover fit behind the sliders; the opaque body keeps the shell
+/// clip to the rounded window corners.
+const BG_PHOTO_FILE: &str = "slider-bg.jpg";
 
 struct SliderDemo {
     bar: Titlebar,
@@ -19,7 +21,7 @@ struct SliderDemo {
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
-    bg_image: UrlImage,
+    bg_image: FileImage,
     command: Option<WindowCommand>,
 }
 
@@ -86,7 +88,7 @@ impl SliderDemo {
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
-            bg_image: UrlImage::new(BG_PHOTO_URL, 900.0, 720.0)
+            bg_image: FileImage::new(bg_photo_path(), 900.0, 720.0)
                 .fit(ImageFit::Cover)
                 .radius(0.0),
             command: None,
@@ -240,4 +242,13 @@ fn main() {
         eprintln!("error: {err}");
         std::process::exit(1);
     }
+}
+
+/// Absolute path of the vendored background photo, resolved from
+/// the crate dir so the example runs from any working directory.
+fn bg_photo_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("examples")
+        .join("assets")
+        .join(BG_PHOTO_FILE)
 }
