@@ -12,7 +12,7 @@ use winit::dpi::LogicalSize;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
-use winit::window::{CursorIcon, Window, WindowAttributes};
+use winit::window::{CursorIcon, ResizeDirection, Window, WindowAttributes};
 
 use super::backdrop::BackdropBlur;
 use super::images::{ImageCache, ImageLoader};
@@ -29,6 +29,15 @@ pub const SCREEN_MARGIN: f32 = 48.0;
 /// screen, so tiny displays still yield a usable window.
 pub const MIN_WINDOW: u32 = 320;
 
+/// Grab width around the window body border in logical px. The window is
+/// transparent with a `MARGIN` shadow rim (see `frame.rs`); the visible body
+/// edge sits `MARGIN` inside the window, so the hit band extends to both
+/// sides of that edge for easy grabbing.
+pub const RESIZE_HIT: f32 = 10.0;
+/// Corner square half-size in logical px around each body corner. Corners
+/// are checked first with this wider band so diagonal resizing wins over
+/// the straight edges near the corners.
+pub const RESIZE_CORNER_HIT: f32 = 22.0;
 /// Standard window corner radius in logical px. Follows the macOS 27 Golden
 /// Gate direction: one fixed radius for all windows, tighter than Tahoe.
 /// Physical pixels = value x window scale factor (17 pt is ~34 px at 2x).
@@ -61,14 +70,115 @@ pub enum Key {
 }
 
 /// Pointer shape requested by content. The shell sets the winit
-/// cursor from `App::cursor` after every move; `Text` is the I-beam
-/// over editable text.
+/// cursor from `App::cursor` after every move, unless the pointer sits on
+/// a window resize zone (edges/corners take precedence); `Text` is the
+/// I-beam over editable text.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CursorKind {
     #[default]
     Default,
     Text,
     ResizeColumn,
+    ResizeNorth,
+    ResizeSouth,
+    ResizeEast,
+    ResizeWest,
+    ResizeNorthEast,
+    ResizeNorthWest,
+    ResizeSouthEast,
+    ResizeSouthWest,
+}
+
+impl From<ResizeDirection> for CursorKind {
+    fn from(direction: ResizeDirection) -> Self {
+        match direction {
+            ResizeDirection::North => CursorKind::ResizeNorth,
+            ResizeDirection::South => CursorKind::ResizeSouth,
+            ResizeDirection::East => CursorKind::ResizeEast,
+            ResizeDirection::West => CursorKind::ResizeWest,
+            ResizeDirection::NorthEast => CursorKind::ResizeNorthEast,
+            ResizeDirection::NorthWest => CursorKind::ResizeNorthWest,
+            ResizeDirection::SouthEast => CursorKind::ResizeSouthEast,
+            ResizeDirection::SouthWest => CursorKind::ResizeSouthWest,
+        }
+    }
+}
+
+impl CursorKind {
+    fn winit_cursor(self) -> CursorIcon {
+        match self {
+            CursorKind::Default => CursorIcon::Default,
+            CursorKind::Text => CursorIcon::Text,
+            CursorKind::ResizeColumn | CursorKind::ResizeEast | CursorKind::ResizeWest => {
+                CursorIcon::EwResize
+            }
+            CursorKind::ResizeNorth | CursorKind::ResizeSouth => CursorIcon::NsResize,
+            CursorKind::ResizeNorthEast | CursorKind::ResizeSouthWest => CursorIcon::NeswResize,
+            CursorKind::ResizeNorthWest | CursorKind::ResizeSouthEast => CursorIcon::NwseResize,
+        }
+    }
+}
+
+/// Resize zone at the given logical pointer position for a logical window
+/// size of `width` x `height`. Hits the visible body border (which sits
+/// `MARGIN` inside the transparent window, see `frame.rs`): corners first
+/// with the wider `RESIZE_CORNER_HIT` band, then straight edges with
+/// `RESIZE_HIT`. Returns `None` inside content, far outside the body, or
+/// when the window is too small to hold a body.
+pub fn resize_direction_at(x: f32, y: f32, width: f32, height: f32) -> Option<ResizeDirection> {
+    let margin = super::frame::MARGIN;
+    let body_l = margin;
+    let body_t = margin;
+    let body_r = width - margin;
+    let body_b = height - margin;
+    if body_r <= body_l || body_b <= body_t {
+        return None;
+    }
+    // Ignore presses far away from the body (deep content or far outside
+    // the shadow rim).
+    if x < body_l - RESIZE_HIT
+        || x > body_r + RESIZE_HIT
+        || y < body_t - RESIZE_HIT
+        || y > body_b + RESIZE_HIT
+    {
+        return None;
+    }
+    let near_left = (x - body_l).abs() <= RESIZE_CORNER_HIT;
+    let near_right = (x - body_r).abs() <= RESIZE_CORNER_HIT;
+    let near_top = (y - body_t).abs() <= RESIZE_CORNER_HIT;
+    let near_bottom = (y - body_b).abs() <= RESIZE_CORNER_HIT;
+    // Corners win: diagonal resize. Require the tight edge band on both
+    // axes so the corner squares do not swallow long edge stretches.
+    let on_left = (x - body_l).abs() <= RESIZE_HIT;
+    let on_right = (x - body_r).abs() <= RESIZE_HIT;
+    let on_top = (y - body_t).abs() <= RESIZE_HIT;
+    let on_bottom = (y - body_b).abs() <= RESIZE_HIT;
+    if near_left && near_top && (on_left || on_top) {
+        return Some(ResizeDirection::NorthWest);
+    }
+    if near_right && near_top && (on_right || on_top) {
+        return Some(ResizeDirection::NorthEast);
+    }
+    if near_left && near_bottom && (on_left || on_bottom) {
+        return Some(ResizeDirection::SouthWest);
+    }
+    if near_right && near_bottom && (on_right || on_bottom) {
+        return Some(ResizeDirection::SouthEast);
+    }
+    // Straight edges.
+    if on_left && y > body_t && y < body_b {
+        return Some(ResizeDirection::West);
+    }
+    if on_right && y > body_t && y < body_b {
+        return Some(ResizeDirection::East);
+    }
+    if on_top && x > body_l && x < body_r {
+        return Some(ResizeDirection::North);
+    }
+    if on_bottom && x > body_l && x < body_r {
+        return Some(ResizeDirection::South);
+    }
+    None
 }
 
 /// Touch contact phases forwarded to the app.
@@ -117,9 +227,11 @@ pub trait App {
     /// default ignores. Tables read it through `set_modifiers`.
     fn set_modifiers(&mut self, _ctrl: bool, _shift: bool) {}
     /// Pointer shape at the given logical position. Called after
-    /// every pointer move; default is the arrow. Text fields return
-    /// `Text` while hovered so the cursor turns into an I-beam;
-    /// the sidebar returns `ResizeColumn` over its resize edge.
+    /// every pointer move when the pointer is not on a window resize
+    /// zone (edges/corners take precedence and show resize arrows);
+    /// default is the arrow. Text fields return `Text` while hovered
+    /// so the cursor turns into an I-beam; the sidebar returns
+    /// `ResizeColumn` over its resize edge.
     fn cursor(&self, _x: f64, _y: f64) -> CursorKind {
         CursorKind::Default
     }
@@ -470,6 +582,8 @@ impl<V: App> ApplicationHandler for Shell<V> {
                         .with_title(&self.title)
                         .with_decorations(false)
                         .with_transparent(true)
+                        .with_resizable(true)
+                        .with_min_inner_size(LogicalSize::new(MIN_WINDOW, MIN_WINDOW))
                         .with_inner_size(LogicalSize::new(width, height)),
                 )
                 .expect("create window"),
@@ -562,14 +676,22 @@ impl<V: App> ApplicationHandler for Shell<V> {
                 let x = position.x / scale;
                 let y = position.y / scale;
                 self.app.mouse_move(x, y);
-                let cursor = self.app.cursor(x, y);
+                // Window resize zones win over content cursors: hovering a
+                // body edge or corner shows the matching resize arrow.
+                // Maximized windows cannot resize, keep the app cursor.
+                let size = active.window.inner_size();
+                let cursor = if active.window.is_maximized() {
+                    self.app.cursor(x, y)
+                } else {
+                    let (w, h) = (size.width as f64 / scale, size.height as f64 / scale);
+                    match resize_direction_at(x as f32, y as f32, w as f32, h as f32) {
+                        Some(direction) => CursorKind::from(direction),
+                        None => self.app.cursor(x, y),
+                    }
+                };
                 if cursor != active.last_cursor {
                     active.last_cursor = cursor;
-                    active.window.set_cursor(match cursor {
-                        CursorKind::Default => CursorIcon::Default,
-                        CursorKind::Text => CursorIcon::Text,
-                        CursorKind::ResizeColumn => CursorIcon::EwResize,
-                    });
+                    active.window.set_cursor(cursor.winit_cursor());
                 }
             }
             WindowEvent::Focused(focused) => {
@@ -582,6 +704,21 @@ impl<V: App> ApplicationHandler for Shell<V> {
                 let y = (active.cursor_pos.1 / scale) as f32;
                 match (button, state) {
                     (MouseButton::Left, ElementState::Pressed) => {
+                        // Edge/corner press starts an OS resize drag instead
+                        // of a content click (maximized windows excepted).
+                        if !active.window.is_maximized() {
+                            let size = active.window.inner_size();
+                            let (w, h) = (
+                                size.width as f64 / scale,
+                                size.height as f64 / scale,
+                            );
+                            if let Some(direction) =
+                                resize_direction_at(x, y, w as f32, h as f32)
+                            {
+                                let _ = active.window.drag_resize_window(direction);
+                                return;
+                            }
+                        }
                         if let Some((rx, ry, rw, rh)) = self.app.drag_region() {
                             if x >= rx && x <= rx + rw && y >= ry && y <= ry + rh {
                                 // Titlebar drag: moving keeps focus, no click.
@@ -707,5 +844,76 @@ impl<V: App> ApplicationHandler for Shell<V> {
         if let Some(active) = self.active.as_ref() {
             active.window.request_redraw();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const W: f32 = 800.0;
+    const H: f32 = 600.0;
+
+    #[test]
+    fn corners_resize_diagonally() {
+        use ResizeDirection::*;
+        let margin = super::super::frame::MARGIN;
+        assert_eq!(resize_direction_at(margin, margin, W, H), Some(NorthWest));
+        assert_eq!(
+            resize_direction_at(W - margin, margin, W, H),
+            Some(NorthEast)
+        );
+        assert_eq!(
+            resize_direction_at(margin, H - margin, W, H),
+            Some(SouthWest)
+        );
+        assert_eq!(
+            resize_direction_at(W - margin, H - margin, W, H),
+            Some(SouthEast)
+        );
+    }
+
+    #[test]
+    fn edges_resize_straight() {
+        use ResizeDirection::*;
+        let margin = super::super::frame::MARGIN;
+        assert_eq!(
+            resize_direction_at(margin, H / 2.0, W, H),
+            Some(West)
+        );
+        assert_eq!(
+            resize_direction_at(W - margin, H / 2.0, W, H),
+            Some(East)
+        );
+        assert_eq!(
+            resize_direction_at(W / 2.0, margin, W, H),
+            Some(North)
+        );
+        assert_eq!(
+            resize_direction_at(W / 2.0, H - margin, W, H),
+            Some(South)
+        );
+    }
+
+    #[test]
+    fn content_has_no_resize_zone() {
+        assert_eq!(resize_direction_at(W / 2.0, H / 2.0, W, H), None);
+        assert_eq!(resize_direction_at(200.0, 200.0, W, H), None);
+    }
+
+    #[test]
+    fn resize_cursor_mapping() {
+        use ResizeDirection::*;
+        assert_eq!(CursorKind::from(SouthEast), CursorKind::ResizeSouthEast);
+        assert_eq!(
+            CursorKind::from(SouthEast).winit_cursor(),
+            CursorIcon::NwseResize
+        );
+        assert_eq!(
+            CursorKind::from(NorthEast).winit_cursor(),
+            CursorIcon::NeswResize
+        );
+        assert_eq!(CursorKind::from(North).winit_cursor(), CursorIcon::NsResize);
+        assert_eq!(CursorKind::from(East).winit_cursor(), CursorIcon::EwResize);
     }
 }

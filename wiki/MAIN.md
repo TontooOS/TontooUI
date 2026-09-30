@@ -90,6 +90,13 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-09-30: Window resizing for undecorated windows. Hovering a
+  body edge or corner shows the matching resize arrow and a left
+  press starts an OS resize drag (`resize_direction_at`,
+  `RESIZE_HIT`, `RESIZE_CORNER_HIT`, eight `CursorKind::Resize*`
+  variants); maximized windows keep the app cursor.
+  See [Renderer.md](Renderer.md).
+
 - 2026-09-29: `slider` example with a vendored `FileImage` photo
   background (`examples/assets/slider-bg.jpg`, `ImageFit::Cover`,
   shell-clipped to the rounded window) and three `BasicToolbar`

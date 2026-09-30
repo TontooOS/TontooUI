@@ -162,6 +162,14 @@ pub enum CursorKind {
     Default,
     Text,
     ResizeColumn,
+    ResizeNorth,
+    ResizeSouth,
+    ResizeEast,
+    ResizeWest,
+    ResizeNorthEast,
+    ResizeNorthWest,
+    ResizeSouthEast,
+    ResizeSouthWest,
 }
 ```
 
@@ -198,7 +206,8 @@ Ctrl+Shift+Z) arrive as `SelectAll`, `Copy`, `Cut`, `Paste`,
 `Undo` and `Redo`, and Shift+arrows as `SelectLeft`, `SelectRight`,
 `SelectUp` and `SelectDown` (see [Textfield.md](Textfield.md)).
 The shell queries `cursor` after every pointer move and sets the
-winit cursor (`Text` is the I-beam over editable text). Wheel
+winit cursor (`Text` is the I-beam over editable text). Window resize
+zones take precedence over the app cursor (see Window Resizing). Wheel
 scrolling arrives via `mouse_wheel` in logical px (right/down
 positive, line steps normalized to 20 px). Right-button presses
 arrive via `context_click` (context menus); touch contacts arrive
@@ -246,6 +255,36 @@ Surface errors are handled per frame:
 
 `Resized` events with non-zero dimensions call
 `RenderContext::resize_surface`. Zero-size events are ignored.
+
+## Window Resizing
+
+Windows are undecorated, so the shell implements resizing itself via
+`winit::Window::drag_resize_window`. Hovering a window body edge or
+corner shows the matching resize arrow; pressing and holding the left
+button there starts an OS resize drag instead of a content click.
+
+```rust
+pub const RESIZE_HIT: f32;
+pub const RESIZE_CORNER_HIT: f32;
+pub fn resize_direction_at(x: f32, y: f32, width: f32, height: f32) -> Option<ResizeDirection>
+```
+
+- The hit zones sit on the visible body border (which is `MARGIN`
+  inside the transparent window): corners are checked first with the
+  wider `RESIZE_CORNER_HIT` band (currently `22.0` logical px), then
+  straight edges with `RESIZE_HIT` (currently `10.0` logical px).
+- `resize_direction_at` takes a logical pointer position plus the
+  logical window size and returns the winit `ResizeDirection`, or
+  `None` inside content, far outside the body, or when the window is
+  too small to hold a body.
+- Each `ResizeDirection` maps to a `CursorKind::Resize*` variant
+  (`North`, `South`, `East`, `West`, `NorthEast`, `NorthWest`,
+  `SouthEast`, `SouthWest`), rendered as the matching winit resize
+  cursor (`NsResize`, `EwResize`, `NeswResize`, `NwseResize`).
+- Maximized windows never resize: hover keeps the app cursor and
+  presses fall through to content.
+- Windows are created `resizable` with a `MIN_WINDOW` minimum inner
+  size; the screen-clamped maximum inner size still applies.
 
 ## Backdrop Blur
 
