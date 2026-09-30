@@ -1,4 +1,7 @@
-use tontooui::elements::{HStack, Slider, Titlebar, TrafficAction, View, VStack};
+use tontooui::elements::{
+    BasicToolbar, HStack, ImageFit, Slider, Titlebar, ToolbarItem, ToolbarPlacement,
+    TrafficAction, UrlImage, View, VStack,
+};
 use tontooui::renderer::FontSystem;
 use tontooui::renderer::ImageLoader;
 use tontooui::renderer::window::{App, Viewport, WindowCommand, run};
@@ -6,14 +9,18 @@ use tontooui::theme::{ThemeMode, ThemeWatcher};
 use vello::Scene;
 use vello::peniko::Color;
 
+/// Window background photo, cover fit behind the sliders (the opaque
+/// body keeps the shell clip to the rounded window corners).
+const BG_PHOTO_URL: &str = "https://unsplash.com/photos/TdVKTu8pudE/download?force=true";
+
 struct SliderDemo {
     bar: Titlebar,
     stack: VStack,
     watcher: ThemeWatcher,
     focused: bool,
     bg: Color,
+    bg_image: UrlImage,
     command: Option<WindowCommand>,
-    dragging: bool,
 }
 
 impl SliderDemo {
@@ -52,6 +59,26 @@ impl SliderDemo {
                 Slider::new(0.6, 0.0, 1.0)
                     .glass(true)
                     .value_text(|v| format!("Glass: {:.0}%", v * 100.0)),
+            )
+            .child(
+                BasicToolbar::from_items(vec![
+                    ToolbarItem::icon("chevron.left"),
+                    ToolbarItem::divider(),
+                    ToolbarItem::icon("chevron.right"),
+                ])
+                .placement(ToolbarPlacement::Leading),
+            )
+            .child(
+                BasicToolbar::from_icons(vec!["heart".to_string()])
+                    .placement(ToolbarPlacement::Center),
+            )
+            .child(
+                BasicToolbar::from_icons(vec![
+                    "xmark".to_string(),
+                    "star".to_string(),
+                    "checkmark".to_string(),
+                ])
+                .placement(ToolbarPlacement::Trailing),
             );
         Self {
             bar: Titlebar::new("Slider"),
@@ -59,8 +86,19 @@ impl SliderDemo {
             watcher: ThemeWatcher::new(),
             focused: true,
             bg: tontooui::renderer::window::BACKGROUND,
+            bg_image: UrlImage::new(BG_PHOTO_URL, 900.0, 720.0)
+                .fit(ImageFit::Cover)
+                .radius(0.0),
             command: None,
-            dragging: false,
+        }
+    }
+
+    fn each_toolbar(&mut self, mut f: impl FnMut(&mut BasicToolbar)) {
+        // Toolbars sit after the sliders/HStack row: probe by type.
+        for index in 0..32 {
+            if let Some(bar) = self.stack.child_mut::<BasicToolbar>(index) {
+                f(bar);
+            }
         }
     }
 
@@ -107,6 +145,10 @@ impl App for SliderDemo {
             slider.set_theme(palette.accent, dark, theme.glass);
             slider.set_focused(focused);
         });
+        self.each_toolbar(|bar| {
+            bar.set_theme(theme.mode, theme.glass);
+            bar.set_focused(focused);
+        });
 
         self.bar.set_palette(
             palette.titlebar_bg,
@@ -115,6 +157,19 @@ impl App for SliderDemo {
         );
         self.bar.set_rect(viewport.x, viewport.y, viewport.width);
         self.bar.draw(scene, fonts);
+
+        // Photo background behind everything (cover fit over the
+        // full viewport; the opaque body keeps the shell clip to
+        // the rounded window corners).
+        self.bg_image.set_theme(dark);
+        self.bg_image.place(
+            fonts,
+            viewport.x,
+            viewport.y,
+            viewport.width,
+            viewport.height,
+        );
+        self.bg_image.draw(scene, fonts, images);
 
         let top = viewport.y + 31.0;
         self.stack.place(
@@ -140,7 +195,8 @@ impl App for SliderDemo {
     }
 
     fn wants_backdrop(&self) -> bool {
-        self.dragging
+        // Glass slider knobs and Lens toolbars need the blur pass.
+        true
     }
 
     fn mouse_down(&mut self, x: f64, y: f64) {
@@ -151,40 +207,31 @@ impl App for SliderDemo {
                 self.command = Some(WindowCommand::ToggleMaximize)
             }
             None => {
-                let mut dragging = false;
                 self.each_slider(|slider| {
                     slider.mouse_down(x, y);
-                    if slider.is_dragging() {
-                        dragging = true;
-                    }
                 });
-                self.dragging = dragging;
+                self.each_toolbar(|bar| bar.mouse_down(x, y));
             }
         }
     }
 
     fn mouse_move(&mut self, x: f64, y: f64) {
         self.bar.set_hover(x as f32, y as f32);
-        let mut dragging = false;
         self.each_slider(|slider| {
             slider.mouse_move(x, y);
-            if slider.is_dragging() {
-                dragging = true;
-            }
         });
-        if dragging {
-            self.dragging = true;
-        }
+        self.each_toolbar(|bar| bar.mouse_move(x as f32, y as f32));
     }
 
     fn mouse_up(&mut self, x: f64, y: f64) {
         self.each_slider(|slider| slider.mouse_up(x, y));
-        self.dragging = false;
+        self.each_toolbar(|bar| bar.mouse_up(x, y));
     }
 
     fn set_focused(&mut self, focused: bool) {
         self.focused = focused;
         self.bar.set_focused(focused);
+        self.bg_image.set_focused(focused);
     }
 }
 
