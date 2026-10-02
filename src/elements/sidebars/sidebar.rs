@@ -138,6 +138,7 @@ pub struct Sidebar {
     selected: usize,
     on_select: Option<Box<dyn FnMut(usize)>>,
     title: Option<String>,
+    show_toolbar: bool,
     collapsed: bool,
     on_collapse: Option<Box<dyn FnMut(bool)>>,
     collapse_anim: Option<TweenAnim<f32>>,
@@ -188,6 +189,7 @@ impl Sidebar {
             selected: 0,
             on_select: None,
             title: None,
+            show_toolbar: true,
             show_toggle: true,
             collapsible: true,
             collapsed: false,
@@ -534,10 +536,30 @@ impl Sidebar {
         self
     }
 
-    /// Fixed toolbar title (follows the selected item label when
+    /// Content toolbar title (follows the selected item label when
     /// never set).
     pub fn set_title(&mut self, title: impl Into<String>) {
         self.title = Some(title.into());
+    }
+
+    /// Content title band above the page (default `true`). Hidden, no
+    /// title is drawn and the page starts at the very top of the
+    /// content area. Use it for apps that paint their own header into
+    /// the page. Only the title goes: the pill row keeps the traffic
+    /// row as its line, moves to the far right of the window once the
+    /// column collapses and floats on top of the page.
+    pub fn toolbar(mut self, show: bool) -> Self {
+        self.set_toolbar(show);
+        self
+    }
+
+    pub fn set_toolbar(&mut self, show: bool) {
+        self.show_toolbar = show;
+    }
+
+    /// True while the content title band is drawn.
+    pub fn has_toolbar(&self) -> bool {
+        self.show_toolbar
     }
 
     pub fn clear_title(&mut self) {
@@ -895,7 +917,9 @@ impl Sidebar {
     }
 
     fn toolbar_cy_for(&self, collapsed: bool) -> f32 {
-        if collapsed {
+        // Hidden title band: the pills stay on the traffic row even while
+        // collapsed, so they never need a title band to sit in.
+        if collapsed && self.show_toolbar {
             self.y + (SIDEBAR_TOOLBAR_H - TOOLBAR_HEIGHT) / 2.0
         } else {
             self.y + SIDEBAR_BAR_TOP
@@ -950,6 +974,9 @@ impl Sidebar {
     /// hit-testing).
     fn place_bars_for(&mut self, fonts: &mut FontSystem, collapsed: bool) {
         let cy = self.toolbar_cy_for(collapsed);
+        // Horizontal anchor only depends on the collapse state: hidden
+        // title band or not, a collapsed column has no width left, so
+        // the group parks at the far right of the window.
         if collapsed {
             // Far-right group in the content: left pill, gap, toggle.
             if self.right_bar_w() > 0.0 {
@@ -1088,11 +1115,16 @@ impl Sidebar {
 
     fn page_rect(&self) -> (f32, f32, f32, f32) {
         let cx = self.content_x();
+        let top = if self.show_toolbar {
+            self.y + SIDEBAR_TOOLBAR_H
+        } else {
+            self.y
+        };
         (
             cx,
-            self.y + SIDEBAR_TOOLBAR_H,
+            top,
             (self.x + self.width - cx).max(0.0),
-            (self.height - SIDEBAR_TOOLBAR_H).max(0.0),
+            (self.y + self.height - top).max(0.0),
         )
     }
 
@@ -1146,7 +1178,13 @@ impl Sidebar {
         // Traffic on top of everything (sidebar top when expanded,
         // content top-left when collapsed).
         self.render_traffic(scene, fonts);
-        self.render_toolbar(scene, fonts, images, p, cross);
+        // Without the content title band the page starts at the very
+        // top and would paint over the pill row, so the row moves
+        // behind it: the pills float on the page (full-bleed apps).
+        let overlay = !self.show_toolbar;
+        if !overlay {
+            self.render_toolbar(scene, fonts, images, p, cross);
+        }
         // Active page below the toolbar.
         let (px0, py0, pw, ph) = self.page_rect();
         if pw > 0.0 && ph > 0.0 {
@@ -1154,6 +1192,9 @@ impl Sidebar {
                 page.place(fonts, px0, py0, pw, ph);
                 page.draw(scene, fonts, images);
             }
+        }
+        if overlay {
+            self.render_toolbar(scene, fonts, images, p, cross);
         }
     }
 
@@ -1289,16 +1330,18 @@ impl Sidebar {
         // Pending pill actions apply here too (clicks handled
         // between frames still land before the next paint).
         self.drain_pending();
-        let title = self.effective_title();
-        let layout = fonts.layout_text_weighted(&title, SIDEBAR_TITLE_SIZE, self.eff(self.text_color()), 600.0, None);
-        let (_, th) = FontSystem::layout_size(&layout);
-        draw_layout(
-            scene,
-            &layout,
-            self.title_x(p),
-            self.y + (SIDEBAR_TOOLBAR_H - th / fonts.scale) / 2.0,
-            fonts.scale,
-        );
+        if self.show_toolbar {
+            let title = self.effective_title();
+            let layout = fonts.layout_text_weighted(&title, SIDEBAR_TITLE_SIZE, self.eff(self.text_color()), 600.0, None);
+            let (_, th) = FontSystem::layout_size(&layout);
+            draw_layout(
+                scene,
+                &layout,
+                self.title_x(p),
+                self.y + (SIDEBAR_TOOLBAR_H - th / fonts.scale) / 2.0,
+                fonts.scale,
+            );
+        }
         if cross && !images.is_capture_pass() {
             // Crossfade mid-flight: expanded pills out, collapsed
             // pills in, then restore the target layout so hit cells
@@ -1455,6 +1498,83 @@ mod tests {
         let mut bar = bar();
         bar.mouse_down(100.0, (SIDEBAR_ITEMS_TOP + SIDEBAR_ROW_H + 10.0) as f64);
         assert_eq!(bar.selected_index(), 1);
+    }
+
+    #[test]
+    fn hidden_toolbar_lets_the_page_fill_the_height() {
+        let mut bar = bar();
+        assert!(bar.has_toolbar());
+        let (x, _, w, h) = bar.page_rect();
+        assert_eq!((x, w), (SIDEBAR_W, 900.0 - SIDEBAR_W));
+        assert_eq!(h, 600.0 - SIDEBAR_TOOLBAR_H);
+
+        bar.set_toolbar(false);
+        assert!(!bar.has_toolbar());
+        let (x, y, w, h) = bar.page_rect();
+        assert_eq!((x, y, w, h), (SIDEBAR_W, 0.0, 900.0 - SIDEBAR_W, 600.0));
+    }
+
+    #[test]
+    fn hidden_toolbar_keeps_the_pills_in_the_traffic_row() {
+        // Without a title band the collapse pill must not drop into the
+        // (absent) content title row when the column collapses.
+        let mut bar = bar().collapsible(true);
+        bar.set_toolbar(false);
+        bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
+        bar.set_collapsed(true);
+        assert!(bar.is_collapsed());
+        bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
+        // The toggle pill keeps its traffic-row center in both states.
+        assert_eq!(bar.toolbar_cy_for(true), bar.toolbar_cy_for(false));
+        assert_eq!(bar.toolbar_cy_for(false), SIDEBAR_BAR_TOP);
+    }
+
+    /// Regression: the hidden title band left no room in the sidebar,
+    /// so the collapsed group used the expanded x formula and parked
+    /// the toggle at a negative x (off screen) with the slot pill on
+    /// the traffic cluster. Both must sit at the far right of the
+    /// window, on the traffic row, and stay clickable.
+    #[test]
+    fn hidden_toolbar_parks_the_collapsed_group_far_right() {
+        use std::cell::Cell;
+        use std::rc::Rc;
+
+        let fired: Rc<Cell<bool>> = Rc::new(Cell::new(false));
+        let flag = fired.clone();
+        let mut bar = Sidebar::new(vec![SidebarItem::new("Solo", "gear")])
+            .left_button(0, "plus", move || flag.set(true));
+        bar.set_toolbar(false);
+        bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
+        bar.set_collapsed(true);
+        bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
+
+        // Traffic lights stay far left; the pill row shares their line.
+        assert_eq!(
+            bar.traffic_center(0).0,
+            TRAFFIC_LEFT + TRAFFIC_SIZE / 2.0
+        );
+        let cy = (SIDEBAR_BAR_TOP + TOOLBAR_HEIGHT / 2.0) as f64;
+        let right_x = 900.0 - SIDEBAR_PAD - TOOLBAR_HEIGHT;
+
+        // Slot pill sits left of the toggle, in the same row and past
+        // the traffic cluster.
+        let left_x = right_x - TOOLBAR_GAP - bar.left_bar_w();
+        let plus_x = (left_x + TOOLBAR_PAD_X + TOOLBAR_HIT / 2.0) as f64;
+        assert!(plus_x > bar.traffic_center(2).0 as f64, "slot pill on the lights");
+        bar.mouse_down(plus_x, cy);
+        bar.mouse_up(plus_x, cy);
+        assert!(fired.get(), "collapsed slot pill click did not fire");
+
+        // Toggle reopens the column (rebuilt bars land on the next
+        // place, exactly like the next frame in the shell).
+        let toggle_x = (right_x + TOOLBAR_HEIGHT / 2.0) as f64;
+        assert!(
+            (right_x..right_x + TOOLBAR_HEIGHT).contains(&(toggle_x as f32)),
+            "toggle outside the window"
+        );
+        bar.mouse_down(toggle_x, cy);
+        bar.mouse_up(toggle_x, cy);
+        assert!(!bar.is_collapsed(), "collapsed toggle click did not reopen");
     }
 
     #[test]

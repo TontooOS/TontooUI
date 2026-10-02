@@ -92,6 +92,22 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-10-02: Two backdrop fixes plus an optional content title band.
+  `readback_variance` no longer leaks a mapped buffer: the
+  variance staging buffer is taken out of `VarTargets` for the
+  whole map, so a failed or late `map_async` cannot leave it
+  mapped and trip wgpu's `Queue::submit` validation (Buffer ...
+  is still mapped) on the next frame; `release_map` unmaps and
+  hands it back once the callback lands. `Sidebar::toolbar(false)` (
+  `set_toolbar` / `has_toolbar`) hides the `SIDEBAR_TOOLBAR_H`r
+  content title band so the page starts at the top. The pill group
+  keeps its own layout: a collapsed column still parks the slot pill
+  plus toggle at the far right of the window on the traffic row, and
+  the row is painted after the page so it floats on a full-bleed
+  background instead of disappearing under it. See
+  [BackdropStream.md](BackdropStream.md), [Sidebar.md](Sidebar.md) and
+  [Renderer.md](Renderer.md).
+
 - 2026-10-02: Protocol level input and a live window title in the
   shell. `App::raw_key` delivers every key transition as a `KeyPress`
   (`RawKey` identity plus the full `Modifiers` state, decoded text

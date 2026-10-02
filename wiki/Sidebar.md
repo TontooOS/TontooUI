@@ -10,7 +10,10 @@ right-side page, which the sidebar owns. Expanded, the slot pill
 sits top right after the traffic lights and the toggle at the far
 right edge with the title left in the content; collapsed, both
 show far right in the content and the title moves next to the
-traffic lights.
+traffic lights. A hidden title band (`toolbar(false)`) drops only
+the title and its band: the pills keep the traffic row as their
+line, still park at the far right of the window when the column
+collapses and float on top of the page instead of under it.
 
 ## Geometry
 
@@ -84,6 +87,9 @@ pub fn on_select(self, callback: impl FnMut(usize) + 'static) -> Self
 pub fn on_collapse(self, callback: impl FnMut(bool) + 'static) -> Self
 pub fn set_title(&mut self, title: impl Into<String>)
 pub fn clear_title(&mut self)
+pub fn toolbar(self, show: bool) -> Self
+pub fn set_toolbar(&mut self, show: bool)
+pub fn has_toolbar(&self) -> bool
 pub fn selected_index(&self) -> usize
 pub fn select(&mut self, index: usize) -> bool
 pub fn is_collapsed(&self) -> bool
@@ -116,6 +122,19 @@ pub fn page_key(&mut self, key: Key) -> bool
 - Pages match items by order; missing pages stay empty. The
   toolbar title follows the selected label until `set_title`
   overrides it (`clear_title` restores the follow mode).
+- `toolbar(false)` drops the whole `SIDEBAR_TOOLBAR_H` content band:
+  no title is drawn and the page starts at the top of the content
+  area. Use it for apps that paint their own header into the page
+  (Weather draws the city name into the detail gradient). Only the
+  title band goes, never the pill placement: with no sidebar width
+  left, a collapsed column still anchors the pill group at the far
+  right of the window (`x + width - SIDEBAR_PAD`), vertically on the
+  traffic row (`SIDEBAR_BAR_TOP`) instead of the title band center.
+  Because the page then fills the whole content area, the pill row
+  is painted **after** the page and floats on it (glass pills over
+  the app background); the traffic lights stay far left on the same
+  line, matching the collapsed layout of a sidebar with the title
+  band.
 - The toolbar holds two `BasicToolbar` pills (see
   [Toolbar.md](Toolbar.md)), both fixed at the top: the left pill
   holds two optional slots (slot 0 first, slot 1 second; each set
