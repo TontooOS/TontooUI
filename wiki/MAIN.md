@@ -92,6 +92,17 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-10-02: Protocol level input and a live window title in the
+  shell. `App::raw_key` delivers every key transition as a `KeyPress`
+  (`RawKey` identity plus the full `Modifiers` state, decoded text
+  and repeat flag) before the intent hooks `key` / `text` keep
+  running; `App::mouse_button` reports every button, including
+  middle, on press and release with its modifiers; `App::window_title`
+  sets the real window title once per frame. Added for the Terminal
+  app, which needs Tab, F-keys, Ctrl chords, Alt as an escape prefix
+  and mouse reports. See [Renderer.md](Renderer.md).
+
+
 - 2026-10-02: `BasicText` gained `size(px)` / `weight(w)` plus
   `clear_size` / `clear_weight`, the `set_size(Option<f32>)` /
   `set_weight(Option<f32>)` setters and the `size_value` /

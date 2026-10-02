@@ -97,14 +97,30 @@ pub trait App {
     );
     fn mouse_down(&mut self, _x: f64, _y: f64) {}
     fn mouse_move(&mut self, _x: f64, _y: f64) {}
+    fn mouse_up(&mut self, _x: f64, _y: f64) {}
     fn set_modifiers(&mut self, _ctrl: bool, _shift: bool) {}
     fn cursor(&self, _x: f64, _y: f64) -> CursorKind {
         CursorKind::Default
     }
     fn mouse_wheel(&mut self, _dx: f64, _dy: f64) {}
+    fn context_click(&mut self, _x: f64, _y: f64) {}
+    fn touch(&mut self, _phase: TouchPhase, _x: f64, _y: f64) {}
     fn set_focused(&mut self, _focused: bool) {}
     fn text(&mut self, _text: &str) {}
     fn key(&mut self, _key: Key) {}
+    fn raw_key(&mut self, _press: &KeyPress) {}
+    fn mouse_button(
+        &mut self,
+        _button: MouseButtonKind,
+        _pressed: bool,
+        _x: f64,
+        _y: f64,
+        _modifiers: Modifiers,
+    ) {
+    }
+    fn window_title(&self) -> Option<&str> {
+        None
+    }
     fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
         None
     }
@@ -122,6 +138,111 @@ pub trait App {
     }
 }
 ```
+
+```rust
+pub struct Modifiers {
+    pub shift: bool,
+    pub ctrl: bool,
+    pub alt: bool,
+    /// Command / Windows key (`super` is a Rust keyword).
+    pub super_key: bool,
+}
+```
+
+Full modifier state. `Modifiers::any` is true while any key is held.
+The shell keeps the snapshot current from `ModifiersChanged` and hands
+it to every `raw_key` and `mouse_button` event, so an app speaking a
+protocol never has to cache transitions itself. `App::set_modifiers`
+still receives the two booleans text fields care about.
+
+```rust
+pub enum RawKey {
+    Character(char),
+    Tab,
+    BackTab,
+    Enter,
+    KeypadEnter,
+    Escape,
+    Backspace,
+    Delete,
+    Insert,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    Left,
+    Right,
+    Up,
+    Down,
+    Function(u8),
+    KeypadDigit(u8),
+    KeypadDot,
+    KeypadPlus,
+    KeypadMinus,
+    KeypadStar,
+    KeypadSlash,
+    ContextMenu,
+    NumLock,
+    CapsLock,
+    ScrollLock,
+    Pause,
+}
+```
+
+Key identity for `raw_key`, mapped from the physical key so the same
+key reports the same value on every layout:
+
+- `Character` carries the produced character, already shifted (`A` is
+  upper case). With Ctrl or Alt held the character is the unshifted
+  base, because the platform then produces no text: `Ctrl+C` arrives as
+  `Character('c')`.
+- `Function` is 1 to 12. A key with no identity above reports no event.
+- `KeypadDigit` is 0 to 9; the numeric keypad keeps its own variants
+  because application keypad mode encodes them differently.
+
+```rust
+pub struct KeyPress {
+    pub key: RawKey,
+    pub modifiers: Modifiers,
+    /// Decoded text for printable input, `None` for control keys.
+    pub text: Option<String>,
+    pub pressed: bool,
+    /// True for auto-repeat while the key is held down.
+    pub repeat: bool,
+}
+```
+
+`raw_key` receives every key transition, including releases and Ctrl
+chords, and runs *before* the intent hooks `key` and `text` (which keep
+firing so existing apps are unaffected). It exists for protocol level
+input: a terminal needs Tab, F1 to F12, Home/End, PageUp/PageDown,
+Insert/Delete, Ctrl+letter and Alt as an escape prefix, none of which
+`App::key` carries.
+
+```rust
+pub enum MouseButtonKind {
+    Left,
+    Middle,
+    Right,
+    Other(u16),
+}
+```
+
+`mouse_button` fires for every button (including middle and right) on
+press *and* release, next to `mouse_down` / `mouse_up` /
+`context_click`. A press claimed by the window itself reports nothing:
+edge and corner resizes and title bar drags return before the app is
+called, so content never sees a window drag. `Other` carries the extra
+buttons (`Back` is 3, `Forward` is 4).
+
+```rust
+fn window_title(&self) -> Option<&str>
+```
+
+Live title for the real window, read once per frame. `Some` replaces
+the title the window was created with, `None` keeps the current one. An
+app that mirrors its own in-window title bar (a terminal following OSC
+program titles) returns the same string from here.
 
 ```rust
 pub struct Viewport {
