@@ -1,0 +1,329 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="tontoo_ui">
+
+  <copyright>
+    Copyright © 2026 TontooOS
+
+    Permission is hereby granted, free of charge, to any person obtaining a
+    copy of this software and associated documentation files (the "Software"),
+    to deal in the Software without restriction, including without limitation
+    the rights to use, copy, modify, merge, publish, distribute, sublicense,
+    and/or sell copies of the Software, and to permit persons to whom the
+    Software is furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+    THE SOFTWARE.
+  </copyright>
+
+  <description>
+    Tontoo UI protocol for declarative, server-side rendered surfaces.
+
+    This protocol allows client applications to describe their user interface
+    as a declarative widget tree which is transmitted to the TontooOS
+    compositor for server-side rendering.  The compositor owns the rendering
+    pipeline — clients never upload buffers or draw pixels.
+
+    Clients bind the tontoo_ui_manager global, create a tontoo_ui_surface
+    for each top-level window, and push widget-tree snapshots via
+    update_widget_tree.  The compositor sends back configure events for
+    sizing and interactive events (clicks, hovers, key input) that clients
+    handle in their application logic.
+
+    The same object also carries the backdrop stream: a client rendered
+    window asks for the pixels behind itself (set_backdrop,
+    create_backdrop_buffer) and receives them in a shared file (backdrop),
+    which lets it run its own frosted-glass blur instead of paying for a
+    compositor side Gaussian blur on every frame.
+  </description>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       1. tontoo_ui_manager — global singleton (version 1)
+       ═══════════════════════════════════════════════════════════ -->
+
+  <interface name="tontoo_ui_manager" version="1"
+             summary="Singleton manager for Tontoo UI surfaces">
+
+    <description summary="Create Tontoo UI surfaces">
+      The tontoo_ui_manager global is the entry point for the Tontoo UI
+      protocol.  Clients bind this global and use it to create individual
+      tontoo_ui_surface objects, one per top-level window.
+    </description>
+
+    <event name="ping" since="1">
+      <description summary="Ping the client to elicit a pong">
+        A ping event is sent by the compositor to check whether the client
+        is still responsive.  The client should respond with a pong request
+        containing the same serial.
+      </description>
+      <arg name="serial" type="uint" summary="Serial number to echo back"/>
+    </event>
+
+    <request name="get_tontoo_ui_surface" since="1">
+      <description summary="Create a new Tontoo UI surface">
+        Create a new tontoo_ui_surface associated with the given id.
+        Each surface corresponds to a single top-level application window.
+      </description>
+      <arg name="id" type="new_id" interface="tontoo_ui_surface"
+           summary="The new Tontoo UI surface"/>
+    </request>
+
+    <request name="pong" since="1">
+      <description summary="Respond to a ping event">
+        A pong request is sent in response to a ping event from the
+        compositor.  The serial must match the most recent ping event
+        received.
+      </description>
+      <arg name="serial" type="uint" summary="Serial from the ping event"/>
+    </request>
+
+  </interface>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       2. tontoo_ui_surface — one per application window
+       ═══════════════════════════════════════════════════════════ -->
+
+  <interface name="tontoo_ui_surface" version="1"
+             summary="A single application surface rendered via widget tree">
+
+    <description summary="Declarative UI surface">
+      A tontoo_ui_surface represents one application window.  The client
+      describes its UI declaratively by pushing serialized widget trees and
+      the compositor renders them server-side.
+
+      The widget tree is encoded as a flat array of serialized nodes.  Each
+      entry in the array is a widget node described by a type tag followed
+      by its typed fields.  Nodes are referenced by their array index
+      (node_id).  Container nodes list their children by index.
+
+      The serialization format is documented separately; the compositor and
+      the TontooUI client library agree on the canonical encoding.
+    </description>
+
+    <!-- ── Requests (client → compositor) ──────────────────── -->
+
+    <request name="set_title" since="1">
+      <description summary="Set the window title">
+        Set a descriptive title for this surface.  The compositor may use
+        this for window lists, task bars, and accessibility labels.
+      </description>
+      <arg name="title" type="string" summary="Window title"/>
+    </request>
+
+    <request name="set_size" since="1">
+      <description summary="Set the preferred window size">
+        Request the compositor to resize this surface to the given
+        dimensions in logical pixels.  The compositor may adjust the
+        final size based on screen constraints and send a configure event
+        with the actual dimensions.
+      </description>
+      <arg name="width" type="int" summary="Width in logical pixels"/>
+      <arg name="height" type="int" summary="Height in logical pixels"/>
+    </request>
+
+    <request name="set_glass" since="1">
+      <description summary="Configure glass (blur) effect parameters">
+        Set the frosted-glass visual effect for this surface.  The
+        compositor applies a Gaussian blur to content behind the surface
+        with the given parameters.
+
+        The compositor does not blur client rendered windows; it only
+        draws the tint quad for widget tree surfaces.  Client rendered
+        apps ask for the raw backdrop instead and run their own blur,
+        see set_backdrop.
+      </description>
+      <arg name="milkiness" type="fixed"
+           summary="Blur milkiness (0.0 = clear, 1.0 = fully opaque frosted glass)"/>
+      <arg name="alpha" type="fixed"
+           summary="Background tint alpha (0.0 = no tint, 1.0 = fully tinted)"/>
+      <arg name="sigma" type="fixed"
+           summary="Blur radius sigma in logical pixels"/>
+    </request>
+
+    <request name="create_backdrop_buffer" since="1">
+      <description summary="Hand over the shared buffer for backdrop frames">
+        The client allocates a shared memory file (memfd_create or a file
+        in /dev/shm), sizes it to stride * height and maps it read-write.
+        It passes the file descriptor here and keeps its own mapping.
+
+        The compositor maps the same file read-write and writes the pixels
+        of every backdrop frame into it.  The layout is Xrgb8888,
+        top-down, stride bytes per row, width times height pixels.  A new
+        frame is announced with the backdrop event; the client answers
+        with ack_backdrop once it copied the pixels out.
+
+        The buffer holds the whole output so that a moving window does not
+        require a new allocation; only the window rect inside it is
+        overwritten.
+      </description>
+      <arg name="fd" type="fd" summary="Shared memory file descriptor"/>
+      <arg name="width" type="int" summary="Buffer width in physical pixels"/>
+      <arg name="height" type="int" summary="Buffer height in physical pixels"/>
+      <arg name="stride" type="int" summary="Bytes per buffer row"/>
+    </request>
+
+    <request name="set_backdrop" since="1">
+      <description summary="Subscribe to the desktop backdrop of a window">
+        Ask the compositor to stream the pixels behind wl_surface_id so the
+        client can render its own backdrop blur.  Enable while backdrop
+        glass is on screen and disable again afterwards; the compositor
+        only captures while the flag is set and only recaptures when the
+        client acknowledged the previous frame or when the window moved,
+        was resized or the frame damage touched its rect.
+
+        wl_surface_id is the protocol id of the client's own wl_surface.
+        Object ids are per client, so the value is only meaningful when
+        both objects live on the same connection.
+      </description>
+      <arg name="enabled" type="uint" summary="1 = stream the backdrop, 0 = stop"/>
+      <arg name="scale" type="uint"
+           summary="Downscale divisor (1, 2 or 4); 0 means the default of 2"/>
+      <arg name="wl_surface_id" type="uint"
+           summary="Protocol id of the wl_surface to capture behind"/>
+    </request>
+
+    <request name="ack_backdrop" since="1">
+      <description summary="Confirm that a backdrop frame was copied">
+        Tells the compositor the client is done reading the frame with this
+        serial, so the next capture may overwrite the buffer.  The
+        compositor skips capturing entirely while a frame is unacked, which
+        keeps glReadPixels stalls off the idle path.
+      </description>
+      <arg name="serial" type="uint" summary="Serial from the backdrop event"/>
+    </request>
+
+    <request name="update_widget_tree" since="1">
+      <description summary="Push a new declarative widget tree snapshot">
+        Replace the entire widget tree for this surface with a new
+        serialized snapshot.  The argument is an array of bytes containing
+        the serialized widget tree.
+
+        The serialization is a compact binary encoding where each node
+        consists of:
+          - A uint32 type tag identifying the widget variant
+          - Type-specific fields encoded in wire format
+          - For containers: a uint32 child count followed by child
+            node_id references
+
+        Node IDs are implicit — they correspond to the index of the node
+        in the serialized array, starting from 0.
+
+        Sending a new widget tree is atomic: the compositor replaces the
+        previous tree entirely on receipt.  Partial updates are not
+        supported.
+      </description>
+      <arg name="nodes" type="array" summary="Serialized widget tree payload"/>
+    </request>
+
+    <request name="set_color_scheme" since="1">
+      <description summary="Set the preferred color scheme">
+        Tell the compositor which color scheme this surface prefers.
+        The compositor may use this to adjust glass tint, shadows, and
+        other visual properties.
+      </description>
+      <arg name="scheme" type="uint" summary="Color scheme: 0 = dark, 1 = light"/>
+    </request>
+
+    <request name="request_close" since="1">
+      <description summary="Request the compositor to close this surface">
+        The client asks the compositor to close this window.  The
+        compositor may honour the request directly or present a
+        confirmation dialog first.
+      </description>
+    </request>
+
+    <request name="request_minimize" since="1">
+      <description summary="Request the compositor to minimize this surface">
+        Ask the compositor to minimize (hide) this window.
+      </description>
+    </request>
+
+    <request name="request_maximize" since="1">
+      <description summary="Request the compositor to maximize this surface">
+        Ask the compositor to maximize this window to fill the available
+        output area.
+      </description>
+    </request>
+
+    <!-- ── Events (compositor → client) ────────────────────── -->
+
+    <event name="configure" since="1">
+      <description summary="Configure the surface geometry">
+        The compositor sends a configure event to inform the client of the
+        final surface dimensions.  The client should update its widget
+        tree to match the provided size.
+      </description>
+      <arg name="width" type="int" summary="Width in logical pixels"/>
+      <arg name="height" type="int" summary="Height in logical pixels"/>
+    </event>
+
+    <event name="backdrop" since="1">
+      <description summary="A new desktop backdrop frame is available">
+        Sent after the compositor wrote the pixels behind the watched
+        wl_surface into the buffer passed with create_backdrop_buffer.
+
+        x, y, width and height are physical output pixels and describe the
+        window rect inside the buffer.  scale is the downscale divisor:
+        consecutive pixels of the frame are scale buffer pixels apart, so a
+        client samples every scale-th pixel of every scale-th row.
+
+        The client must copy the frame out before sending ack_backdrop.
+      </description>
+      <arg name="serial" type="uint" summary="Frame serial, echoed in ack_backdrop"/>
+      <arg name="x" type="int" summary="Region origin x in buffer pixels"/>
+      <arg name="y" type="int" summary="Region origin y in buffer pixels"/>
+      <arg name="width" type="int" summary="Region width in physical pixels"/>
+      <arg name="height" type="int" summary="Region height in physical pixels"/>
+      <arg name="scale" type="uint" summary="Downscale divisor"/>
+    </event>
+
+    <event name="close" since="1">
+      <description summary="The compositor requests the surface to close">
+        Sent when the compositor decides the surface should close (e.g.
+        user clicked the close button).  The client should tear down its
+        surface and exit.
+      </description>
+    </event>
+
+    <event name="widget_clicked" since="1">
+      <description summary="A widget node was clicked by the user">
+        Emitted when the user clicks on a widget node within this surface.
+        The node_id corresponds to the index of the widget node in the
+        most recently received widget tree.  The client should inspect
+        the widget type and handle the interaction accordingly.
+      </description>
+      <arg name="node_id" type="uint"
+           summary="Index of the clicked node in the widget tree"/>
+    </event>
+
+    <event name="widget_hovered" since="1">
+      <description summary="The pointer entered or moved over a widget node">
+        Emitted when the pointer enters or moves to a different widget
+        node.  The client can use this to update hover visual states.
+        node_id 0 with no further events indicates the pointer left all
+        interactive widgets.
+      </description>
+      <arg name="node_id" type="uint"
+           summary="Index of the hovered node in the widget tree, 0 if none"/>
+    </event>
+
+    <event name="key_event" since="1">
+      <description summary="A keyboard event directed at this surface">
+        Forwarded keyboard events from the compositor.  The key field is
+        an evdev key code.  The state field is 1 for key-down and 0 for
+        key-up.
+      </description>
+      <arg name="key" type="uint" summary="evdev key code"/>
+      <arg name="state" type="uint" summary="Key state: 1 = pressed, 0 = released"/>
+    </event>
+
+  </interface>
+
+</protocol>

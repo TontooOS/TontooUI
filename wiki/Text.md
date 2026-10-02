@@ -14,21 +14,42 @@ painting the same frame with a horizontal gradient brush
 ```rust
 pub fn new(content: impl Into<String>) -> Self
 pub fn style(self, style: TextStyle) -> Self
+pub fn size(self, px: f32) -> Self
+pub fn weight(self, weight: f32) -> Self
+pub fn clear_size(self) -> Self
+pub fn clear_weight(self) -> Self
 pub fn foreground(self, foreground: TextForeground) -> Self
 pub fn foreground_color(self, color: Color) -> Self
 pub fn foreground_gradient(self, colors: Vec<Color>) -> Self
 pub fn alignment(self, alignment: TextAlignment) -> Self
 pub fn width(self, px: f32) -> Self
+pub fn size_value(&self) -> f32
+pub fn weight_value(&self) -> f32
 ```
 
 - Single line by default; `width` fixes the box so longer content
   wraps.
-- `set_text`, `set_style`, `set_foreground`, `set_alignment`,
+- `size` and `weight` override the `TextStyle` metrics for one label
+  (`size` clamps at `0.0`, `weight` to `1.0..=1000.0`); `clear_size`
+  and `clear_weight` drop the override so the style applies again.
+  `size_value` and `weight_value` report the effective values.
+  `style` still selects the type scale, the overrides only change its
+  numbers.
+- `set_text`, `set_style`, `set_size(Option<f32>)`,
+  `set_weight(Option<f32>)`, `set_foreground`, `set_alignment`,
   `set_width(Option<f32>)`, `set_theme(ThemeMode)`,
   `set_focused(bool)` update live and mark the layout dirty.
   The cached layout is also rebuilt automatically when the window
   scale factor changes (DPI move), so glyphs stay sharp.
 - No mouse handling: display-only.
+
+```rust
+BasicText::new("21°").size(72.0).weight(100.0);
+```
+
+`TextStyle::LargeTitle` tops out at 34 px, so display numbers and
+oversized headlines set `size` directly instead of extending
+`TextStyle`.
 
 ```rust
 pub enum TextAlignment {

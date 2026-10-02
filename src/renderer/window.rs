@@ -15,6 +15,7 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{CursorIcon, ResizeDirection, Window, WindowAttributes};
 
 use super::backdrop::BackdropBlur;
+use super::backdrop_stream::CompositorBackdrop;
 use super::images::{ImageCache, ImageLoader};
 use super::text::FontSystem;
 
@@ -71,6 +72,101 @@ pub enum Key {
     SelectRight,
     SelectUp,
     SelectDown,
+}
+
+/// Modifier keys held while an input event happened.
+///
+/// Unlike the two booleans of `App::set_modifiers` this is the full
+/// state and travels with every raw key and pointer button event, so
+/// apps that speak protocols (a terminal sending Ctrl chords or mouse
+/// reports) never have to cache modifier transitions themselves.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Modifiers {
+    pub shift: bool,
+    pub ctrl: bool,
+    pub alt: bool,
+    /// Command / Windows key (`super` is a Rust keyword).
+    pub super_key: bool,
+}
+
+impl Modifiers {
+    /// True when any modifier key is held.
+    pub fn any(&self) -> bool {
+        self.shift || self.ctrl || self.alt || self.super_key
+    }
+}
+
+/// Key identity for `App::raw_key`.
+///
+/// The shell maps the physical key, so the same key reports the same
+/// value on every layout. Printable keys carry the produced character
+/// in `RawKey::Character` (already shifted, so `A` is upper case),
+/// which is what an app needs to write the byte the user expects.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RawKey {
+    /// A printable key: letter, digit or symbol, carrying the produced
+    /// character. With Ctrl or Alt held the character is the unshifted
+    /// base (Ctrl+C is `Character('c')`).
+    Character(char),
+    Tab,
+    /// Shift+Tab. Terminals expect `CSI Z` for this.
+    BackTab,
+    Enter,
+    /// Numeric keypad enter, distinct from the main Enter key.
+    KeypadEnter,
+    Escape,
+    Backspace,
+    Delete,
+    Insert,
+    Home,
+    End,
+    PageUp,
+    PageDown,
+    Left,
+    Right,
+    Up,
+    Down,
+    /// F1 to F12.
+    Function(u8),
+    /// Keypad digits `0` to `9`.
+    KeypadDigit(u8),
+    KeypadDot,
+    KeypadPlus,
+    KeypadMinus,
+    KeypadStar,
+    KeypadSlash,
+    ContextMenu,
+    NumLock,
+    CapsLock,
+    ScrollLock,
+    Pause,
+}
+
+/// One raw key transition, forwarded to `App::raw_key`.
+///
+/// Every key event reaches the app here, including Ctrl chords, Tab,
+/// the function keys and releases: the intent based `App::key` and
+/// `App::text` hooks only cover what text fields need. `text` carries
+/// the decoded string for printable input (including key repeat) and is
+/// `None` for control keys and releases.
+#[derive(Clone, Debug)]
+pub struct KeyPress {
+    pub key: RawKey,
+    pub modifiers: Modifiers,
+    pub text: Option<String>,
+    pub pressed: bool,
+    /// True for auto-repeat while the key is held down.
+    pub repeat: bool,
+}
+
+/// Pointer button that produced an `App::mouse_button` event.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MouseButtonKind {
+    Left,
+    Middle,
+    Right,
+    /// Any further button, numbered from zero.
+    Other(u16),
 }
 
 /// Pointer shape requested by content. The shell sets the winit
@@ -260,6 +356,33 @@ pub trait App {
     fn set_focused(&mut self, _focused: bool) {}
     fn text(&mut self, _text: &str) {}
     fn key(&mut self, _key: Key) {}
+    /// Every key transition with the full modifier state, called before
+    /// the intent hooks `key` / `text` (which keep running afterwards
+    /// for existing apps). Use this for protocol level input: terminal
+    /// chords, Tab, function keys, keypad, Ctrl+letter.
+    fn raw_key(&mut self, _press: &KeyPress) {}
+    /// Pointer button press or release with the full modifier state,
+    /// called for every button (including middle and right) next to the
+    /// intent hooks `mouse_down` / `mouse_up` / `context_click`. Window
+    /// resize drags and title bar drags report no button event, so
+    /// content never sees those.
+    fn mouse_button(
+        &mut self,
+        _button: MouseButtonKind,
+        _pressed: bool,
+        _x: f64,
+        _y: f64,
+        _modifiers: Modifiers,
+    ) {
+    }
+    /// Live title for the real window (task switcher, compositor),
+    /// read once per frame. `Some` replaces the title the window was
+    /// created with, `None` keeps the current one. An app that mirrors
+    /// its own in-window title bar (a terminal following OSC titles)
+    /// returns the same string from here.
+    fn window_title(&self) -> Option<&str> {
+        None
+    }
     /// Draggable region for window moving: (x, y, width, height) in logical
     /// px. A press inside starts a window drag instead of a click.
     fn drag_region(&self) -> Option<(f32, f32, f32, f32)> {
@@ -310,10 +433,161 @@ struct Active {
     images: ImageCache,
     scene: Scene,
     backdrop: BackdropBlur,
+    /// Live compositor backdrop subscription, `None` on compositors that
+    /// do not offer the stream.
+    backdrop_stream: Option<CompositorBackdrop>,
+    /// True while the backdrop texture holds compositor pixels instead of an
+    /// in-app capture, which removes the second Vello pass.
+    backdrop_external: bool,
     scale: f64,
     cursor_pos: (f64, f64),
     last_cursor: CursorKind,
     start: Instant,
+}
+
+/// Modifier state from a winit `KeyModifiersState`.
+fn modifiers_from(state: winit::keyboard::ModifiersState) -> Modifiers {
+    Modifiers {
+        shift: state.shift_key(),
+        ctrl: state.control_key(),
+        alt: state.alt_key(),
+        super_key: state.super_key(),
+    }
+}
+
+/// Physical key to [`RawKey`], independent of the produced text. Returns
+/// `None` for keys that produce a character, so the caller can fall back
+/// to the decoded text (which knows about Shift and AltGr).
+fn raw_key_from_code(code: KeyCode, modifiers: Modifiers) -> Option<RawKey> {
+    // Shift+Tab reports as `BackTab` by the backend on most platforms,
+    // but the Shift+Tab chord itself is what apps need.
+    let back_tab = matches!(code, KeyCode::Tab) && modifiers.shift;
+    let key = match code {
+        KeyCode::Tab if back_tab => RawKey::BackTab,
+        KeyCode::Tab => RawKey::Tab,
+        KeyCode::Enter => RawKey::Enter,
+        KeyCode::NumpadEnter => RawKey::KeypadEnter,
+        KeyCode::Escape => RawKey::Escape,
+        KeyCode::Backspace => RawKey::Backspace,
+        KeyCode::Delete => RawKey::Delete,
+        KeyCode::Insert => RawKey::Insert,
+        KeyCode::Home => RawKey::Home,
+        KeyCode::End => RawKey::End,
+        KeyCode::PageUp => RawKey::PageUp,
+        KeyCode::PageDown => RawKey::PageDown,
+        KeyCode::ArrowLeft => RawKey::Left,
+        KeyCode::ArrowRight => RawKey::Right,
+        KeyCode::ArrowUp => RawKey::Up,
+        KeyCode::ArrowDown => RawKey::Down,
+        KeyCode::F1 => RawKey::Function(1),
+        KeyCode::F2 => RawKey::Function(2),
+        KeyCode::F3 => RawKey::Function(3),
+        KeyCode::F4 => RawKey::Function(4),
+        KeyCode::F5 => RawKey::Function(5),
+        KeyCode::F6 => RawKey::Function(6),
+        KeyCode::F7 => RawKey::Function(7),
+        KeyCode::F8 => RawKey::Function(8),
+        KeyCode::F9 => RawKey::Function(9),
+        KeyCode::F10 => RawKey::Function(10),
+        KeyCode::F11 => RawKey::Function(11),
+        KeyCode::F12 => RawKey::Function(12),
+        KeyCode::Numpad0 => RawKey::KeypadDigit(0),
+        KeyCode::Numpad1 => RawKey::KeypadDigit(1),
+        KeyCode::Numpad2 => RawKey::KeypadDigit(2),
+        KeyCode::Numpad3 => RawKey::KeypadDigit(3),
+        KeyCode::Numpad4 => RawKey::KeypadDigit(4),
+        KeyCode::Numpad5 => RawKey::KeypadDigit(5),
+        KeyCode::Numpad6 => RawKey::KeypadDigit(6),
+        KeyCode::Numpad7 => RawKey::KeypadDigit(7),
+        KeyCode::Numpad8 => RawKey::KeypadDigit(8),
+        KeyCode::Numpad9 => RawKey::KeypadDigit(9),
+        KeyCode::NumpadDecimal => RawKey::KeypadDot,
+        KeyCode::NumpadAdd => RawKey::KeypadPlus,
+        KeyCode::NumpadSubtract => RawKey::KeypadMinus,
+        KeyCode::NumpadMultiply => RawKey::KeypadStar,
+        KeyCode::NumpadDivide => RawKey::KeypadSlash,
+        KeyCode::ContextMenu => RawKey::ContextMenu,
+        KeyCode::NumLock => RawKey::NumLock,
+        KeyCode::CapsLock => RawKey::CapsLock,
+        KeyCode::ScrollLock => RawKey::ScrollLock,
+        KeyCode::Pause => RawKey::Pause,
+        _ => return None,
+    };
+    Some(key)
+}
+
+/// Full key identity for one winit keyboard event: the physical mapping
+/// wins for named keys, the decoded text names the printable ones, and a
+/// bare letter/digit physical key fills in when Ctrl or Alt swallowed the
+/// text (Ctrl+C arrives without any text but must still be reported).
+fn raw_key_from_event(code: KeyCode, text: Option<&str>, modifiers: Modifiers) -> Option<RawKey> {
+    if let Some(key) = raw_key_from_code(code, modifiers) {
+        return Some(key);
+    }
+    if let Some(text) = text {
+        if let Some(ch) = text.chars().find(|ch| !ch.is_control()) {
+            return Some(RawKey::Character(ch));
+        }
+    }
+    base_character(code)
+}
+
+/// Unmodified character a physical key produces, or `None` for keys
+/// without one. Only letters and digits are needed: symbols already
+/// arrive through the decoded text.
+fn base_character(code: KeyCode) -> Option<RawKey> {
+    let letter = match code {
+        KeyCode::KeyA => 'a',
+        KeyCode::KeyB => 'b',
+        KeyCode::KeyC => 'c',
+        KeyCode::KeyD => 'd',
+        KeyCode::KeyE => 'e',
+        KeyCode::KeyF => 'f',
+        KeyCode::KeyG => 'g',
+        KeyCode::KeyH => 'h',
+        KeyCode::KeyI => 'i',
+        KeyCode::KeyJ => 'j',
+        KeyCode::KeyK => 'k',
+        KeyCode::KeyL => 'l',
+        KeyCode::KeyM => 'm',
+        KeyCode::KeyN => 'n',
+        KeyCode::KeyO => 'o',
+        KeyCode::KeyP => 'p',
+        KeyCode::KeyQ => 'q',
+        KeyCode::KeyR => 'r',
+        KeyCode::KeyS => 's',
+        KeyCode::KeyT => 't',
+        KeyCode::KeyU => 'u',
+        KeyCode::KeyV => 'v',
+        KeyCode::KeyW => 'w',
+        KeyCode::KeyX => 'x',
+        KeyCode::KeyY => 'y',
+        KeyCode::KeyZ => 'z',
+        KeyCode::Digit0 => '0',
+        KeyCode::Digit1 => '1',
+        KeyCode::Digit2 => '2',
+        KeyCode::Digit3 => '3',
+        KeyCode::Digit4 => '4',
+        KeyCode::Digit5 => '5',
+        KeyCode::Digit6 => '6',
+        KeyCode::Digit7 => '7',
+        KeyCode::Digit8 => '8',
+        KeyCode::Digit9 => '9',
+        _ => return None,
+    };
+    Some(RawKey::Character(letter))
+}
+
+/// winit mouse button to [`MouseButtonKind`].
+fn mouse_button_kind(button: MouseButton) -> MouseButtonKind {
+    match button {
+        MouseButton::Left => MouseButtonKind::Left,
+        MouseButton::Middle => MouseButtonKind::Middle,
+        MouseButton::Right => MouseButtonKind::Right,
+        MouseButton::Back => MouseButtonKind::Other(3),
+        MouseButton::Forward => MouseButtonKind::Other(4),
+        MouseButton::Other(index) => MouseButtonKind::Other(index),
+    }
 }
 
 struct Shell<V: App> {
@@ -323,8 +597,7 @@ struct Shell<V: App> {
     app: V,
     context: Option<RenderContext>,
     active: Option<Active>,
-    ctrl: bool,
-    shift: bool,
+    modifiers: Modifiers,
 }
 
 impl<V: App> Shell<V> {
@@ -336,8 +609,7 @@ impl<V: App> Shell<V> {
             app,
             context: None,
             active: None,
-            ctrl: false,
-            shift: false,
+            modifiers: Modifiers::default(),
         }
     }
 
@@ -345,6 +617,13 @@ impl<V: App> Shell<V> {
         let Some(active) = self.active.as_mut() else {
             return;
         };
+        if let Some(title) = self.app.window_title() {
+            let title = title.to_string();
+            if title != self.title {
+                self.title = title.clone();
+                active.window.set_title(&title);
+            }
+        }
         if let Some(command) = self.app.poll_window_command() {
             match command {
                 WindowCommand::Close => event_loop.exit(),
@@ -388,57 +667,99 @@ impl<V: App> Shell<V> {
             Some(self.app.background())
         };
 
-        if self.app.wants_backdrop() {
-            if active.backdrop.size() != Some((size.width, size.height)) {
+        // Desktop backdrop stream. The subscription follows
+        // `wants_backdrop`, so a window that never shows glass never makes the
+        // compositor capture anything.
+        let app_wants = self.app.wants_backdrop();
+        if let Some(stream) = active.backdrop_stream.as_mut() {
+            stream.set_enabled(app_wants, size.width, size.height);
+            stream.poll();
+            let frame = stream.take_frame();
+            if !stream.is_alive() {
+                // The connection died (or the compositor never offered the
+                // stream): drop it and keep the in-app capture pass.
+                active.backdrop_stream = None;
+                active.backdrop_external = false;
+            } else if let Some(frame) = frame {
+                if active.backdrop.size() != Some((frame.width, frame.height)) {
+                    active.backdrop.take_image(&mut active.renderer);
+                    active
+                        .backdrop
+                        .ensure_size(&device_handle.device, frame.width, frame.height);
+                }
+                active.backdrop_external = active.backdrop.upload_content(
+                    &device_handle.queue,
+                    &frame.pixels,
+                    frame.width,
+                    frame.height,
+                );
+            }
+        }
+
+        if app_wants || active.backdrop_external {
+            if !active.backdrop_external
+                && active.backdrop.size() != Some((size.width, size.height))
+            {
                 active.backdrop.take_image(&mut active.renderer);
-                active.backdrop
+                active
+                    .backdrop
                     .ensure_size(&device_handle.device, size.width, size.height);
             }
-
-            // Pass 1: capture without glass bodies (no frame lines: they
-            // sit above content and must not appear under glass).
-            active.scene.reset();
-            super::frame::draw_behind(
-                &mut active.scene,
-                size.width,
-                size.height,
-                scale,
-                background,
-            );
-            // Clip content to the rounded body so square views never
-            // spill over the corners. Transparent bodies skip the clip
-            // (nothing to round against).
             let clip_body = background.is_some();
-            if clip_body {
-                let clip = super::frame::body_shape(size.width, size.height, scale);
-                active
-                    .scene
-                    .push_clip_layer(Fill::NonZero, Affine::IDENTITY, &clip);
-            }
-            {
-                let mut loader = ImageLoader::new(
-                    &mut active.renderer,
+            let capture_clip = clip_body && !active.backdrop_external;
+
+            if !active.backdrop_external {
+                // Pass 1: capture without glass bodies (no frame lines: they
+                // sit above content and must not appear under glass).
+                active.scene.reset();
+                super::frame::draw_behind(
+                    &mut active.scene,
+                    size.width,
+                    size.height,
+                    scale,
+                    background,
+                );
+                // Clip content to the rounded body so square views never
+                // spill over the corners. Transparent bodies skip the clip
+                // (nothing to round against).
+                if capture_clip {
+                    let clip = super::frame::body_shape(size.width, size.height, scale);
+                    active
+                        .scene
+                        .push_clip_layer(Fill::NonZero, Affine::IDENTITY, &clip);
+                }
+                {
+                    let mut loader = ImageLoader::new(
+                        &mut active.renderer,
+                        &device_handle.device,
+                        &device_handle.queue,
+                        &mut active.images,
+                    );
+                    loader.set_capture_pass(true);
+                    loader.set_busy(active.backdrop.busy_handle());
+                    self.app.draw(
+                        &mut active.scene,
+                        &mut active.fonts,
+                        &mut loader,
+                        viewport,
+                        elapsed,
+                    );
+                }
+                if capture_clip {
+                    active.scene.pop_layer();
+                }
+                if let Err(err) = active.renderer.render_to_texture(
                     &device_handle.device,
                     &device_handle.queue,
-                    &mut active.images,
-                );
-                loader.set_capture_pass(true);
-                loader.set_busy(active.backdrop.busy_handle());
-                self.app.draw(&mut active.scene, &mut active.fonts, &mut loader, viewport, elapsed);
+                    &active.scene,
+                    active.backdrop.content_view(),
+                    &params,
+                ) {
+                    eprintln!("backdrop capture error: {err:?}");
+                    return;
+                }
             }
-            if clip_body {
-                active.scene.pop_layer();
-            }
-            if let Err(err) = active.renderer.render_to_texture(
-                &device_handle.device,
-                &device_handle.queue,
-                &active.scene,
-                active.backdrop.content_view(),
-                &params,
-            ) {
-                eprintln!("backdrop capture error: {err:?}");
-                return;
-            }
+
             active
                 .backdrop
                 .run(&device_handle.device, &device_handle.queue);
@@ -645,6 +966,18 @@ impl<V: App> ApplicationHandler for Shell<V> {
         self.context = Some(context);
         let backdrop_device = &self.context.as_ref().expect("context").devices[surface.dev_id].device;
         let backdrop = BackdropBlur::new(backdrop_device);
+
+        // Desktop backdrop stream: the compositor hands us the pixels behind
+        // this window so glass can blur the desktop instead of the app's own
+        // second render pass. Optional, so a failure here is not fatal.
+        let output_size = event_loop
+            .primary_monitor()
+            .map(|monitor| monitor.size())
+            .unwrap_or(winit::dpi::PhysicalSize::new(size.width, size.height));
+        let buffer_width = output_size.width.max(size.width).max(1);
+        let buffer_height = output_size.height.max(size.height).max(1);
+        let backdrop_stream = CompositorBackdrop::attach(&*window, buffer_width, buffer_height);
+
         self.active = Some(Active {
             window,
             surface,
@@ -653,6 +986,8 @@ impl<V: App> ApplicationHandler for Shell<V> {
             images: ImageCache::new(),
             scene: Scene::new(),
             backdrop,
+            backdrop_stream,
+            backdrop_external: false,
             scale,
             cursor_pos: (0.0, 0.0),
             last_cursor: CursorKind::Default,
@@ -666,6 +1001,9 @@ impl<V: App> ApplicationHandler for Shell<V> {
         window_id: winit::window::WindowId,
         event: WindowEvent,
     ) {
+        // Copied before the window borrow below: the event handlers read
+        // the modifier snapshot through this local, never through `self`.
+        let modifiers = self.modifiers;
         let Some(active) = self.active.as_mut() else {
             return;
         };
@@ -718,30 +1056,43 @@ impl<V: App> ApplicationHandler for Shell<V> {
                 let scale = active.scale;
                 let x = (active.cursor_pos.0 / scale) as f32;
                 let y = (active.cursor_pos.1 / scale) as f32;
+                let pressed = state == ElementState::Pressed;
+                // Left presses can be claimed by the window itself (edge
+                // resize, title bar drag). Those return early and report
+                // no button event, so content never sees a drag.
+                if button == MouseButton::Left && pressed {
+                    // Edge/corner press starts an OS resize drag instead
+                    // of a content click (maximized windows excepted).
+                    if !active.window.is_maximized() {
+                        let size = active.window.inner_size();
+                        let (w, h) = (
+                            size.width as f64 / scale,
+                            size.height as f64 / scale,
+                        );
+                        if let Some(direction) =
+                            resize_direction_at(x, y, w as f32, h as f32)
+                        {
+                            let _ = active.window.drag_resize_window(direction);
+                            return;
+                        }
+                    }
+                    if let Some((rx, ry, rw, rh)) = self.app.drag_region() {
+                        if x >= rx && x <= rx + rw && y >= ry && y <= ry + rh {
+                            // Titlebar drag: moving keeps focus, no click.
+                            let _ = active.window.drag_window();
+                            return;
+                        }
+                    }
+                }
+                self.app.mouse_button(
+                    mouse_button_kind(button),
+                    pressed,
+                    x as f64,
+                    y as f64,
+                    modifiers,
+                );
                 match (button, state) {
                     (MouseButton::Left, ElementState::Pressed) => {
-                        // Edge/corner press starts an OS resize drag instead
-                        // of a content click (maximized windows excepted).
-                        if !active.window.is_maximized() {
-                            let size = active.window.inner_size();
-                            let (w, h) = (
-                                size.width as f64 / scale,
-                                size.height as f64 / scale,
-                            );
-                            if let Some(direction) =
-                                resize_direction_at(x, y, w as f32, h as f32)
-                            {
-                                let _ = active.window.drag_resize_window(direction);
-                                return;
-                            }
-                        }
-                        if let Some((rx, ry, rw, rh)) = self.app.drag_region() {
-                            if x >= rx && x <= rx + rw && y >= ry && y <= ry + rh {
-                                // Titlebar drag: moving keeps focus, no click.
-                                let _ = active.window.drag_window();
-                                return;
-                            }
-                        }
                         self.app.mouse_down(x as f64, y as f64);
                         active.window.request_redraw();
                     }
@@ -772,19 +1123,40 @@ impl<V: App> ApplicationHandler for Shell<V> {
                 active.window.request_redraw();
             }
             WindowEvent::KeyboardInput { event, .. } => {
+                // The raw hook sees every transition (including releases
+                // and Ctrl chords that produce no text) and runs before
+                // the intent hooks below, which still fire for existing
+                // apps.
+                if let PhysicalKey::Code(code) = event.physical_key {
+                    let text = event.text.as_ref().map(|text| text.as_str());
+                    if let Some(key) = raw_key_from_event(code, text, modifiers) {
+                        let press = KeyPress {
+                            key,
+                            modifiers,
+                            text: text.map(|text| text.to_string()),
+                            pressed: event.state == ElementState::Pressed,
+                            repeat: event.repeat,
+                        };
+                        let repeats = press.pressed;
+                        self.app.raw_key(&press);
+                        if repeats {
+                            active.window.request_redraw();
+                        }
+                    }
+                }
                 if event.state != ElementState::Pressed {
                     return;
                 }
                 // Ctrl shortcuts translate to editing intents before
                 // the regular key/text handling below (which would
                 // otherwise see the bare letters).
-                if self.ctrl {
+                if modifiers.ctrl {
                     let combo = match event.physical_key {
                         PhysicalKey::Code(KeyCode::KeyA) => Some(Key::SelectAll),
                         PhysicalKey::Code(KeyCode::KeyC) => Some(Key::Copy),
                         PhysicalKey::Code(KeyCode::KeyX) => Some(Key::Cut),
                         PhysicalKey::Code(KeyCode::KeyV) => Some(Key::Paste),
-                        PhysicalKey::Code(KeyCode::KeyZ) if self.shift => Some(Key::Redo),
+                        PhysicalKey::Code(KeyCode::KeyZ) if modifiers.shift => Some(Key::Redo),
                         PhysicalKey::Code(KeyCode::KeyZ) => Some(Key::Undo),
                         PhysicalKey::Code(KeyCode::KeyY) => Some(Key::Redo),
                         _ => None,
@@ -797,7 +1169,7 @@ impl<V: App> ApplicationHandler for Shell<V> {
                 }
                 // Shift+arrows extend the text selection instead of
                 // moving the caret.
-                if self.shift && !self.ctrl {
+                if modifiers.shift && !modifiers.ctrl {
                     let extend = match event.physical_key {
                         PhysicalKey::Code(KeyCode::ArrowLeft) => Some(Key::SelectLeft),
                         PhysicalKey::Code(KeyCode::ArrowRight) => Some(Key::SelectRight),
@@ -835,10 +1207,8 @@ impl<V: App> ApplicationHandler for Shell<V> {
                 }
             }
             WindowEvent::ModifiersChanged(modifiers) => {
-                let state = modifiers.state();
-                self.ctrl = state.control_key();
-                self.shift = state.shift_key();
-                self.app.set_modifiers(self.ctrl, self.shift);
+                self.modifiers = modifiers_from(modifiers.state());
+                self.app.set_modifiers(self.modifiers.ctrl, self.modifiers.shift);
                 active.window.request_redraw();
             }
             WindowEvent::MouseWheel { delta, .. } => {
@@ -866,6 +1236,120 @@ impl<V: App> ApplicationHandler for Shell<V> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Modifiers with only the named keys held.
+    fn mods(ctrl: bool, shift: bool, alt: bool) -> Modifiers {
+        Modifiers {
+            shift,
+            ctrl,
+            alt,
+            super_key: false,
+        }
+    }
+
+    const NONE: Modifiers = Modifiers {
+        shift: false,
+        ctrl: false,
+        alt: false,
+        super_key: false,
+    };
+
+    #[test]
+    fn named_keys_map_from_physical_code() {
+        assert_eq!(raw_key_from_code(KeyCode::Tab, NONE), Some(RawKey::Tab));
+        assert_eq!(raw_key_from_code(KeyCode::Enter, NONE), Some(RawKey::Enter));
+        assert_eq!(
+            raw_key_from_code(KeyCode::NumpadEnter, NONE),
+            Some(RawKey::KeypadEnter)
+        );
+        assert_eq!(
+            raw_key_from_code(KeyCode::PageUp, NONE),
+            Some(RawKey::PageUp)
+        );
+        assert_eq!(
+            raw_key_from_code(KeyCode::F12, NONE),
+            Some(RawKey::Function(12))
+        );
+        assert_eq!(
+            raw_key_from_code(KeyCode::Numpad7, NONE),
+            Some(RawKey::KeypadDigit(7))
+        );
+        assert_eq!(
+            raw_key_from_code(KeyCode::NumpadDecimal, NONE),
+            Some(RawKey::KeypadDot)
+        );
+    }
+
+    #[test]
+    fn shift_tab_is_back_tab() {
+        assert_eq!(
+            raw_key_from_code(KeyCode::Tab, mods(false, true, false)),
+            Some(RawKey::BackTab)
+        );
+    }
+
+    #[test]
+    fn printable_keys_use_decoded_text() {
+        // Shift is already applied by the platform text.
+        assert_eq!(
+            raw_key_from_event(KeyCode::KeyA, Some("A"), mods(false, true, false)),
+            Some(RawKey::Character('A'))
+        );
+        // AltGr layouts produce a symbol instead of the base letter.
+        assert_eq!(
+            raw_key_from_event(KeyCode::KeyE, Some("@"), mods(false, false, true)),
+            Some(RawKey::Character('@'))
+        );
+    }
+
+    #[test]
+    fn ctrl_chords_fall_back_to_base_character() {
+        // Ctrl+C produces no text at all, but the key must still be
+        // reported so an app can send its control byte.
+        let key = raw_key_from_event(KeyCode::KeyC, None, mods(true, false, false));
+        assert_eq!(key, Some(RawKey::Character('c')));
+        let digit = raw_key_from_event(KeyCode::Digit4, None, mods(true, false, false));
+        assert_eq!(digit, Some(RawKey::Character('4')));
+    }
+
+    #[test]
+    fn control_text_is_ignored_for_identity() {
+        // A control byte in the text must not become a Character.
+        let key = raw_key_from_event(KeyCode::KeyL, Some("\u{c}"), NONE);
+        assert_eq!(key, Some(RawKey::Character('l')));
+    }
+
+    #[test]
+    fn unmapped_keys_report_none() {
+        assert_eq!(raw_key_from_event(KeyCode::F13, None, NONE), None);
+        assert_eq!(raw_key_from_event(KeyCode::NumpadEqual, None, NONE), None);
+    }
+
+    #[test]
+    fn mouse_buttons_keep_their_kind() {
+        assert_eq!(mouse_button_kind(MouseButton::Left), MouseButtonKind::Left);
+        assert_eq!(
+            mouse_button_kind(MouseButton::Middle),
+            MouseButtonKind::Middle
+        );
+        assert_eq!(mouse_button_kind(MouseButton::Right), MouseButtonKind::Right);
+        assert_eq!(
+            mouse_button_kind(MouseButton::Other(3)),
+            MouseButtonKind::Other(3)
+        );
+    }
+
+    #[test]
+    fn modifiers_track_every_key() {
+        assert!(!NONE.any());
+        assert!(mods(true, false, false).any());
+        assert!(mods(false, false, true).any());
+        assert!(Modifiers {
+            super_key: true,
+            ..Modifiers::default()
+        }
+        .any());
+    }
 
     const W: f32 = 800.0;
     const H: f32 = 600.0;

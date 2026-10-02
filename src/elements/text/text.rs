@@ -24,7 +24,9 @@ pub enum TextAlignment {
 
 /// Basic text: a label in a `TextStyle` size with a `TextForeground`
 /// color or gradient. Single line by default; `width` fixes the box
-/// so longer content wraps (each line follows `alignment`).
+/// so longer content wraps (each line follows `alignment`). `size` and
+/// `weight` override the style metrics for one-off type (display
+/// numbers, oversized headlines) without touching `TextStyle`.
 ///
 /// Built on CoreText (`FontSystem::layout_text_aligned` plus
 /// `draw_layout` for solid colors). Only gradients take a custom
@@ -33,6 +35,8 @@ pub enum TextAlignment {
 pub struct BasicText {
     content: String,
     style: TextStyle,
+    size_override: Option<f32>,
+    weight_override: Option<f32>,
     foreground: TextForeground,
     alignment: TextAlignment,
     wrap_width: Option<f32>,
@@ -52,6 +56,8 @@ impl BasicText {
         Self {
             content: content.into(),
             style: TextStyle::Body,
+            size_override: None,
+            weight_override: None,
             foreground: TextForeground::Primary,
             alignment: TextAlignment::Leading,
             wrap_width: None,
@@ -78,6 +84,62 @@ impl BasicText {
             self.style = style;
             self.dirty = true;
         }
+    }
+
+    /// Font size in logical px, overriding the `TextStyle` size.
+    /// `clear_size` restores the style size.
+    pub fn size(mut self, px: f32) -> Self {
+        self.size_override = Some(px.max(0.0));
+        self.dirty = true;
+        self
+    }
+
+    /// Clear the size override: the `TextStyle` size applies again.
+    pub fn clear_size(mut self) -> Self {
+        self.size_override = None;
+        self.dirty = true;
+        self
+    }
+
+    pub fn set_size(&mut self, px: Option<f32>) {
+        let px = px.map(|value| value.max(0.0));
+        if self.size_override != px {
+            self.size_override = px;
+            self.dirty = true;
+        }
+    }
+
+    /// Weight in the CoreText scale (`100` thin to `900` black),
+    /// overriding the `TextStyle` weight.
+    pub fn weight(mut self, weight: f32) -> Self {
+        self.weight_override = Some(weight.clamp(1.0, 1000.0));
+        self.dirty = true;
+        self
+    }
+
+    /// Clear the weight override: the `TextStyle` weight applies again.
+    pub fn clear_weight(mut self) -> Self {
+        self.weight_override = None;
+        self.dirty = true;
+        self
+    }
+
+    pub fn set_weight(&mut self, weight: Option<f32>) {
+        let weight = weight.map(|value| value.clamp(1.0, 1000.0));
+        if self.weight_override != weight {
+            self.weight_override = weight;
+            self.dirty = true;
+        }
+    }
+
+    /// Effective font size in logical px (override or style).
+    pub fn size_value(&self) -> f32 {
+        self.size_override.unwrap_or_else(|| self.style.size())
+    }
+
+    /// Effective weight (override or style).
+    pub fn weight_value(&self) -> f32 {
+        self.weight_override.unwrap_or_else(|| self.style.weight())
     }
 
     pub fn foreground(mut self, foreground: TextForeground) -> Self {
@@ -202,9 +264,9 @@ impl BasicText {
         };
         let mut layout = fonts.layout_text_aligned(
             &self.content,
-            self.style.size(),
+            self.size_value(),
             bake,
-            self.style.weight(),
+            self.weight_value(),
             self.wrap_width,
             match self.alignment {
                 TextAlignment::Leading => CTTextAlignment::Leading,
@@ -443,6 +505,56 @@ mod tests {
             TextForeground::Gradient(vec![Color::WHITE]).resolve(ThemeMode::Dark, true),
             ResolvedForeground::Solid(_)
         ));
+    }
+
+    #[test]
+    fn size_and_weight_override_the_style() {
+        let mut fonts = FontSystem::new();
+        let mut base = BasicText::new("21°");
+        assert_eq!(base.size_value(), TextStyle::Body.size());
+        assert_eq!(base.weight_value(), TextStyle::Body.weight());
+
+        let mut big = BasicText::new("21°").size(72.0).weight(100.0);
+        assert_eq!(big.size_value(), 72.0);
+        assert_eq!(big.weight_value(), 100.0);
+
+        let (base_w, base_h) = base.measure(&mut fonts);
+        let (big_w, big_h) = big.measure(&mut fonts);
+        assert!(big_w > base_w, "larger text must measure wider");
+        assert!(big_h > base_h, "larger text must measure taller");
+
+        // Clearing both restores the style metrics. `clear_size` and
+        // `clear_weight` consume the builder, so build one chain per
+        // assertion.
+        let cleared = BasicText::new("21°").size(72.0).weight(100.0);
+        assert_eq!(cleared.clear_size().size_value(), TextStyle::Body.size());
+        let cleared = BasicText::new("21°").size(72.0).weight(100.0);
+        assert_eq!(
+            cleared.clear_size().clear_weight().weight_value(),
+            TextStyle::Body.weight()
+        );
+    }
+
+    #[test]
+    fn set_size_and_set_weight_mark_layout_dirty() {
+        let mut fonts = FontSystem::new();
+        let mut text = BasicText::new("Tokyo");
+        let (_, first) = text.measure(&mut fonts);
+        text.set_size(Some(48.0));
+        text.set_weight(Some(300.0));
+        let (wider, second) = text.measure(&mut fonts);
+        assert!(second > first);
+        assert!(wider > 0.0);
+        assert_eq!(text.size_value(), 48.0);
+        assert_eq!(text.weight_value(), 300.0);
+
+        // No-ops when the value does not change.
+        let before = text.layout.is_some();
+        text.set_size(Some(48.0));
+        assert_eq!(text.layout.is_some(), before);
+        text.set_size(None);
+        text.set_weight(None);
+        assert_eq!(text.size_value(), TextStyle::Body.size());
     }
 
     #[test]

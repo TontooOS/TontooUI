@@ -429,7 +429,8 @@ impl BackdropBlur {
             height,
             TextureUsages::STORAGE_BINDING
                 | TextureUsages::TEXTURE_BINDING
-                | TextureUsages::COPY_SRC,
+                | TextureUsages::COPY_SRC
+                | TextureUsages::COPY_DST,
         );
         let temp = create_target(
             device,
@@ -518,6 +519,54 @@ impl BackdropBlur {
             .as_ref()
             .expect("backdrop size ensured")
             .content_view
+    }
+
+    /// Replace the capture content with RGBA8 `pixels`.
+    ///
+    /// Used by the compositor backdrop stream (see
+    /// [`CompositorBackdrop`](super::backdrop_stream::CompositorBackdrop)),
+    /// which hands over desktop pixels instead of the app having to render
+    /// them a second time. `width` and `height` must match the size passed to
+    /// [`ensure_size`](Self::ensure_size). Returns `false` without touching
+    /// the texture when the geometry does not match.
+    pub fn upload_content(&mut self, queue: &Queue, pixels: &[u8], width: u32, height: u32) -> bool {
+        let Some(targets) = self.targets.as_ref() else {
+            return false;
+        };
+        if targets.content.width() != width || targets.content.height() != height {
+            return false;
+        }
+        if pixels.len() != width as usize * height as usize * 4 {
+            return false;
+        }
+        // Rows must align to COPY_BYTES_PER_ROW_ALIGNMENT.
+        let row_bytes = width as usize * 4;
+        let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT as usize;
+        let padded = row_bytes.div_ceil(align) * align;
+        let mut upload = vec![0u8; padded * height as usize];
+        for (dst, src) in upload.chunks_mut(padded).zip(pixels.chunks(row_bytes)) {
+            dst[..row_bytes].copy_from_slice(src);
+        }
+        queue.write_texture(
+            wgpu::TexelCopyTextureInfo {
+                texture: &targets.content,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            &upload,
+            wgpu::TexelCopyBufferLayout {
+                offset: 0,
+                bytes_per_row: Some(padded as u32),
+                rows_per_image: Some(height),
+            },
+            wgpu::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+        );
+        true
     }
 
     /// Horizontal then vertical gaussian over `content` into `output`.

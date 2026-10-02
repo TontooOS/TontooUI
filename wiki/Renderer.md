@@ -13,6 +13,7 @@ result to the winit surface. There is no UIKit layer and no GTK dependency.
 | `text` | `src/renderer/text.rs` | CoreText font system and crisp scene text drawing |
 | `frame` | `src/renderer/frame.rs` | Window frame: shadows, rounded body, edge, outline |
 | `backdrop` | `src/renderer/backdrop.rs` | Offscreen capture + separable gaussian blur for glass |
+| `backdrop_stream` | `src/renderer/backdrop_stream.rs` | Compositor desktop backdrop stream (shared mmap) |
 | `images` | `src/renderer/images.rs` | SF Symbol cache, per-frame `ImageLoader`, backdrop access |
 
 ## Window
@@ -311,8 +312,18 @@ it (window body, tracks, labels, bars):
    `set_backdrop_sharp(Some(sharp))`, frame lines, render to the
    surface target, blit.
 
-Desktop pixels behind a transparent window still belong to the compositor;
-this pass blurs only what the app itself draws.
+### Desktop pixels
+
+Step 1 is skipped when the compositor backdrop stream is live. In that case
+the compositor captures the elements below the window at half resolution,
+writes them into a shared memory file and announces the rect; the shell
+upsamples it and pushes it into `content` with
+`BackdropBlur::upload_content`, so steps 2 and 3 are unchanged and the frame
+costs a single Vello pass. See [BackdropStream.md](BackdropStream.md).
+
+Without the stream, the two-pass capture above is the only source and glass
+blurs just what the app itself draws; the desktop stays sharp behind a
+transparent body.
 
 ```rust
 pub const BACKDROP_SIGMA: f32;
@@ -328,6 +339,10 @@ pub fn fill_lens_glass(scene: &mut Scene, images: &ImageLoader<'_>, rect: &Rect,
 
 - `BackdropBlur` owns the three offscreen targets and the compute pipeline;
   the shell creates one per window and resizes it with `ensure_size`.
+- `upload_content(queue, pixels, width, height)` replaces the capture
+  content with external RGBA8 pixels. Returns `false` and leaves the
+  texture untouched when the size does not match `ensure_size` or the
+  buffer length is wrong.
 - `fill_backdrop` paints `shape` with the blurred capture when
   `ImageLoader::backdrop()` is `Some`; no-op otherwise (single-pass frames).
   Scene coordinates are physical px and the texture is full-window physical
@@ -533,5 +548,6 @@ fn main() {
 - [Layout.md](Layout.md) – VStack, HStack, ZStack, Spacer and the View trait
 - [Theme.md](Theme.md) – live dark/light plus accent with fade animation
 - [Glass.md](Glass.md) – liquid glass container plus transparent body
+- [BackdropStream.md](BackdropStream.md) – desktop pixels from the compositor
 - [Button.md](Button.md) – standard button with CoreIcon SF Symbols
 - [Slider.md](Slider.md) – slider with steps, labels, ticks and glass track

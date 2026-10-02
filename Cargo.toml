@@ -17,6 +17,10 @@ coreimage = { package = "coreimage", path = "../CoreImage" }
 # Layer-shell backend (shell bars like the menubar): Wayland only.
 smithay-client-toolkit = "0.19"
 wayland-client = { version = "0.31", features = ["system"] }
+# Generates the `tontoo_ui` client bindings used by the compositor backdrop
+# stream (protocol/tontoo_ui.xml).
+wayland-scanner = "0.31"
+wayland-backend = "0.3"
 raw-window-handle = "0.6"
 networkkit = { path = "../NetworkKit" }
 mediakit = { path = "../MediaKit" }
@@ -27,6 +31,7 @@ foundation = { path = "../Foundation" }
 # Settings daemon client (unix socket, TontooOS target only).
 [target.'cfg(unix)'.dependencies]
 coresettings = { path = "../CoreSettings" }
+libc = "0.2"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

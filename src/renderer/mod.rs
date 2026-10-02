@@ -1,4 +1,5 @@
 pub mod backdrop;
+pub mod backdrop_stream;
 pub mod frame;
 pub mod images;
 pub mod layershell;
@@ -6,6 +7,7 @@ pub mod text;
 pub mod window;
 
 pub use backdrop::{BACKDROP_SIGMA, BackdropBlur, LENS_OVERSHOOT_RATIO, fill_backdrop, fill_backdrop_lens, fill_backdrop_lens_xy, fill_backdrop_veil, fill_frosted_glass, fill_lens_glass, lens_zoom_for_size, stroke_backdrop_edge};
+pub use backdrop_stream::{BACKDROP_SCALE, CompositorBackdrop, Frame as BackdropFrame};
 pub use frame::{EDGE, INNER_TOP, MARGIN, OUTER, body_shape, content_rect, ensure_transparent_alpha};
 pub use images::{ImageCache, ImageLoader};
 pub use layershell::{

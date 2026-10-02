@@ -120,12 +120,17 @@ corners, over a wider faint halo that softens it; the bottom edge
 gets a much fainter counterpart. Like the reference menu highlight,
 only the middle reads brighter while the corners stay clean.
 
-Desktop pixels behind a transparent window still need the compositor (it
-owns those pixels); `App::transparent_body` skips the window background
-fill so only frame lines, bars and glass show over the desktop. Enable
-`App::wants_backdrop` for in-app blur of content the shell itself draws
-(window body, titlebar, tracks). On the capture pass the whole container
-(body and children) is omitted so the blur sees only what sits behind it.
+Desktop pixels behind a transparent window come from the compositor. When
+`tontoo_ui_manager` offers the backdrop stream, the shell subscribes and the
+compositor writes the pixels below the window into a shared file; TontooUI
+blurs those itself, and the shell skips its own capture pass. See
+[BackdropStream.md](BackdropStream.md).
+
+`App::transparent_body` skips the window background fill so only frame
+lines, bars and glass show over the desktop. Enable `App::wants_backdrop`
+for the fallback in-app blur of content the shell itself draws (window body,
+titlebar, tracks); on that capture pass the whole container (body and
+children) is omitted so the blur sees only what sits behind it.
 
 ## Usage / Example
 

@@ -16,6 +16,7 @@ theme, animation and a Vello/WGPU renderer.
 | Animation | [Animation.md](Animation.md) | Frame clock, tweens, springs, decay |
 | Alerts | [Alerts.md](Alerts.md) | Modal frosted alert with OK/Cancel actions |
 | BarSwitcher | [BarSwitcher.md](BarSwitcher.md) | Single-select toolbar with icon/text/both cells |
+| BackdropStream | [BackdropStream.md](BackdropStream.md) | Compositor desktop backdrop stream for client blur |
 | Button | [Button.md](Button.md) | Standard button with CoreIcon SF Symbols |
 | Colors | [Colors.md](Colors.md) | System colors and linear/radial/angular gradients |
 | ContentUnavailable | [ContentUnavailable.md](ContentUnavailable.md) | Empty-state placeholder with refresh |
@@ -90,6 +91,30 @@ See [Renderer.md](Renderer.md) for the shell and [Layout.md](Layout.md)
 for the `View` tree.
 
 ## Changelog
+
+- 2026-10-02: `BasicText` gained `size(px)` / `weight(w)` plus
+  `clear_size` / `clear_weight`, the `set_size(Option<f32>)` /
+  `set_weight(Option<f32>)` setters and the `size_value` /
+  `weight_value` readers. `TextStyle` tops out at `LargeTitle` (34 px),
+  so display numbers set the size directly; `style` still picks the type
+  scale. See [Text.md](Text.md).
+
+- 2026-10-02: Desktop backdrop stream (`src/renderer/backdrop_stream.rs`).
+  TontooUI now blurs the *desktop* instead of only its own content:
+  `CompositorBackdrop::attach` wraps winit's `wl_display` in a guest
+  Wayland backend, binds `tontoo_ui_manager`, hands the compositor a
+  `memfd` and subscribes with `set_backdrop`. The compositor captures the
+  elements below the window at half resolution, writes them into the
+  shared file and sends a `backdrop` event; TontooUI upsamples the rect and
+  pushes it into `BackdropBlur` through the new `upload_content`, so the
+  existing WGSL blur, lens, frost and rim code is untouched. A live stream
+  also removes the second Vello pass. `App::wants_backdrop` keeps working
+  as the fallback for compositors without the global. New deps:
+  `wayland-scanner`, `wayland-backend`, `libc` plus a vendored
+  `protocol/tontoo_ui.xml`. See [BackdropStream.md](BackdropStream.md).
+- 2026-10-02: Fixed three compile errors in the `BasicText` unit tests
+  (`measure` needs a mutable receiver, `clear_size` consumes the builder).
+  The test target did not build before. See [Text.md](Text.md).
 
 - 2026-09-30: List icons plus outline upgrades. `ListRow::icon`
   plus `icon_tint` draw an 18px SF Symbol ahead of item labels
