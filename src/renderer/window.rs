@@ -392,6 +392,28 @@ pub trait App {
     fn poll_window_command(&mut self) -> Option<WindowCommand> {
         None
     }
+    /// Clickable rectangle in logical px, `None` (the default) makes the
+    /// whole window clickable. A panel that floats over the desktop uses
+    /// this to stay click-through outside its own body: the shell turns the
+    /// rect into an input region, so pointer presses only land on the panel.
+    /// Return a negative width or height to make the surface click-through
+    /// entirely. Only honored by the layer-shell backend
+    /// (see `renderer::layershell`); the winit shell ignores it.
+    fn input_region(&self) -> Option<(f32, f32, f32, f32)> {
+        None
+    }
+    /// Additional layer surface this app wants, polled once per frame like
+    /// `poll_window_command` and consumed when it returns `Some`. The
+    /// overlay is mapped on the same output as the requesting surface and
+    /// disappears again when its own app returns
+    /// `WindowCommand::Close`, leaving the requester running. Used by the
+    /// dock for its LaunchPad grid: the panel stays up while the grid
+    /// opens and closes above it. `None` (the default) never opens one.
+    /// Honored by the layer-shell backend (see `renderer::layershell`); the
+    /// winit shell ignores it.
+    fn poll_overlay(&mut self) -> Option<crate::renderer::layershell::OverlayRequest> {
+        None
+    }
     /// Window body background. Read every frame so theme changes apply
     /// live; defaults to the dark base color.
     fn background(&self) -> Color {

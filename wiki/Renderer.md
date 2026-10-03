@@ -9,7 +9,7 @@ result to the winit surface. There is no UIKit layer and no GTK dependency.
 | Module | Path | Description |
 |---|---|---|
 | `window` | `src/renderer/window.rs` | winit event loop, surface management, `App` trait, `run` |
-| `layershell` | `src/renderer/layershell.rs` | Wayland layer-shell backend, one `App` per output, `run_layer` |
+| `layershell` | `src/renderer/layershell.rs` | Wayland layer-shell backend (bars, bottom panel, overlays) |
 | `text` | `src/renderer/text.rs` | CoreText font system and crisp scene text drawing |
 | `frame` | `src/renderer/frame.rs` | Window frame: shadows, rounded body, edge, outline |
 | `backdrop` | `src/renderer/backdrop.rs` | Offscreen capture + separable gaussian blur for glass |
@@ -127,6 +127,12 @@ pub trait App {
     fn poll_window_command(&mut self) -> Option<WindowCommand> {
         None
     }
+    fn input_region(&self) -> Option<(f32, f32, f32, f32)> {
+        None
+    }
+    fn poll_overlay(&mut self) -> Option<OverlayRequest> {
+        None
+    }
     fn background(&self) -> Color {
         BACKGROUND
     }
@@ -138,6 +144,30 @@ pub trait App {
     }
 }
 ```
+
+```rust
+fn input_region(&self) -> Option<(f32, f32, f32, f32)>
+```
+
+Clickable rectangle `(x, y, width, height)` in logical px, read every
+frame; the default `None` leaves the whole surface clickable. The
+layer-shell backend turns the rect into a `wl_surface` input region, so
+a floating panel stays click-through outside its own body while the
+surface itself is larger. A negative width or height installs an empty
+region, which makes the surface click-through entirely. The winit shell
+has no input shape and ignores this hook.
+
+```rust
+fn poll_overlay(&mut self) -> Option<OverlayRequest>
+```
+
+Extra layer surface this app wants right now, polled once per frame and
+consumed when it returns `Some`. The shell maps it on the same output as
+the requesting surface, above every surface that existed when it was
+created, and drops it again when the overlay's own app returns
+`WindowCommand::Close` — the requester keeps running. The dock uses this
+for its LaunchPad grid: the panel stays up while the grid opens and
+closes above it. See [LayerShell](#layershell).
 
 ```rust
 pub struct Modifiers {
@@ -615,27 +645,150 @@ call it after every `create_surface` (resizes reuse the stored config).
 
 ## LayerShell
 
-Wayland layer-shell backend for shell bars (`src/renderer/layershell.rs`,
-smithay-client-toolkit): one layer surface per output (top edge,
-exclusive zone, no keyboard focus), each driving its own `App` instance,
-so a single process serves all monitors. Rendering reuses the
-texture/blit/present pipeline; there is no backdrop blur on this path.
+Wayland layer-shell backend for shell surfaces (`src/renderer/layershell.rs`,
+`smithay-client-toolkit`): one or more layer surfaces per output, each
+driving its own `App` instance, so a single process serves all monitors.
+Rendering reuses the texture/blit/present pipeline; there is no backdrop blur
+on this path.
+
+> **Note:** The compositor backdrop stream only feeds space windows (a normal
+> `run()` window), never a layer surface, so `wants_backdrop` has no effect
+> here. Bars paint their own translucent fills (see `BarMenu`); a floating
+> panel such as the dock paints a baked image of its own background.
+
+### Placement
+
+```rust
+pub enum LayerPlacement {
+    TopBar,
+    BottomBar,
+    Fullscreen,
+}
+```
+
+| Placement | Anchors | Exclusive zone | Layer | Size request |
+|---|---|---|---|---|
+| `TopBar` | top, left, right | `height` | `Top` | width follows the output, height fixed |
+| `BottomBar` | bottom only | `0` | `Top` | fixed `width` and `height` |
+| `Fullscreen` | all four | `0` | `Bottom` | `0 x 0`, the compositor sizes it |
+
+- `TopBar` is the shell bar case: it reserves its own strip, so maximized
+  windows never overlap it.
+- `BottomBar` is a floating bottom panel (the dock). The vertical-only
+  anchor makes the compositor **center it horizontally**, and the neutral
+  exclusive zone leaves the whole output to app windows. `Layer::Top` puts
+  it above every app window.
+- `Fullscreen` covers the output on `Layer::Bottom`: above the wallpaper and
+  below every app window (the desktop widget layer). It reserves nothing, so
+  windows are unaffected.
+
+### Options
 
 ```rust
 pub struct LayerBarOptions;
-pub struct LayerOutput;
-pub fn run_layer(make: impl FnMut(LayerOutput) -> Option<(Box<dyn App>, LayerBarOptions>)) -> Result<(), Box<dyn Error>>
+pub fn new(namespace: impl Into<String>, height: u32) -> Self;
+pub fn bottom(namespace: impl Into<String>, height: u32) -> Self;
+pub fn fullscreen(namespace: impl Into<String>) -> Self;
+pub fn with_width(self, width: u32) -> Self;
+pub fn with_backdrop(self, backdrop: bool) -> Self;
+pub fn with_keyboard(self, keyboard: bool) -> Self;
+pub fn wants_keyboard(&self) -> bool;
+pub fn layer_kind(&self) -> Layer;
+pub fn exclusive_zone(&self) -> i32;
+pub fn anchors(&self) -> Anchor;
+pub fn configured_size(&self, output_width: u32, output_height: u32) -> (u32, u32);
 ```
 
-- `LayerOutput` carries the output `name`, logical `width` and `scale`;
-  the factory returns the bar `App` plus `LayerBarOptions` (`namespace`,
-  `height` in logical px, also the exclusive zone), or `None` to skip
-  the output. Hotplugged outputs call the factory again.
-- Pointer events (left button only) map to `mouse_move`/`mouse_down`/
-  `mouse_up` in logical px; only `WindowCommand::Close` is honored
-  (drops the surface, exits when none is left).
-- Without a Wayland compositor `run_layer` returns an error. Transparent
-  bars use `App::transparent_body` and paint their own background.
+`height` is clamped to at least 1. `width` defaults to `0`, meaning "follow
+the output"; a fixed width plus a `BottomBar` placement is what centers the
+surface.
+
+### Running
+
+```rust
+pub type LayerSurfaces = Vec<(Box<dyn App>, LayerBarOptions)>;
+pub fn run_layer(
+    make: impl FnMut(LayerOutput) -> Option<(Box<dyn App>, LayerBarOptions)> + 'static,
+) -> Result<(), Box<dyn Error>>;
+pub fn run_layer_multi(
+    make: impl FnMut(LayerOutput) -> Option<LayerSurfaces> + 'static,
+) -> Result<(), Box<dyn Error>>;
+```
+
+- `run_layer` maps exactly one surface per output and is what the Menubar
+  uses.
+- `run_layer_multi` maps every surface the factory returns, in stacking
+  order: later entries sit above earlier ones. `[]` or `None` skips the
+  output. Both drive continuous redraw, so animations run without timers.
+- Returns an error without a Wayland compositor (no `WAYLAND_DISPLAY`), and
+  returns when the last surface closes.
+- `LayerOutput` carries the output `name`, logical `width` and `scale`.
+  Hotplugged outputs call the factory again.
+
+```rust
+pub struct OverlayRequest {
+    pub app: Box<dyn App>,
+    pub options: LayerBarOptions,
+}
+```
+
+Returned from [`App::poll_overlay`](#app) to open a further surface while
+running.
+
+### Input
+
+- Pointer events (left, middle and right button, motion, wheel) arrive as
+  `mouse_down` / `mouse_move` / `mouse_up` / `context_click` /
+  `mouse_button` in logical px, with the current `Modifiers` snapshot.
+  The window itself claims no pointer area, so nothing is filtered.
+- `App::input_region` installs the surface input region, re-sent only when
+  the rect actually changes. A panel shrinks it to its own body and grows it
+  back to the whole surface while a drag is in flight.
+- `options.keyboard` maps the surface to `KeyboardInteractivity::Exclusive`:
+  the compositor focuses it while it is mapped and releases it when it
+  closes. Without a compositor that honors this (or with the flag off) keys
+  never arrive, which is what bars and the dock want.
+- A surface only takes keyboard focus when it asked for it, so a keyboard
+  event aimed at a bar is ignored.
+
+### Keyboard
+
+Key transitions arrive through the same hooks the winit shell uses, in the
+same order:
+
+1. `App::raw_key` with the full `KeyPress` (identity plus `Modifiers`, decoded
+   text and the pressed flag) for **every** transition, including releases
+   and chords that produce no text.
+2. A Ctrl chord resolves to one intent key (`SelectAll`, `Copy`, `Cut`,
+   `Paste`, `Undo`, `Redo`) or a Shift+arrow to `SelectLeft` /
+   `SelectRight` / `SelectUp` / `SelectDown`, delivered via `App::key`, and
+   stops there.
+3. `Backspace`, `Left`, `Right`, `Enter`, `KeypadEnter` and `Escape` map to
+   their `App::key` intent; every other press arrives as `App::text`.
+
+```rust
+pub fn raw_key_from_keysym(keysym: u32, modifiers: &Modifiers) -> Option<RawKey>
+```
+
+Maps the compositor's translated X11 keysym to a `RawKey`. Latin-1 keysyms
+become `Character`, so a German layout reports the umlaut it produced;
+`KS_F1..KS_F12` and `KS_KP_0..KS_KP_9` are contiguous runs. Modifier keysyms
+(`Shift_L`, `Control_R`, ...) return `None`: they carry no identity of their
+own and reach the app through `Modifiers` only, exactly like a bare modifier
+press in the winit shell. The `KS_*` constants are exported for apps that
+need the raw values.
+
+### Geometry helpers
+
+```rust
+pub fn exclusive_zone_for_height(height: u32) -> i32;
+pub fn logical_size(physical: u32, scale: i32) -> u32;
+pub fn physical_size(logical: u32, scale: f32) -> u32;
+pub fn output_label(name: Option<&str>, index: usize) -> String;
+pub const LAYER_BUTTON_LEFT: u32;
+pub fn button_kind(code: u32) -> Option<MouseButtonKind>;
+pub fn button_press(code: u32, pressed: bool) -> Option<bool>;
+```
 
 ## Usage / Example
 
@@ -672,3 +825,4 @@ fn main() {
 - [BackdropStream.md](BackdropStream.md) – desktop pixels from the compositor
 - [Button.md](Button.md) – standard button with CoreIcon SF Symbols
 - [Slider.md](Slider.md) – slider with steps, labels, ticks and glass track
+- [Gestures.md](Gestures.md) – `GestureArea` for tap, long press and drag on a bar

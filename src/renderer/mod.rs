@@ -11,8 +11,9 @@ pub use backdrop_stream::{BACKDROP_SCALE, CompositorBackdrop, Frame as BackdropF
 pub use frame::{EDGE, INNER_TOP, MARGIN, OUTER, body_shape, content_rect, ensure_transparent_alpha};
 pub use images::{ImageCache, ImageLoader};
 pub use layershell::{
-    LAYER_BUTTON_LEFT, LayerBarOptions, LayerOutput, button_press,
-    exclusive_zone_for_height, logical_size, output_label, physical_size, run_layer,
+    KS_BACKSPACE, KS_ESCAPE, KS_F1, KS_RETURN, KS_TAB, LAYER_BUTTON_LEFT, LayerBarOptions,
+    LayerOutput, LayerPlacement, LayerSurfaces, OverlayRequest, button_press, exclusive_zone_for_height,
+    logical_size, output_label, physical_size, raw_key_from_keysym, run_layer, run_layer_multi,
 };
 pub use text::{
     AttrSpan, AttributedString, CTFont, CTFontDescriptor, CTFontStyle, CTFontWeight,

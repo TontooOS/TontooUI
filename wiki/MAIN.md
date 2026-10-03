@@ -33,7 +33,7 @@ theme, animation and a Vello/WGPU renderer.
 | Menu | [Menu.md](Menu.md) | Simple dropdown with action rows, picker base |
 | Outline | [Outline.md](Outline.md) | File tree with fade reveal, chevrons and single-select |
 | Material | [Material.md](Material.md) | Translucent material veils in five thicknesses |
-| Renderer | [Renderer.md](Renderer.md) | Window shell, frame pipeline, backdrop blur |
+| Renderer | [Renderer.md](Renderer.md) | Window shell, frame pipeline, backdrop blur, layer shell |
 | Picker | [Picker.md](Picker.md) | Segmented, inline, menu and date pickers |
 | Progress | [Progress.md](Progress.md) | Linear progress bar with chase buffer |
 | Scrollbar | [Scrollbar.md](Scrollbar.md) | Overlay side bar with fade, drag and page jump |
@@ -91,6 +91,23 @@ See [Renderer.md](Renderer.md) for the shell and [Layout.md](Layout.md)
 for the `View` tree.
 
 ## Changelog
+
+- 2026-10-03: The layer-shell backend grew into a full shell-surface host,
+  built for the dock. `LayerPlacement` (`TopBar`, `BottomBar`, `Fullscreen`)
+  replaces the old `fullscreen` flag: a bottom bar is anchored to the
+  bottom edge only, so the compositor centers it, and takes no exclusive
+  zone, so maximized windows keep the whole output. `App::input_region`
+  installs a per-surface input region, so a panel floats over the desktop
+  and stays click-through outside its own body (and a drag can grow the
+  region back to the whole surface). `run_layer_multi` maps several
+  surfaces per output in stacking order and `App::poll_overlay` opens more
+  while running, which is how one process hosts the dock bar plus its
+  LaunchPad grid; `LayerBarOptions::with_keyboard(true)` maps the surface to
+  `KeyboardInteractivity::Exclusive` so a modal overlay with a search field
+  can be typed into. Keys arrive through the same `raw_key` / `key` / `text`
+  hooks the winit shell uses, mapped with `raw_key_from_keysym`.
+  `run_layer` keeps its old signature, so the Menubar is unchanged. See
+  [Renderer.md](Renderer.md).
 
 - 2026-10-03: `SearchField` can paint a solid body instead of glass.
   `fill(color)` / `set_fill` / `fill_color` plus `SEARCH_RADIUS` replace
