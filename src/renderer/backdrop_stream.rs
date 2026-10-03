@@ -43,11 +43,15 @@ pub mod protocol {
 use protocol::tontoo_ui_manager::TontooUiManager;
 use protocol::tontoo_ui_surface::TontooUiSurface;
 
-/// Downscale divisor requested from the compositor. Two is visually
+/// Downscale divisor requested from the compositor.
+///
+/// One means full resolution. That is the right choice because the compositor
+/// only captures when the content behind the window actually changed, so a
+/// panel opening over a still desktop pays for exactly one readback no matter
+/// how long it stays open. A divisor above one only helps when something
+/// behind the window animates continuously.
+pub const BACKDROP_SCALE: u32 = 1;
 
-/// indistinguishable from full resolution once blurred and halves the
-/// readback the compositor performs.
-pub const BACKDROP_SCALE: u32 = 2;
 
 // ---------------------------------------------------------------------------
 // Shared memory

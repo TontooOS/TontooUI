@@ -92,6 +92,12 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-10-02: `BACKDROP_SCALE` is now `1`, so the compositor stream delivers
+  full resolution. Affordable because the compositor only captures when the
+  content behind the window actually changed: a panel opening over a still
+  desktop pays for exactly one readback, and divisors above one only help
+  while something behind the window animates. See
+  [BackdropStream.md](BackdropStream.md).
 - 2026-10-03: The wheel reaches every element again. `View::mouse_wheel`
   has a do-nothing default and parents only reach their children through
   the trait, but no scrollable element forwarded it in its `impl View`

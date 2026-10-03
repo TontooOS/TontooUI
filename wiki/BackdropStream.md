@@ -37,6 +37,8 @@ Wraps winit's `wl_display` in a guest Wayland backend, binds
 `create_backdrop_buffer` with a fresh `memfd` of `buffer_width` x
 `buffer_height` x 4 bytes.
 
+The compositor captures only when the content behind the window changed, so
+this buffer is written rarely; its size has nothing to do with frame rate.
 `buffer_width` and `buffer_height` must cover the whole output in physical
 pixels: the compositor writes the window rect at its position inside that
 buffer, so a small buffer would only work for a window in the top left
@@ -135,9 +137,11 @@ the window size.
 | Same size requested | Copy of `src` |
 | Success | Upscaled RGBA8 |
 
-The compositor samples the desktop at `1 / BACKDROP_SCALE`. The glass blur
-uses a sigma far larger than that, so blocky samples disappear afterwards.
-Upsampling on the CPU keeps every glass view (`fill_lens_glass`,
+The compositor samples the desktop at `1 / BACKDROP_SCALE`, which is `1` by
+default, so in practice this is a straight copy. It stays in place because
+the compositor allows a client to ask for a divisor above one.
+
+Upscaling on the CPU keeps every glass view (`fill_lens_glass`,
 `fill_backdrop_veil`, `stroke_backdrop_edge`, ...) unchanged: they all
 assume a full window sized backdrop texture with image pixel `(0, 0)` at
 scene `(0, 0)`.
@@ -147,11 +151,21 @@ scene `(0, 0)`.
 ### BACKDROP_SCALE
 
 ```rust
-pub const BACKDROP_SCALE: u32 = 2;
+pub const BACKDROP_SCALE: u32 = 1;
 ```
 
-Downscale divisor sent with `set_backdrop`. Two halves the compositor's
-readback and is visually indistinguishable from full resolution once blurred.
+Downscale divisor sent with `set_backdrop`.
+
+One means full resolution: the client receives one buffer pixel per output
+pixel and the blur runs on real pixels. That is affordable because the
+compositor only captures when the content behind the window actually
+changed, so a panel opening over a still desktop pays for exactly one
+readback no matter how long it stays open. A divisor above one only helps
+when something behind the window animates continuously, where the smaller
+readback buys back frame rate.
+
+At one the compositor's samples already match the window size, so
+[`upsample`](upsample) degenerates to a single copy rather than a resample.
 
 ## Renderer integration
 

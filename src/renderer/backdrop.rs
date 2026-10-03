@@ -248,9 +248,16 @@ struct VarTargets {
     view: TextureView,
     tiles_x: u32,
     tiles_y: u32,
-    staging: Buffer,
+    /// Readback buffer. Taken out (`None`) while a map is in flight so
+    /// no `copy_texture_to_buffer` can target a mapped buffer.
+    staging: Option<Buffer>,
     /// Floats per staging row (256-byte aligned).
     row_stride: usize,
+    /// A map was requested and not yet released.
+    mapping: bool,
+    /// Callback of the in-flight map, kept so a late arrival can be
+    /// released on a later frame.
+    pending: Option<std::sync::mpsc::Receiver<bool>>,
 }
 
 /// Owns the offscreen targets and the compute pipeline for one window.
@@ -492,8 +499,10 @@ impl BackdropBlur {
             tex: var_tex,
             tiles_x,
             tiles_y,
-            staging,
+            staging: Some(staging),
             row_stride,
+            mapping: false,
+            pending: None,
         });
         if let Ok(mut busy) = self.busy.lock() {
             *busy = BusyGrid {
@@ -642,6 +651,11 @@ impl BackdropBlur {
         let (Some(t), Some(vt)) = (self.targets.as_ref(), self.var_targets.as_ref()) else {
             return;
         };
+        // A buffer with a live or pending map cannot take a copy, so the
+        // whole sample waits one frame.
+        let Some(staging) = vt.staging.as_ref() else {
+            return;
+        };
         let params = VParams {
             width,
             height,
@@ -694,7 +708,7 @@ impl BackdropBlur {
                 aspect: wgpu::TextureAspect::All,
             },
             wgpu::TexelCopyBufferInfo {
-                buffer: &vt.staging,
+                buffer: staging,
                 layout: wgpu::TexelCopyBufferLayout {
                     offset: 0,
                     bytes_per_row: Some(vt.row_stride as u32 * 4),
@@ -712,26 +726,50 @@ impl BackdropBlur {
     /// Block briefly on the tiny staging readback and publish the
     /// grid. Skips silently when mapping fails so a frame never dies
     /// on measurement.
+    ///
+    /// The staging buffer is taken out of `VarTargets` for the whole
+    /// map, so a failed or late map can never leave it mapped: the next
+    /// dispatch skips its copy instead of tripping wgpu's
+    /// "buffer is still mapped" validation, and [`Self::release_map`]
+    /// hands the buffer back once the callback has landed.
     fn readback_variance(&mut self, device: &Device) {
-        let Some(vt) = self.var_targets.as_ref() else {
+        let Some(vt) = self.var_targets.as_mut() else {
+            return;
+        };
+        if vt.mapping {
+            // A map from an earlier frame is still in flight.
+            Self::release_map(vt);
+            return;
+        }
+        let Some(staging) = vt.staging.take() else {
             return;
         };
         let (tiles_x, tiles_y, row_stride) = (vt.tiles_x, vt.tiles_y, vt.row_stride);
-        let (width, height) = (tiles_x, tiles_y);
-        let slice = vt.staging.slice(..);
+        let slice = staging.slice(..);
         let (tx, rx) = std::sync::mpsc::channel();
         slice.map_async(wgpu::MapMode::Read, move |result| {
             let _ = tx.send(result.is_ok());
         });
-        // Bounded wait: a late map just skips this sample.
+        vt.mapping = true;
+        vt.pending = Some(rx);
+        // Bounded wait: a late map keeps the buffer out for one more
+        // frame instead of reading unmapped memory.
         let wait = wgpu::PollType::Wait {
             submission_index: None,
             timeout: Some(std::time::Duration::from_millis(100)),
         };
-        if device.poll(wait).is_err() {
+        let polled = device.poll(wait).is_ok();
+        let landed = polled
+            && vt
+                .pending
+                .as_ref()
+                .and_then(|rx| rx.try_recv().ok())
+                .unwrap_or(false);
+        if !landed {
             return;
         }
-        if rx.recv().unwrap_or(false) {
+        vt.pending = None;
+        {
             let data = slice.get_mapped_range();
             let mut tiles = vec![0.0f32; tiles_x as usize * tiles_y as usize];
             for ty in 0..tiles_y as usize {
@@ -742,15 +780,44 @@ impl BackdropBlur {
                 }
             }
             drop(data);
-            vt.staging.unmap();
+            staging.unmap();
             if let Ok(mut busy) = self.busy.lock() {
-                busy.width = width;
-                busy.height = height;
+                busy.width = tiles_x;
+                busy.height = tiles_y;
                 busy.tiles_x = tiles_x;
                 busy.tiles_y = tiles_y;
                 busy.tiles = tiles;
             }
         }
+        vt.staging = Some(staging);
+        vt.mapping = false;
+    }
+
+    /// Release a map whose callback landed after the bounded wait: the
+    /// sample is dropped, but the buffer is unmapped and handed back so
+    /// the next dispatch can copy into it again. A callback that has
+    /// not fired yet keeps the buffer out for one more frame.
+    fn release_map(vt: &mut VarTargets) {
+        use std::sync::mpsc::TryRecvError;
+        let Some(staging) = vt.staging.take() else {
+            vt.mapping = false;
+            vt.pending = None;
+            return;
+        };
+        match vt.pending.take().map(|rx| rx.try_recv()) {
+            // Callback fired (with or without an error): the map slot is
+            // done and wgpu wants the buffer unmapped either way.
+            Some(Ok(_)) | Some(Err(TryRecvError::Disconnected)) => staging.unmap(),
+            // Still pending: leave the buffer out, retry next frame.
+            Some(Err(TryRecvError::Empty)) => {
+                vt.staging = None;
+                vt.mapping = true;
+                return;
+            }
+            None => {}
+        }
+        vt.staging = Some(staging);
+        vt.mapping = false;
     }
 
     /// Register (or refresh) the blurred output so views can sample it.
