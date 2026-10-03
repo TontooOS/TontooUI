@@ -31,6 +31,7 @@ placeholder, typing, Backspace and caret keys.
 | `LARGE_EDITOR_WRAP_W` / `LARGE_EDITOR_MIN_H` | 320 px intrinsic wrap width / 220 px minimum height |
 | `LARGE_EDITOR_BG_DARK` / `LARGE_EDITOR_BG_LIGHT` | `#141416` / `#F2F2F5` large editor fill |
 | `SEARCH_FONT_SIZE` / `SEARCH_ICON_SIZE` / `SEARCH_PAD_X` / `SEARCH_GAP` | 14 px / 16 px / 14 px / 8 px search metrics |
+| `SEARCH_RADIUS` | 6 px corner radius of the solid body (`fill`) |
 | `GLASS_FIELD_FONT_SIZE` / `GLASS_FIELD_PAD_X` | 14 px / 14 px glass field metrics |
 
 ## FieldCore
@@ -211,6 +212,9 @@ with a live value readout and a pending-key queue for the editors).
 
 ```rust
 pub fn new(placeholder: impl Into<String>) -> Self
+pub fn fill(self, color: impl Into<Option<Color>>) -> Self
+pub fn set_fill(&mut self, color: Option<Color>)
+pub fn fill_color(&self) -> Option<Color>
 pub fn set_theme(&mut self, mode: ThemeMode, accent: Color, glass: GlassAmount)
 pub fn set_focused(&mut self, focused: bool)
 pub fn on_change(self, callback: impl FnMut(&str) + 'static) -> Self
@@ -230,6 +234,16 @@ pub fn rect(&self) -> (f32, f32, f32, f32)
   needs the shell blur pass: the app opts in with `wants_backdrop`
   while visible, and the capsule skips the capture pass so the blur
   stays clean.
+- `fill(color)` paints a solid body with the `SEARCH_RADIUS` corner
+  radius instead of the glass capsule, like the search field of the
+  macOS open panel (`#EDEDF0` light, a dark gray in dark mode). Icon,
+  text, caret, editing and `rect` are unchanged; an unfocused window
+  desaturates the fill. `None` (default) keeps the glass.
+- The glass body samples the **window backdrop**, so it takes its
+  color from whatever sits behind the field: on a white card inside a
+  sheet it still came out tinted by the app background behind the card.
+  Use `fill` whenever the field must read as a neutral control
+  (sheets, forms, panels); a solid fill needs no blur pass at all.
 
 ## GlassTextField
 

@@ -24,6 +24,9 @@ pub const SEARCH_ICON_SIZE: f32 = 16.0;
 pub const SEARCH_PAD_X: f32 = 14.0;
 /// Search icon-text gap in logical px.
 pub const SEARCH_GAP: f32 = 8.0;
+/// Corner radius of the solid body in logical px (the glass capsule
+/// uses its own lens radius).
+pub const SEARCH_RADIUS: f32 = 6.0;
 
 /// Toolbar-like search field: clear (`Lens`) glass capsule with a magnifier
 /// icon and a single-line text input on top (like the reference
@@ -38,6 +41,7 @@ pub struct SearchField {
     glass: GlassContainer,
     dark: bool,
     focused: bool,
+    fill: Option<Color>,
     x: f32,
     y: f32,
     placed_w: f32,
@@ -52,11 +56,32 @@ impl SearchField {
             glass: GlassContainer::new().glass_type(GlassType::Lens),
             dark: true,
             focused: true,
+            fill: None,
             x: 0.0,
             y: 0.0,
             placed_w: 0.0,
             placed_h: 0.0,
         }
+    }
+
+    /// Solid body color instead of the glass capsule, like the search
+    /// field of the macOS open panel. `None` (default) keeps the
+    /// `Lens` glass, which samples the window backdrop and therefore
+    /// picks up whatever sits behind the field. A solid fill needs no
+    /// blur pass, so apps can opt out of `wants_backdrop` for it.
+    pub fn fill(mut self, color: impl Into<Option<Color>>) -> Self {
+        self.fill = color.into();
+        self
+    }
+
+    /// Solid body color after construction.
+    pub fn set_fill(&mut self, color: Option<Color>) {
+        self.fill = color;
+    }
+
+    /// Current body color override (`None` is the glass capsule).
+    pub fn fill_color(&self) -> Option<Color> {
+        self.fill
     }
 
     /// Live theme: frost amount, dark mode and the caret accent.
@@ -255,7 +280,32 @@ impl View for SearchField {
             // and caret skip too so the blur stays clean.
             return;
         }
-        self.glass.draw(scene, fonts, images);
+        let scale = fonts.scale as f64;
+        let px = |v: f32| v as f64 * scale;
+        // Solid body (open-panel style) or the glass capsule.
+        match self.fill {
+            Some(color) => {
+                let body = RoundedRect::new(
+                    px(self.x),
+                    px(self.y),
+                    px(self.x + self.placed_w),
+                    px(self.y + self.placed_h),
+                    px(SEARCH_RADIUS),
+                );
+                scene.fill(
+                    Fill::NonZero,
+                    Affine::IDENTITY,
+                    &Brush::Solid(if self.focused {
+                        color
+                    } else {
+                        desaturate(color)
+                    }),
+                    None,
+                    &body,
+                );
+            }
+            None => self.glass.draw(scene, fonts, images),
+        }
         self.icon.draw(scene, fonts, images);
         let scale = fonts.scale as f64;
         let px = |v: f32| v as f64 * scale;
@@ -369,9 +419,34 @@ mod tests {
         SearchField::new("Search items…")
     }
 
+    /// A solid body replaces the glass capsule, which otherwise
+    /// samples the window backdrop and takes its color from whatever
+    /// sits behind the field (a white card inside a sheet still came
+    /// out blue). Off by default, so the sidebar filter keeps its
+    /// glass.
     #[test]
-    fn typing_selects_and_edits() {
-        let mut field = field();
+    fn solid_fill_replaces_the_glass_body() {
+        let gray = Color::from_rgb8(0xed, 0xed, 0xf0);
+        let mut solid = field();
+        assert_eq!(solid.fill_color(), None);
+        solid.set_fill(Some(gray));
+        assert_eq!(solid.fill_color(), Some(gray));
+        // Geometry is untouched: the body follows the placed rect.
+        let mut fonts = FontSystem::new();
+        let (_, h) = solid.measure(&mut fonts);
+        solid.place(&mut fonts, 10.0, 20.0, 300.0, h);
+        let (x, y, w, hh) = solid.rect();
+        assert_eq!((x, y, w), (10.0, 20.0, 300.0));
+        assert_eq!(hh, h);
+        // Builder form and clearing back to glass.
+        let built = field().fill(gray);
+        assert_eq!(built.fill_color(), Some(gray));
+        let cleared = built.fill(None);
+        assert_eq!(cleared.fill_color(), None);
+    }
+
+    #[test]
+    fn typing_selects_and_edits() {        let mut field = field();
         let mut fonts = FontSystem::new();
         let (_, h) = field.measure(&mut fonts);
         field.place(&mut fonts, 0.0, 0.0, 400.0, h);

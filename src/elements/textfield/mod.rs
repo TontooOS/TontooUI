@@ -25,7 +25,7 @@ pub use large_editor::{
     LARGE_EDITOR_RADIUS, LARGE_EDITOR_WRAP_W,
 };
 pub use search::{
-    SearchField, SEARCH_FONT_SIZE, SEARCH_GAP, SEARCH_ICON_SIZE, SEARCH_PAD_X,
+    SearchField, SEARCH_FONT_SIZE, SEARCH_GAP, SEARCH_ICON_SIZE, SEARCH_PAD_X, SEARCH_RADIUS,
 };
 pub use glass::{GlassTextField, GLASS_FIELD_FONT_SIZE, GLASS_FIELD_PAD_X};
 pub use secure::SecureField;

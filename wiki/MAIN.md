@@ -92,6 +92,14 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-10-03: `SearchField` can paint a solid body instead of glass.
+  `fill(color)` / `set_fill` / `fill_color` plus `SEARCH_RADIUS` replace
+  the `Lens` capsule with a flat rounded field, like the macOS open panel
+  (`#EDEDF0` light). The lens body samples the window backdrop, so a field
+  on a white card inside a sheet still came out tinted by the app background
+  behind the card; a solid fill needs no blur pass. Default stays glass, so
+  the sidebar filter row is unchanged. See [Textfield.md](Textfield.md).
+
 - 2026-10-03: A `ContextMenu` no longer shows a stray button before the
   first right-click. The wrapped `Menu` / `NestedMenu` only entered anchor
   mode once `set_anchor` received a point, so until then it behaved like a
