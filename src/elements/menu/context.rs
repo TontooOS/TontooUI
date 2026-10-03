@@ -36,7 +36,15 @@ pub struct ContextMenu {
 }
 
 impl ContextMenu {
-    pub fn new(area: (f32, f32, f32, f32), kind: ContextKind) -> Self {
+    pub fn new(area: (f32, f32, f32, f32), mut kind: ContextKind) -> Self {
+        // Context menus never own a button: park both kinds in
+        // context mode from the start, otherwise the wrapped menu
+        // draws its (usually empty) dropdown button until the first
+        // right-click sets an anchor.
+        match &mut kind {
+            ContextKind::Basic(menu) => menu.set_anchored(true),
+            ContextKind::Nested(menu) => menu.set_anchored(true),
+        }
         Self {
             area,
             kind,
@@ -320,5 +328,46 @@ mod tests {
         let mut ctx = basic();
         let mut fonts = FontSystem::new();
         assert_eq!(ctx.measure(&mut fonts), (0.0, 0.0));
+    }
+
+    /// Regression: the wrapped menu used to wait for the first
+    /// right-click to learn it is a context menu, so it drew its
+    /// (usually empty) dropdown button on top of the app from launch
+    /// until the first open.
+    #[test]
+    fn no_button_before_the_first_right_click() {
+        use super::super::nested::MenuItem;
+
+        let mut ctx = basic();
+        pump_viewport(&mut ctx);
+        let mut fonts = FontSystem::new();
+        match &mut ctx.kind {
+            ContextKind::Basic(menu) => {
+                assert!(menu.is_anchored());
+                // No layout space and no button width at the placed
+                // rect: a live button would report its own width here.
+                assert_eq!(menu.measure(&mut fonts), (0.0, 0.0));
+                assert_eq!(menu.button_rect().2, 0.0);
+                // And it never opens from a plain press.
+                menu.mouse_down(100.0, 100.0);
+                menu.mouse_up(100.0, 100.0);
+                assert!(!menu.is_open());
+            }
+            ContextKind::Nested(_) => unreachable!(),
+        }
+        // Same for the nested kind.
+        let mut ctx = ContextMenu::nested(
+            (10.0, 10.0, 200.0, 150.0),
+            NestedMenu::new("Share", vec![MenuItem::action("Mail")]),
+        );
+        pump_viewport(&mut ctx);
+        match &mut ctx.kind {
+            ContextKind::Nested(menu) => {
+                assert!(menu.is_anchored());
+                assert_eq!(menu.measure(&mut fonts), (0.0, 0.0));
+                assert_eq!(menu.button_rect().2, 0.0);
+            }
+            ContextKind::Basic(_) => unreachable!(),
+        }
     }
 }

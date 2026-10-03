@@ -199,6 +199,11 @@ pub fn mouse_wheel(&mut self, dx: f64, dy: f64)
   right-click press or touch long-press inside the area. The menu
   hides its button, takes no layout space and clamps into the
   viewport like every glass panel.
+- The constructor puts the wrapped menu in context mode
+  (`set_anchored(true)`), so the button never appears, not even
+  between opens: before this the menu drew its (usually empty)
+  dropdown button on top of the app from launch until the first
+  right-click set an anchor.
 - Touch long-press opens on release after holding still; quick taps
   and moving away cancel it.
 - Overlay element: draw it after everything else so its panel
@@ -265,6 +270,17 @@ a point instead of its button (context mode): the button hides,
 takes no layout space and never hits, while the panel anchors at
 the point with the usual viewport clamp. `None` restores the
 button-anchored dropdown.
+
+```rust
+pub fn set_anchored(&mut self, anchored: bool)
+pub fn is_anchored(&self) -> bool
+```
+
+`set_anchored(true)` enters the same mode without a point, which is
+what a `ContextMenu` needs before the first open: with only
+`set_anchor` the mode started at the first anchor point, so the
+button was drawn until then. `set_anchor(Some(point))` implies
+`set_anchored(true)`; `set_anchored` leaves the point alone.
 
 ## Usage / Example
 

@@ -92,6 +92,15 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-10-03: A `ContextMenu` no longer shows a stray button before the
+  first right-click. The wrapped `Menu` / `NestedMenu` only entered anchor
+  mode once `set_anchor` received a point, so until then it behaved like a
+  normal dropdown and drew its (usually empty) button on top of the app:
+  Weather showed a small chevron pill in the sidebar from launch, gone
+  after the first right-click. `set_anchored(true)` / `is_anchored()` enter
+  anchor mode without a point and the `ContextMenu` constructor sets it.
+  See [Menu.md](Menu.md).
+
 - 2026-10-02: `BACKDROP_SCALE` is now `1`, so the compositor stream delivers
   full resolution. Affordable because the compositor only captures when the
   content behind the window actually changed: a panel opening over a still

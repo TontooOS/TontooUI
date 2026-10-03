@@ -116,6 +116,7 @@ pub struct NestedMenu {
     label: String,
     button: String,
     anchor: Option<(f32, f32)>,
+    anchored: bool,
     items: Vec<MenuItem>,
     open: bool,
     /// Open submenu chain: row index per level.
@@ -165,6 +166,7 @@ impl NestedMenu {
             label: String::new(),
             button: button.into(),
             anchor: None,
+            anchored: false,
             items,
             open: false,
             path: Vec::new(),
@@ -298,6 +300,21 @@ impl NestedMenu {
     /// button-anchored dropdown.
     pub fn set_anchor(&mut self, point: Option<(f32, f32)>) {
         self.anchor = point;
+        // A point means context mode; `None` restores the dropdown.
+        self.anchored = point.is_some();
+    }
+
+    /// Stay in context mode before any point is known: the button
+    /// hides, takes no layout space and never hits even while the menu
+    /// is still closed, so a `ContextMenu` never shows a stray
+    /// dropdown button between opens. `set_anchor` still moves the
+    /// root panel (and `set_anchor(None)` leaves this flag alone).
+    pub fn set_anchored(&mut self, anchored: bool) {
+        self.anchored = anchored;
+    }
+
+    pub fn is_anchored(&self) -> bool {
+        self.anchored
     }
 
     /// Window bounds the panels clamp into. Apps must call this
@@ -583,7 +600,7 @@ impl NestedMenu {
     }
 
     fn button_hit(&self, x: f32, y: f32) -> bool {
-        if self.anchor.is_some() {
+        if self.anchored {
             return false;
         }
         x >= self.btn_x
@@ -764,7 +781,7 @@ impl View for NestedMenu {
     fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
         // Anchored context menus float above content and take no
         // layout space.
-        if self.anchor.is_some() {
+        if self.anchored {
             return (0.0, 0.0);
         }
         let (label_w, label_h) = self.label_size(fonts);
@@ -784,11 +801,16 @@ impl View for NestedMenu {
         self.y = y;
         self.width = w;
         self.height = h;
-        if let Some((ax, ay)) = self.anchor {
-            self.btn_x = ax;
-            self.btn_y = ay;
-            self.btn_w = self.button_w(fonts);
-            self.layout_panels(fonts);
+        if self.anchored {
+            // Context mode: the root panel follows the last anchor
+            // point, set when the menu opens. Before the first open
+            // there is nothing to place and the button stays hidden.
+            if let Some((ax, ay)) = self.anchor {
+                self.btn_x = ax;
+                self.btn_y = ay;
+                self.btn_w = self.button_w(fonts);
+                self.layout_panels(fonts);
+            }
             return;
         }
         let (label_w, label_h) = self.label_size(fonts);
@@ -813,7 +835,7 @@ impl View for NestedMenu {
 
         // Button with fixed text (no hover state). Hidden in anchor
         // mode, where the panels float at the anchor point.
-        if self.anchor.is_none() {
+        if !self.anchored {
             if !self.label.is_empty() {
                 let layout = fonts.layout_text_weighted(
                     &self.label,
