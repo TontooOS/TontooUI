@@ -258,6 +258,14 @@ impl View for ScrollView {
         self.child.set_hover(x, y);
     }
 
+    /// Forward the wheel to the bar. Without this the trait default
+    /// swallows it: any parent holds its children as `Box<dyn View>`,
+    /// so a `ScrollView` nested in a container (or behind a custom
+    /// `View` wrapper) never scrolled.
+    fn mouse_wheel(&mut self, dx: f64, dy: f64) {
+        ScrollView::mouse_wheel(self, dx, dy);
+    }
+
     /// Take the remaining stack space instead of the full content
     /// height, so surrounding windows keep their size.
     fn flex(&self) -> f32 {
@@ -293,6 +301,49 @@ mod tests {
         w: f32,
         h: f32,
         hits: Rc<RefCell<u32>>,
+    }
+
+    /// Minimal pass-through wrapper, the shape every custom app `View`
+    /// has (Weather paints its condition gradient this way).
+    struct Wrap(Box<dyn View>);
+
+    impl View for Wrap {
+        fn measure(&mut self, fonts: &mut FontSystem) -> (f32, f32) {
+            self.0.measure(fonts)
+        }
+
+        fn place(&mut self, fonts: &mut FontSystem, x: f32, y: f32, w: f32, h: f32) {
+            self.0.place(fonts, x, y, w, h)
+        }
+
+        fn draw(
+            &mut self,
+            scene: &mut Scene,
+            fonts: &mut FontSystem,
+            images: &mut ImageLoader<'_>,
+        ) {
+            self.0.draw(scene, fonts, images)
+        }
+
+        fn mouse_down(&mut self, x: f64, y: f64) {
+            self.0.mouse_down(x, y)
+        }
+
+        fn mouse_up(&mut self, x: f64, y: f64) {
+            self.0.mouse_up(x, y)
+        }
+
+        fn set_hover(&mut self, x: f32, y: f32) {
+            self.0.set_hover(x, y)
+        }
+
+        fn mouse_wheel(&mut self, dx: f64, dy: f64) {
+            self.0.mouse_wheel(dx, dy)
+        }
+
+        fn as_any_mut(&mut self) -> &mut dyn Any {
+            self
+        }
     }
 
     impl View for HitBox {
@@ -349,6 +400,26 @@ mod tests {
         assert_eq!(view.offset(), 100.0);
         view.mouse_wheel(0.0, 1000.0);
         assert_eq!(view.offset(), 0.0);
+    }
+
+    /// Regression: the inherent `mouse_wheel` only helped direct
+    /// calls. Behind a `Box<dyn View>` (any parent container, or a
+    /// custom wrapper view like an app gradient) the trait default
+    /// swallowed the wheel, so the bar showed a thumb that never
+    /// moved.
+    #[test]
+    fn wheel_reaches_a_wrapped_scroll_view() {
+        let mut f = fonts();
+        let mut wrap = Wrap(Box::new(ScrollView::new(tall_stack(10))));
+        wrap.place(&mut f, 0.0, 0.0, 200.0, 100.0);
+        // Driven through the trait, exactly like an app or container.
+        View::mouse_wheel(&mut wrap, 0.0, -40.0);
+        let scroll = wrap
+            .0
+            .as_any_mut()
+            .downcast_mut::<ScrollView>()
+            .expect("scroll view");
+        assert_eq!(scroll.offset(), 40.0);
     }
 
     #[test]

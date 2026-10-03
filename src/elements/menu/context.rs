@@ -219,6 +219,12 @@ impl View for ContextMenu {
         self.mouse_up(x, y);
     }
 
+    /// Forward the wheel: without it a context menu nested as
+    /// `Box<dyn View>` never scrolls its panel.
+    fn mouse_wheel(&mut self, dx: f64, dy: f64) {
+        ContextMenu::mouse_wheel(self, dx, dy);
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }

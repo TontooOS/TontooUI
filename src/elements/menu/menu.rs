@@ -870,6 +870,12 @@ impl View for Menu {
         self.finish_up(x, y);
     }
 
+    /// Forward the wheel: without it a menu nested as `Box<dyn View>`
+    /// never scrolls its panel.
+    fn mouse_wheel(&mut self, dx: f64, dy: f64) {
+        Menu::mouse_wheel(self, dx, dy);
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }

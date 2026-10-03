@@ -1243,6 +1243,12 @@ impl View for BasicTable {
         1.0
     }
 
+
+    /// Forward the wheel: without it this element held as `Box<dyn View>`
+    /// inside a container would swallow the scroll.
+    fn mouse_wheel(&mut self, dx: f64, dy: f64) {
+        BasicTable::mouse_wheel(self, dx, dy);
+    }
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }

@@ -56,6 +56,11 @@ pub fn mouse_wheel(&mut self, dx: f64, dy: f64)
   never hits). Presses outside the viewport are dropped.
 - `mouse_wheel` scrolls in logical px (right/down positive, like the
   shell). The child re-places on the next draw, so no fonts are needed.
+  The inherent method **and** the `View` trait forward it to the bar,
+  so a `ScrollView` still scrolls when it is not held directly but
+  nested as a `Box<dyn View>` (inside a stack or behind a custom
+  wrapper view such as an app gradient). Without the trait forwarding
+  the bar would draw a thumb that never moved.
 - The `View` trait carries no `mouse_down` with press tracking for
   some children (e.g. `FormattedText` link arming is inherent-only):
   forward `mouse_down` to the concrete child as well when links must

@@ -1472,6 +1472,12 @@ impl View for Sidebar {
         self.set_hover(x, y);
     }
 
+    /// Forward the wheel to the active page. Without it a sidebar
+    /// nested as `Box<dyn View>` never scrolls its pages.
+    fn mouse_wheel(&mut self, dx: f64, dy: f64) {
+        Sidebar::mouse_wheel(self, dx, dy);
+    }
+
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }

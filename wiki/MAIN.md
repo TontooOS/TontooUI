@@ -92,6 +92,17 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-10-03: The wheel reaches every element again. `View::mouse_wheel`
+  has a do-nothing default and parents only reach their children through
+  the trait, but no scrollable element forwarded it in its `impl View`
+  block, so anything held as a `Box<dyn View>` swallowed the wheel: a
+  `ScrollView` behind a stack or a custom wrapper view (Weather paints
+  its condition gradient that way) drew its scrollbar thumb but never
+  scrolled. `ScrollView`, `Scrollbar`, `Sidebar`, `Menu`, `NestedMenu`,
+  `MenuButton`, `ContextMenu`, `Form`, `BasicTable` and `DatePicker` now
+  forward it; custom wrapper views must do the same, see
+  [Layout.md](Layout.md) and [ScrollView.md](ScrollView.md).
+
 - 2026-10-03: Sidebar row hit test plus destructive menu rows.
   `Sidebar::item_at(x, y)` returns the real item index under a point
   (column width, collapse state and search filter applied), the same

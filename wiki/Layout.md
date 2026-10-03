@@ -38,6 +38,17 @@ into it.
 Concrete views keep their inherent `draw` methods, so direct callers work
 unchanged; stacks use the trait through `Box<dyn View>`.
 
+> **Note:** every optional trait hook has a do-nothing default, and a parent
+> reaches its children **only** through the trait. A custom wrapper `View` (an
+> app gradient, a card frame) therefore has to forward `mouse_down`,
+> `mouse_up`, `set_hover`, `set_focused`, `text`, `key` **and `mouse_wheel`**
+> to its child. An element that only implements the inherent method stays
+> scrollable for direct calls and dead inside any container. Every scrollable
+> element in the library (`ScrollView`, `Scrollbar`, `Sidebar`, `Menu`,
+> `NestedMenu`, `MenuButton`, `ContextMenu`, `Form`, `BasicTable`,
+> `DatePicker`) forwards it in its `impl View` block; see
+> [ScrollView.md](ScrollView.md).
+
 ```rust
 pub enum Align {
     Leading,
