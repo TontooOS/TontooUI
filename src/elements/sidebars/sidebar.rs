@@ -570,6 +570,27 @@ impl Sidebar {
         self.selected
     }
 
+    /// Item index under a point in logical px, honoring the live
+    /// column width, the collapse state and the search filter (the
+    /// real item index, not the visible row). Returns `None` outside
+    /// the column, above the first row, past the last visible row or
+    /// while collapsed. Apps use it for context menus, since a
+    /// right-click arrives as `context_click` and never selects.
+    pub fn item_at(&self, x: f32, y: f32) -> Option<usize> {
+        if self.collapsed {
+            return None;
+        }
+        if x < self.x || x > self.x + self.bar_w() {
+            return None;
+        }
+        let top = self.y + SIDEBAR_ITEMS_TOP;
+        if y < top {
+            return None;
+        }
+        let row = ((y - top) / self.row_h).floor() as usize;
+        self.visible.get(row).copied()
+    }
+
     /// Select programmatically (fires `on_select` on change).
     /// Returns false for out-of-range indices.
     pub fn select(&mut self, index: usize) -> bool {
@@ -1036,14 +1057,8 @@ impl Sidebar {
             self.search.mouse_down(x, y);
         }
         // Item rows (sidebar visible only, filtered by search).
-        if !self.collapsed && x32 >= self.x && x32 <= self.x + self.bar_w() {
-            let top = self.y + SIDEBAR_ITEMS_TOP;
-            if y32 >= top {
-                let row = ((y32 - top) / self.row_h).floor() as usize;
-                if let Some(&index) = self.visible.get(row) {
-                    self.select(index);
-                }
-            }
+        if let Some(index) = self.item_at(x32, y32) {
+            self.select(index);
         }
         if let Some(page) = self.active_page_mut() {
             page.mouse_down(x, y);
@@ -1498,6 +1513,29 @@ mod tests {
         let mut bar = bar();
         bar.mouse_down(100.0, (SIDEBAR_ITEMS_TOP + SIDEBAR_ROW_H + 10.0) as f64);
         assert_eq!(bar.selected_index(), 1);
+    }
+
+    /// Context menus ask for the row under the pointer: a right-click
+    /// never reaches `mouse_down`, so the hit test has to be public.
+    #[test]
+    fn item_at_maps_points_to_real_items() {
+        let mut bar = bar();
+        let row_y = |row: f32| SIDEBAR_ITEMS_TOP + row * SIDEBAR_ROW_H + 4.0;
+        assert_eq!(bar.item_at(100.0, row_y(0.0)), Some(0));
+        assert_eq!(bar.item_at(100.0, row_y(1.0)), Some(1));
+        // Right edge of the column counts, past it does not.
+        assert_eq!(bar.item_at(SIDEBAR_W, row_y(1.0)), Some(1));
+        assert_eq!(bar.item_at(SIDEBAR_W + 1.0, row_y(1.0)), None);
+        // Search row and above are no items, past the last row neither.
+        assert_eq!(bar.item_at(100.0, SIDEBAR_SEARCH_TOP as f32), None);
+        assert_eq!(bar.item_at(100.0, row_y(2.0)), None);
+        // Filtered rows report the real item, not the visible row.
+        bar.set_search_text("sec");
+        assert_eq!(bar.item_at(100.0, row_y(0.0)), Some(1));
+        bar.set_search_text("");
+        // Collapsed: no column, no items.
+        bar.set_collapsed(true);
+        assert_eq!(bar.item_at(100.0, row_y(0.0)), None);
     }
 
     #[test]

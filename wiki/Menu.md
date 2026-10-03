@@ -23,6 +23,7 @@ change).
 | `MENU_PANEL_GAP` | 4 px button-to-panel gap |
 | `MENU_SHADOW_BLUR` | 24 px heavy edge shadow |
 | `MENU_ACCENT` | `#007AFF` default hover fill |
+| `MENU_DESTRUCTIVE_LIGHT` / `MENU_DESTRUCTIVE_DARK` | `#FF3B30` / `#FF453A` destructive row text (macOS system red) |
 
 ## Chevron
 
@@ -45,6 +46,9 @@ pub fn from_slice(button: impl Into<String>, options: &[&str]) -> Self
 pub fn label(self, label: impl Into<String>) -> Self
 pub fn chevron(self, chevron: MenuChevron) -> Self
 pub fn checked(self, row: Option<usize>) -> Self
+pub fn destructive(self, row: usize) -> Self
+pub fn set_destructive(&mut self, row: usize, destructive: bool)
+pub fn is_destructive(&self, row: usize) -> bool
 pub fn hover_fill(self, color: Color) -> Self
 pub fn disabled(self, disabled: bool) -> Self
 pub fn on_action(self, callback: impl FnMut(usize) + 'static) -> Self
@@ -82,6 +86,12 @@ pub fn mouse_up(&mut self, x: f64, y: f64)
 - `checked` draws the fixed checkmark on that row (picker use)
   and reserves the check column; `None` is plain action rows with
   text starting at the panel padding (no wasted left space).
+- `destructive(row)` marks one row as destructive: its label uses the
+  macOS system red (`MENU_DESTRUCTIVE_LIGHT`, `MENU_DESTRUCTIVE_DARK`
+  by mode, desaturated while the window is unfocused). Rows are plain
+  by default, out-of-range rows are ignored, and hover still wins
+  with white text on the hover fill. Use it for `Delete` in a context
+  menu; the action itself stays an ordinary `on_action` row.
 - Hovering a row tints it with the hover fill (system accent unless
   set manually with `hover_fill`) and turns row text and checkmark
   white.

@@ -47,6 +47,10 @@ pub const MENU_CHECK_H: f32 = 7.5;
 pub const MENU_SHADOW_BLUR: f32 = 24.0;
 /// Default hover fill (theme accent blue).
 pub const MENU_ACCENT: Color = Color::from_rgb8(0x00, 0x7a, 0xff);
+/// Destructive row text in light mode (macOS system red).
+pub const MENU_DESTRUCTIVE_LIGHT: Color = Color::from_rgb8(0xff, 0x3b, 0x30);
+/// Destructive row text in dark mode (macOS system red, dark variant).
+pub const MENU_DESTRUCTIVE_DARK: Color = Color::from_rgb8(0xff, 0x45, 0x3a);
 
 /// Button chevron style.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -77,6 +81,7 @@ pub struct Menu {
     anchor: Option<(f32, f32)>,
     chevron: MenuChevron,
     options: Vec<String>,
+    destructive: Vec<bool>,
     open: bool,
     checked: Option<usize>,
     last_action: Option<usize>,
@@ -120,6 +125,7 @@ impl Menu {
             button: button.into(),
             anchor: None,
             chevron: MenuChevron::Down,
+            destructive: vec![false; options.len()],
             options,
             open: false,
             checked: None,
@@ -180,6 +186,37 @@ impl Menu {
     pub fn checked(mut self, row: Option<usize>) -> Self {
         self.checked = row;
         self
+    }
+
+    /// Mark a row destructive (macOS red label, for `Delete` and
+    /// friends). Out-of-range rows are ignored. Hover still wins with
+    /// white text on the hover fill, like every other row.
+    pub fn destructive(mut self, row: usize) -> Self {
+        self.set_destructive(row, true);
+        self
+    }
+
+    /// Set the destructive flag of one row at runtime. Out-of-range
+    /// rows are ignored.
+    pub fn set_destructive(&mut self, row: usize, destructive: bool) {
+        if row < self.destructive.len() {
+            self.destructive[row] = destructive;
+        }
+    }
+
+    /// True while a row is marked destructive.
+    pub fn is_destructive(&self, row: usize) -> bool {
+        self.destructive.get(row).copied().unwrap_or(false)
+    }
+
+    /// Destructive row text color for the live mode (macOS system
+    /// red; the caller applies `eff`).
+    pub(crate) fn destructive_color(&self) -> Color {
+        if self.dark {
+            MENU_DESTRUCTIVE_DARK
+        } else {
+            MENU_DESTRUCTIVE_LIGHT
+        }
     }
 
     /// Manual hover fill: wins over the system accent until cleared.
@@ -795,6 +832,8 @@ impl View for Menu {
             }
             let color = if is_hovered {
                 Color::WHITE
+            } else if self.is_destructive(i) {
+                self.destructive_color()
             } else {
                 self.text_color
             };
@@ -1011,5 +1050,40 @@ mod tests {
         assert_eq!(menu().chevron, MenuChevron::Down);
         let both = menu().chevron(MenuChevron::Both);
         assert_eq!(both.chevron, MenuChevron::Both);
+    }
+
+    #[test]
+    fn destructive_row_is_red_and_opt_in() {
+        let mut m = menu();
+        // Plain by default, per row.
+        assert!(!m.is_destructive(0));
+        assert!(!m.is_destructive(2));
+        let mut m = m.destructive(1);
+        assert!(m.is_destructive(1));
+        assert!(!m.is_destructive(0));
+        assert!(!m.is_destructive(2));
+        // Out-of-range rows are ignored, no panic.
+        m.set_destructive(9, true);
+        assert!(!m.is_destructive(9));
+        // The label color follows the mode (macOS system red).
+        m.set_theme(MENU_ACCENT, true);
+        assert_eq!(m.destructive_color(), MENU_DESTRUCTIVE_DARK);
+        m.set_theme(MENU_ACCENT, false);
+        assert_eq!(m.destructive_color(), MENU_DESTRUCTIVE_LIGHT);
+        // Unfocused windows desaturate it at draw time like every
+        // other label.
+        m.set_focused(false);
+        assert_ne!(m.eff(m.destructive_color()), MENU_DESTRUCTIVE_LIGHT);
+        // The row still fires its action.
+        let (mut m, _) = placed();
+        m.set_destructive(1, true);
+        m.open();
+        let seen: Rc<Cell<Option<usize>>> = Rc::new(Cell::new(None));
+        let cell = seen.clone();
+        let mut m = m.on_action(move |row| cell.set(Some(row)));
+        let (x, y) = row_center(&m, 1);
+        m.mouse_down(x, y);
+        m.mouse_up(x, y);
+        assert_eq!(seen.get(), Some(1));
     }
 }

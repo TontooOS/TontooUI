@@ -92,6 +92,18 @@ for the `View` tree.
 
 ## Changelog
 
+- 2026-10-03: Sidebar row hit test plus destructive menu rows.
+  `Sidebar::item_at(x, y)` returns the real item index under a point
+  (column width, collapse state and search filter applied), the same
+  test `mouse_down` uses, so context menus can resolve the row a
+  right-click landed on: a right-click arrives as `App::context_click`
+  and never selects. `Menu::destructive(row)` (`set_destructive`,
+  `is_destructive`, `MENU_DESTRUCTIVE_LIGHT` / `_DARK`) paints one row
+  in the macOS system red for `Delete`-style actions. Added for the
+  Weather app, which removes a location through a sidebar context menu
+  and an `ActionAlert`. See [Sidebar.md](Sidebar.md) and
+  [Menu.md](Menu.md).
+
 - 2026-10-02: Two backdrop fixes plus an optional content title band.
   `readback_variance` no longer leaks a mapped buffer: the
   variance staging buffer is taken out of `VarTargets` for the

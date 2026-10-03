@@ -92,6 +92,7 @@ pub fn set_toolbar(&mut self, show: bool)
 pub fn has_toolbar(&self) -> bool
 pub fn selected_index(&self) -> usize
 pub fn select(&mut self, index: usize) -> bool
+pub fn item_at(&self, x: f32, y: f32) -> Option<usize>
 pub fn is_collapsed(&self) -> bool
 pub fn is_animating(&self) -> bool
 pub fn is_resizing(&self) -> bool
@@ -147,8 +148,14 @@ pub fn page_key(&mut self, key: Key) -> bool
   shared pending state and apply on the next mouse-up or draw, so
   unit tests never need a draw in between.
 - Item clicks select (firing `on_select` on change); programmatic
-  `select` returns false out of range. Slot callbacks only fire
-  their own press action (history stays the app's job, see the
+  `select` returns false out of range. `item_at(x, y)` is the same
+  hit test as a public query: it returns the **real** item index for
+  a point (honoring the live column width, the collapse state and the
+  search filter, so a filtered row reports its item, not its visible
+  row) and `None` outside the column, above the first row, past the
+  last visible row or while collapsed. `mouse_down` routes through it,
+  so clicks and context menus can never disagree. Slot callbacks only
+  fire their own press action (history stays the app's job, see the
   demo: slot 0 goes back, slot 1 jumps to Notifications).
 - The single toggle flips the column and fires `on_collapse`;
   `set_collapsed` stays silent and snaps at once. `toggle_sidebar`
