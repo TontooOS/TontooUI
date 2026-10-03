@@ -1190,17 +1190,10 @@ impl Sidebar {
                 self.paint_body(scene, fonts, images, bar_w);
             }
         }
-        // Traffic on top of everything (sidebar top when expanded,
-        // content top-left when collapsed).
-        self.render_traffic(scene, fonts);
-        // Without the content title band the page starts at the very
-        // top and would paint over the pill row, so the row moves
-        // behind it: the pills float on the page (full-bleed apps).
-        let overlay = !self.show_toolbar;
-        if !overlay {
-            self.render_toolbar(scene, fonts, images, p, cross);
-        }
-        // Active page below the toolbar.
+        // Active page first. Without the content title band it starts at
+        // the very top and fills the whole content area, so painting it
+        // last would bury the window decoration: the traffic lights and
+        // the pill row float on the page (full-bleed apps).
         let (px0, py0, pw, ph) = self.page_rect();
         if pw > 0.0 && ph > 0.0 {
             if let Some(page) = self.active_page_mut() {
@@ -1208,9 +1201,10 @@ impl Sidebar {
                 page.draw(scene, fonts, images);
             }
         }
-        if overlay {
-            self.render_toolbar(scene, fonts, images, p, cross);
-        }
+        // Traffic on top of everything (sidebar top when expanded,
+        // content top-left when collapsed).
+        self.render_traffic(scene, fonts);
+        self.render_toolbar(scene, fonts, images, p, cross);
     }
 
     /// Sidebar body paint: background, content divider and items.
@@ -1496,6 +1490,46 @@ mod tests {
         .page(crate::elements::BasicText::new("Security page"));
         bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
         bar
+    }
+
+    /// Regression: the traffic lights and the pill row are window
+    /// decoration and must be painted after the page. With the title
+    /// band hidden the page starts at the top, and a collapsed column
+    /// hands it the full content area, so painting it last buried the
+    /// lights completely. Rasterizing needs a GPU, so this pins the
+    /// geometry that makes the paint order mandatory: the page rect
+    /// really does swallow the traffic row.
+    #[test]
+    fn full_bleed_page_covers_the_traffic_row() {
+        let mut bar = Sidebar::new(vec![SidebarItem::new("Solo", "gear")])
+            .page(crate::elements::BasicText::new("page"))
+            .left_button(0, "plus", || {});
+        bar.set_toolbar(false);
+        bar.place(&mut FontSystem::new(), 0.0, 0.0, 900.0, 600.0);
+
+        // Expanded the column keeps the traffic cluster to itself.
+        bar.set_collapsed(false);
+        let (px, py, pw, ph) = bar.page_rect();
+        let (tx, ty) = bar.traffic_center(0);
+        assert!(
+            !(tx >= px && tx <= px + pw && ty >= py && ty <= py + ph),
+            "expanded page already covers the lights"
+        );
+
+        // Collapsed the page takes the whole window, lights included.
+        bar.set_collapsed(true);
+        let (px, py, pw, ph) = bar.page_rect();
+        assert_eq!((px, py, pw, ph), (0.0, 0.0, 900.0, 600.0));
+        let (tx, ty) = bar.traffic_center(0);
+        assert!(
+            tx >= px && tx <= px + pw && ty >= py && ty <= py + ph,
+            "collapsed page no longer covers the lights, revisit the paint order"
+        );
+        // The lights themselves never move: they stay on the window
+        // left edge in both states, which is what makes one paint order
+        // correct for both.
+        bar.set_collapsed(false);
+        assert_eq!(bar.traffic_center(0), (tx, ty));
     }
 
     #[test]

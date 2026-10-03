@@ -127,15 +127,15 @@ pub fn page_key(&mut self, key: Key) -> bool
   no title is drawn and the page starts at the top of the content
   area. Use it for apps that paint their own header into the page
   (Weather draws the city name into the detail gradient). Only the
-  title band goes, never the pill placement: with no sidebar width
-  left, a collapsed column still anchors the pill group at the far
-  right of the window (`x + width - SIDEBAR_PAD`), vertically on the
-  traffic row (`SIDEBAR_BAR_TOP`) instead of the title band center.
-  Because the page then fills the whole content area, the pill row
-  is painted **after** the page and floats on it (glass pills over
-  the app background); the traffic lights stay far left on the same
-  line, matching the collapsed layout of a sidebar with the title
-  band.
+  title band goes, never the decoration: with no sidebar width left, a
+  collapsed column still anchors the pill group at the far right of
+  the window (`x + width - SIDEBAR_PAD`), vertically on the traffic
+  row (`SIDEBAR_BAR_TOP`) instead of the title band center. Because the
+  page then fills the whole content area, `render` paints it **first**
+  and the traffic lights plus the pill row after it, so both float on
+  the app background (glass pills over the gradient) instead of being
+  buried by it; the lights stay far left on the same line, matching the
+  collapsed layout of a sidebar with the title band.
 - The toolbar holds two `BasicToolbar` pills (see
   [Toolbar.md](Toolbar.md)), both fixed at the top: the left pill
   holds two optional slots (slot 0 first, slot 1 second; each set
@@ -203,7 +203,10 @@ pub fn page_key(&mut self, key: Key) -> bool
   `set_focused` dims pills, search and every page for unfocused
   windows.
 - `press` reports traffic hits for the shell `WindowCommand`
-  mapping (never forward those presses to `mouse_down`).
+  mapping (never forward those presses to `mouse_down`). The lights
+  are painted after the page (see `toolbar(false)` above), so they
+  stay visible in both sidebar states: they never move, the collapsed
+  state only hands the rest of the window to the page.
   `drag_rect` cuts out the traffic cluster and the pill group:
   expanded it spans the sidebar traffic band up to the pills
   (pill presses must reach the app, never start a window-drag),

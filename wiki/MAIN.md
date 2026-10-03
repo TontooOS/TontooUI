@@ -98,6 +98,15 @@ for the `View` tree.
   desktop pays for exactly one readback, and divisors above one only help
   while something behind the window animates. See
   [BackdropStream.md](BackdropStream.md).
+- 2026-10-03: The traffic lights survive a collapsed column with a hidden
+  title band. `render` painted the traffic lights before the page, and with
+  `toolbar(false)` a collapsed column hands the page the whole content area
+  (`0, 0, width, height`), so the lights were buried by the app background
+  and disappeared. The page paints first now and the decoration (lights plus
+  pill row) after it, which also made the old `overlay` special case in
+  `render` unnecessary. The lights keep their window-left position in both
+  states. See [Sidebar.md](Sidebar.md).
+
 - 2026-10-03: The wheel reaches every element again. `View::mouse_wheel`
   has a do-nothing default and parents only reach their children through
   the trait, but no scrollable element forwarded it in its `impl View`
